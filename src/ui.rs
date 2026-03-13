@@ -78,7 +78,14 @@ impl Ui {
     }
 
     fn draw_tree(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
-        let rows = build_rows(&state.tree, state.selection, theme, state.size_mode);
+        let rows = build_rows(
+            &state.tree,
+            state.selection,
+            theme,
+            state.size_mode,
+            &state.filter_query,
+            state.filter_active,
+        );
         let table = Table::new(rows)
             .block(Block::default().borders(Borders::ALL).title("filesystem"))
             .widths(&[
@@ -115,7 +122,7 @@ impl Ui {
             ]),
             Line::from(Span::raw(selected_info_line(state))),
             Line::from(Span::raw(
-                "hjkl: move │ gg/G: jump │ enter/tab: toggle │ d: delete │ o: open │ r: rescan │ b: size mode │ E/I: export/import │ q: quit",
+                "hjkl: move │ gg/G: jump │ enter/tab: toggle │ d: delete │ o: open │ /: filter │ c: clear filter │ r: rescan │ b: size mode │ E/I: export/import │ q: quit",
             )),
         ])
         .block(Block::default().borders(Borders::ALL))
@@ -139,9 +146,15 @@ fn build_rows(
     selection: Option<usize>,
     theme: Theme,
     size_mode: SizeDisplayMode,
+    filter_query: &str,
+    filter_active: bool,
 ) -> Vec<Row<'static>> {
     let mut rows = Vec::new();
     traverse(tree, tree.root(), 0, &mut rows);
+    if filter_active && !filter_query.is_empty() {
+        let filter = filter_query.to_lowercase();
+        rows.retain(|row| row.name.to_lowercase().contains(&filter));
+    }
     let max_size = rows
         .iter()
         .map(|row| chosen_size(row, size_mode))

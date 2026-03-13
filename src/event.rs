@@ -113,6 +113,30 @@ fn handle_input_action(action: InputAction, state: &mut AppState) {
         InputAction::ExportScan => export_scan(state),
         InputAction::ImportScan => import_scan(state),
         InputAction::Rescan => rescan_selection(state),
+        InputAction::StartFilter => {
+            state.filter_active = true;
+            state.update_status("filter: type name substring and press Enter");
+        }
+        InputAction::FilterChar(ch) => {
+            state.filter_query.push(ch);
+            state.filter_active = true;
+        }
+        InputAction::FilterBackspace => {
+            state.filter_query.pop();
+        }
+        InputAction::ApplyFilter => {
+            if state.filter_query.is_empty() {
+                state.filter_active = false;
+                state.update_status("filter cleared");
+            } else {
+                state.filter_active = true;
+                state.update_status(format!("filter active: {}", state.filter_query));
+            }
+        }
+        InputAction::ClearFilter => {
+            state.clear_filter();
+            state.update_status("filter cleared");
+        }
         InputAction::Collapse => collapse_selection(state),
         _ => {}
     }

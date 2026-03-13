@@ -31,6 +31,11 @@ pub enum InputAction {
     ExportScan,
     ImportScan,
     Rescan,
+    StartFilter,
+    FilterChar(char),
+    FilterBackspace,
+    ApplyFilter,
+    ClearFilter,
     Quit,
     None,
 }
@@ -39,6 +44,7 @@ pub enum InputAction {
 #[derive(Debug, Default)]
 pub struct InputState {
     pending_gg: bool,
+    filter_mode: bool,
 }
 
 impl InputState {
@@ -49,6 +55,18 @@ impl InputState {
     pub fn process_key(&mut self, key_event: KeyEvent) -> InputAction {
         if key_event.kind != KeyEventKind::Press && key_event.kind != KeyEventKind::Repeat {
             return InputAction::None;
+        }
+
+        if self.filter_mode {
+            return match key_event.code {
+                KeyCode::Esc | KeyCode::Enter => {
+                    self.filter_mode = false;
+                    InputAction::ApplyFilter
+                }
+                KeyCode::Backspace => InputAction::FilterBackspace,
+                KeyCode::Char(c) => InputAction::FilterChar(c),
+                _ => InputAction::None,
+            };
         }
 
         let action = match key_event.code {
@@ -62,6 +80,11 @@ impl InputState {
             KeyCode::Char('E') => InputAction::ExportScan,
             KeyCode::Char('I') => InputAction::ImportScan,
             KeyCode::Char('r') => InputAction::Rescan,
+            KeyCode::Char('/') => {
+                self.filter_mode = true;
+                InputAction::StartFilter
+            }
+            KeyCode::Char('c') => InputAction::ClearFilter,
             KeyCode::Char('q') if key_event.modifiers.is_empty() => InputAction::Quit,
             KeyCode::Enter | KeyCode::Tab => InputAction::Select,
             KeyCode::Char('g') => {
@@ -176,9 +199,42 @@ mod tests {
             InputAction::Rescan
         );
         assert_eq!(
+            state.process_key(event(KeyCode::Char('c'))),
+            InputAction::ClearFilter
+        );
+        assert_eq!(
             state.process_key(event(KeyCode::Enter)),
             InputAction::Select
         );
         assert_eq!(state.process_key(event(KeyCode::Tab)), InputAction::Select);
+        assert_eq!(
+            state.process_key(event(KeyCode::Char('/'))),
+            InputAction::StartFilter
+        );
+        assert_eq!(
+            state.process_key(event(KeyCode::Enter)),
+            InputAction::ApplyFilter
+        );
+    }
+
+    #[test]
+    fn filter_mode_collects_characters() {
+        let mut state = InputState::new();
+        assert_eq!(
+            state.process_key(event(KeyCode::Char('/'))),
+            InputAction::StartFilter
+        );
+        assert_eq!(
+            state.process_key(event(KeyCode::Char('a'))),
+            InputAction::FilterChar('a')
+        );
+        assert_eq!(
+            state.process_key(event(KeyCode::Backspace)),
+            InputAction::FilterBackspace
+        );
+        assert_eq!(
+            state.process_key(event(KeyCode::Enter)),
+            InputAction::ApplyFilter
+        );
     }
 }

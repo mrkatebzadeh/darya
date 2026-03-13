@@ -47,6 +47,8 @@ pub struct AppState {
     pub spinner_phase: usize,
     pub pending_delete: Option<NodeId>,
     pub size_mode: SizeDisplayMode,
+    pub filter_query: String,
+    pub filter_active: bool,
 }
 
 impl AppState {
@@ -61,6 +63,8 @@ impl AppState {
             spinner_phase: 0,
             pending_delete: None,
             size_mode: SizeDisplayMode::Apparent,
+            filter_query: String::new(),
+            filter_active: false,
         }
     }
 
@@ -112,6 +116,11 @@ impl AppState {
             SizeDisplayMode::Apparent => SizeDisplayMode::Disk,
             SizeDisplayMode::Disk => SizeDisplayMode::Apparent,
         };
+    }
+
+    pub fn clear_filter(&mut self) {
+        self.filter_query.clear();
+        self.filter_active = false;
     }
 }
 
