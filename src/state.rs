@@ -39,6 +39,7 @@ pub struct AppState {
     pub scan_state: ScanState,
     pub status_message: Option<String>,
     pub spinner_phase: usize,
+    pub pending_delete: Option<NodeId>,
 }
 
 impl AppState {
@@ -51,6 +52,7 @@ impl AppState {
             scan_state: ScanState::Idle,
             status_message: None,
             spinner_phase: 0,
+            pending_delete: None,
         }
     }
 
