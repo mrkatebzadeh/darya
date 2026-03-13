@@ -26,6 +26,7 @@ pub enum InputAction {
     JumpBottom,
     Select,
     Delete,
+    Open,
     Quit,
     None,
 }
@@ -52,6 +53,7 @@ impl InputState {
             KeyCode::Char('h') | KeyCode::Left => InputAction::Collapse,
             KeyCode::Char('l') | KeyCode::Right => InputAction::Expand,
             KeyCode::Char('d') => InputAction::Delete,
+            KeyCode::Char('o') => InputAction::Open,
             KeyCode::Char('q') if key_event.modifiers.is_empty() => InputAction::Quit,
             KeyCode::Enter | KeyCode::Tab => InputAction::Select,
             KeyCode::Char('g') => {
@@ -144,6 +146,10 @@ mod tests {
         assert_eq!(
             state.process_key(event(KeyCode::Char('d'))),
             InputAction::Delete
+        );
+        assert_eq!(
+            state.process_key(event(KeyCode::Char('o'))),
+            InputAction::Open
         );
         assert_eq!(
             state.process_key(event(KeyCode::Enter)),

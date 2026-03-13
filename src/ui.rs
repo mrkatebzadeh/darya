@@ -113,7 +113,7 @@ impl Ui {
                 Span::styled(progress_label, Style::default().fg(theme.selection)),
             ]),
             Line::from(Span::raw(
-                "hjkl: move │ gg/G: jump │ q: quit │ enter: expand",
+                "hjkl: move │ gg/G: jump │ enter/tab: toggle │ d: delete │ o: open │ q: quit",
             )),
         ])
         .block(Block::default().borders(Borders::ALL))
