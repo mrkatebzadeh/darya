@@ -26,6 +26,7 @@ use crate::{
 use anyhow::Result;
 use crossterm::event::{self, Event};
 use ratatui::{backend::CrosstermBackend, terminal::Terminal};
+use std::fs;
 use std::{
     io::Stdout,
     time::{Duration, Instant},
@@ -103,6 +104,7 @@ fn handle_input_action(action: InputAction, state: &mut AppState) {
         InputAction::JumpBottom => select_last(state),
         InputAction::Expand => expand_selection(state),
         InputAction::Select => toggle_selection(state),
+        InputAction::Delete => delete_selection(state),
         InputAction::Collapse => collapse_selection(state),
         _ => {}
     }
@@ -189,6 +191,50 @@ fn toggle_selection(state: &mut AppState) {
     }
 }
 
+fn delete_selection(state: &mut AppState) {
+    let Some(selected_id) = state.selection else {
+        return;
+    };
+
+    if state.pending_delete != Some(selected_id) {
+        state.pending_delete = Some(selected_id);
+        if let Some(node) = state.tree.node(selected_id) {
+            state.update_status(format!("press d again to delete {}", node.path.display()));
+        }
+        return;
+    }
+
+    let Some(target) = state.tree.node(selected_id).map(|n| n.path.clone()) else {
+        state.pending_delete = None;
+        return;
+    };
+
+    let result = if target.is_dir() {
+        fs::remove_dir_all(&target)
+    } else {
+        fs::remove_file(&target)
+    };
+
+    match result {
+        Ok(()) => {
+            if let Some(node) = state.tree.node_mut(selected_id) {
+                if !node.name.starts_with("✖ ") {
+                    node.name = format!("✖ {}", node.name);
+                }
+                node.size = 0;
+                node.children.clear();
+                node.expanded = false;
+            }
+            state.update_status(format!("deleted {}", target.display()));
+        }
+        Err(err) => {
+            state.mark_scan_error(format!("delete failed for {}: {err}", target.display()));
+            state.update_status(format!("delete failed: {}", target.display()));
+        }
+    }
+    state.pending_delete = None;
+}
+
 fn handle_scan_event(state: &mut AppState, event: ScanEvent) {
     match event {
         ScanEvent::Node(node) => {
@@ -267,5 +313,13 @@ mod tests {
 
         handle_input_action(InputAction::Select, &mut state);
         assert!(!state.tree.node(dir_id).unwrap().expanded);
+    }
+
+    #[test]
+    fn delete_action_first_press_requests_confirmation() {
+        let mut state = sample_state();
+        state.selection = Some(1);
+        handle_input_action(InputAction::Delete, &mut state);
+        assert_eq!(state.pending_delete, Some(1));
     }
 }
