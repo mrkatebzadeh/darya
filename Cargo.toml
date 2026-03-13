@@ -2,5 +2,22 @@
 name = "dar"
 version = "0.1.0"
 edition = "2024"
+description = "A fast, keyboard-driven disk usage explorer built on ratatui."
+license = "MIT OR Apache-2.0"
 
 [dependencies]
+anyhow = "1.0"
+crossterm = "0.29"
+directories = "5.0"
+ratatui = { version = "0.24", default-features = false, features = ["crossterm"] }
+rayon = "1.8"
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
+toml = "0.7"
+walkdir = "2.3"
+
+[profile.release]
+opt-level = 3
+codegen-units = 1
+lto = true
