@@ -36,6 +36,8 @@ const HELP_TEXT: &str = concat!(
     "    -f FILE  Import snapshot from FILE (use '-' for stdin, JSON only)\n",
     "    -o FILE  Export scan tree to FILE in JSON format\n",
     "    -O FILE  Export scan tree to FILE in binary format\n",
+    "    -e, --extended  Enable extended metadata mode for owner/permissions/mtime\n",
+    "    --no-extended  Disable extended metadata mode\n",
     "    --exclude PATTERN  Exclude files/directories by glob pattern (repeatable)\n"
 );
 
@@ -71,6 +73,7 @@ impl CliCommand {
         let mut import_snapshot = None;
         let mut export_json = None;
         let mut export_binary = None;
+        let mut extended = false;
 
         while let Some(arg) = args.next() {
             match arg.to_str() {
@@ -90,6 +93,12 @@ impl CliCommand {
                     let value = take_option_value(&mut args, "-O")?;
                     export_binary = Some(parse_endpoint(&value));
                 }
+                Some("-e") | Some("--extended") => {
+                    extended = true;
+                }
+                Some("--no-extended") => {
+                    extended = false;
+                }
                 Some(value) if value.starts_with('-') => {
                     return Err(CliParseError::UnknownOption(value.to_string()));
                 }
@@ -107,6 +116,7 @@ impl CliCommand {
             CliArgs {
                 root,
                 exclude_patterns,
+                extended,
                 import_snapshot,
                 export_json,
                 export_binary,
@@ -114,6 +124,7 @@ impl CliCommand {
         } else {
             let mut cli = CliArgs::from_current_dir()?;
             cli.exclude_patterns = exclude_patterns;
+            cli.extended = extended;
             cli.import_snapshot = import_snapshot;
             cli.export_json = export_json;
             cli.export_binary = export_binary;
@@ -137,6 +148,7 @@ impl CliCommand {
 pub struct CliArgs {
     pub root: PathBuf,
     pub exclude_patterns: Vec<String>,
+    pub extended: bool,
     pub import_snapshot: Option<SnapshotEndpoint>,
     pub export_json: Option<SnapshotEndpoint>,
     pub export_binary: Option<SnapshotEndpoint>,
@@ -148,6 +160,7 @@ impl CliArgs {
         Ok(Self {
             root,
             exclude_patterns: Vec::new(),
+            extended: false,
             import_snapshot: None,
             export_json: None,
             export_binary: None,
@@ -233,6 +246,26 @@ mod tests {
         if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
             assert!(matches!(cli.export_json, Some(SnapshotEndpoint::File(_))));
             assert!(matches!(cli.export_binary, Some(SnapshotEndpoint::File(_))));
+        } else {
+            panic!("expected run command");
+        }
+    }
+
+    #[test]
+    fn parse_extended_flag_sets_mode() {
+        let args = vec![OsString::from("-e"), OsString::from("/tmp")];
+        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
+            assert!(cli.extended);
+        } else {
+            panic!("expected run command");
+        }
+    }
+
+    #[test]
+    fn parse_no_extended_flag_unsets_mode() {
+        let args = vec![OsString::from("--no-extended"), OsString::from("/tmp")];
+        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
+            assert!(!cli.extended);
         } else {
             panic!("expected run command");
         }

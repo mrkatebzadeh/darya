@@ -117,6 +117,15 @@ impl FileTree {
         self.add_child(parent_id, node)
     }
 
+    pub fn set_node_metadata(&mut self, node_id: NodeId, metadata: NodeMetadata) {
+        if let Some(node) = self.nodes.get_mut(node_id) {
+            node.modified = metadata.modified;
+            node.permissions = metadata.permissions;
+            node.uid = metadata.uid;
+            node.gid = metadata.gid;
+        }
+    }
+
     pub fn add_size(&mut self, node_id: NodeId, size: u64) {
         let mut current = Some(node_id);
         while let Some(id) = current {
@@ -190,7 +199,18 @@ pub struct TreeNode {
     pub size: u64,
     pub disk_size: u64,
     pub modified: Option<SystemTime>,
+    pub permissions: Option<u32>,
+    pub uid: Option<u32>,
+    pub gid: Option<u32>,
     pub expanded: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct NodeMetadata {
+    pub modified: Option<SystemTime>,
+    pub permissions: Option<u32>,
+    pub uid: Option<u32>,
+    pub gid: Option<u32>,
 }
 
 impl TreeNode {
@@ -206,6 +226,9 @@ impl TreeNode {
             size: 0,
             disk_size: 0,
             modified: None,
+            permissions: None,
+            uid: None,
+            gid: None,
             expanded: file_type == NodeType::Directory,
         }
     }

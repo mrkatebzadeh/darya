@@ -22,7 +22,7 @@ use crate::{
     snapshot::{self, SnapshotEndpoint, SnapshotFormat},
     state::AppState,
     theme::Theme,
-    tree::NodeType,
+    tree::{NodeMetadata, NodeType},
     ui::Ui,
 };
 use anyhow::Result;
@@ -435,6 +435,17 @@ pub(crate) fn process_scan_event(state: &mut AppState, event: ScanEvent) {
             if node.kind == NodeType::File {
                 state.tree.add_size(node_id, node.size);
                 state.tree.add_disk_size(node_id, node.disk_size);
+            }
+            if state.extended_mode {
+                state.tree.set_node_metadata(
+                    node_id,
+                    NodeMetadata {
+                        modified: node.modified,
+                        permissions: node.permissions,
+                        uid: node.uid,
+                        gid: node.gid,
+                    },
+                );
             }
             if let Some(parent) = state.tree.node(node_id).and_then(|node| node.parent) {
                 state.tree.sort_children(parent, state.sort_mode);

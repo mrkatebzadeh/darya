@@ -53,6 +53,7 @@ pub struct AppState {
     pub show_help: bool,
     pub treemap_nodes: Vec<TreemapNode>,
     pub allow_modifications: bool,
+    pub extended_mode: bool,
 }
 
 impl AppState {
@@ -72,7 +73,12 @@ impl AppState {
             show_help: false,
             treemap_nodes: Vec::new(),
             allow_modifications: true,
+            extended_mode: false,
         }
+    }
+
+    pub fn set_extended_mode(&mut self, enabled: bool) {
+        self.extended_mode = enabled;
     }
 
     pub fn select_node(&mut self, node: NodeId) {
@@ -179,6 +185,7 @@ mod tests {
         assert_eq!(state.sort_mode, SortMode::SizeDesc);
         assert!(state.treemap_nodes.is_empty());
         assert!(state.allow_modifications);
+        assert!(!state.extended_mode);
     }
 
     #[test]

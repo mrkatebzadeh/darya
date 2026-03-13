@@ -44,6 +44,9 @@ pub struct ScanNode {
     pub size: u64,
     pub disk_size: u64,
     pub modified: Option<SystemTime>,
+    pub permissions: Option<u32>,
+    pub uid: Option<u32>,
+    pub gid: Option<u32>,
 }
 
 /// Progress metrics emitted regularly while scanning.
@@ -154,12 +157,27 @@ fn run_scan(
                             disk_size = 0;
                         }
 
+                        #[cfg(unix)]
+                        let (permissions, uid, gid) = {
+                            use std::os::unix::fs::{MetadataExt, PermissionsExt};
+                            (
+                                Some(metadata.permissions().mode()),
+                                Some(metadata.uid()),
+                                Some(metadata.gid()),
+                            )
+                        };
+                        #[cfg(not(unix))]
+                        let (permissions, uid, gid) = (None, None, None);
+
                         let node = ScanNode {
                             path: entry.path().to_path_buf(),
                             kind: classify(&entry),
                             size,
                             disk_size,
                             modified: metadata.modified().ok(),
+                            permissions,
+                            uid,
+                            gid,
                         };
                         let _ = tx.send(ScanEvent::Node(node));
                     }

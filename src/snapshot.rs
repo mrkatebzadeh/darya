@@ -13,13 +13,14 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::tree::{FileTree, NodeType};
+use crate::tree::{FileTree, NodeType, TreeNode};
 use bincode::config::standard;
 use bincode::serde::{decode_from_std_read, encode_into_std_write};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
+use std::time::{Duration, UNIX_EPOCH};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct SnapshotEntry {
@@ -28,6 +29,10 @@ struct SnapshotEntry {
     size: u64,
     disk_size: u64,
     expanded: bool,
+    permissions: Option<u32>,
+    uid: Option<u32>,
+    gid: Option<u32>,
+    modified_secs: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -85,6 +90,23 @@ fn read_entries<R: Read>(reader: R, format: SnapshotFormat) -> anyhow::Result<Ve
     Ok(entries)
 }
 
+fn entry_from_node(node: &TreeNode) -> SnapshotEntry {
+    SnapshotEntry {
+        path: node.path.clone(),
+        kind: node.file_type,
+        size: node.size,
+        disk_size: node.disk_size,
+        expanded: node.expanded,
+        permissions: node.permissions,
+        uid: node.uid,
+        gid: node.gid,
+        modified_secs: node
+            .modified
+            .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+            .map(|d| d.as_secs()),
+    }
+}
+
 fn build_tree(entries: Vec<SnapshotEntry>, default_root: &Path) -> FileTree {
     let mut entries = entries;
     entries.sort_by_key(|entry| entry.path.components().count());
@@ -99,23 +121,19 @@ fn build_tree(entries: Vec<SnapshotEntry>, default_root: &Path) -> FileTree {
             node.size = entry.size;
             node.disk_size = entry.disk_size;
             node.expanded = entry.expanded;
+            node.permissions = entry.permissions;
+            node.uid = entry.uid;
+            node.gid = entry.gid;
+            node.modified = entry
+                .modified_secs
+                .and_then(|secs| UNIX_EPOCH.checked_add(Duration::from_secs(secs)));
         }
     }
     tree
 }
 
 pub fn export_tree(tree: &FileTree, path: &Path) -> anyhow::Result<()> {
-    let entries: Vec<SnapshotEntry> = tree
-        .nodes()
-        .iter()
-        .map(|node| SnapshotEntry {
-            path: node.path.clone(),
-            kind: node.file_type,
-            size: node.size,
-            disk_size: node.disk_size,
-            expanded: node.expanded,
-        })
-        .collect();
+    let entries: Vec<SnapshotEntry> = tree.nodes().iter().map(entry_from_node).collect();
     let writer = fs::File::create(path)?;
     write_entries(writer, &entries, SnapshotFormat::Json)
 }
@@ -125,17 +143,7 @@ pub fn export_to_destination(
     destination: SnapshotEndpoint,
     format: SnapshotFormat,
 ) -> anyhow::Result<()> {
-    let entries: Vec<SnapshotEntry> = tree
-        .nodes()
-        .iter()
-        .map(|node| SnapshotEntry {
-            path: node.path.clone(),
-            kind: node.file_type,
-            size: node.size,
-            disk_size: node.disk_size,
-            expanded: node.expanded,
-        })
-        .collect();
+    let entries: Vec<SnapshotEntry> = tree.nodes().iter().map(entry_from_node).collect();
     let writer = destination.to_writer()?;
     write_entries(writer, &entries, format)
 }

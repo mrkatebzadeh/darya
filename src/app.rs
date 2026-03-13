@@ -50,7 +50,14 @@ pub fn run(cli_args: CliArgs, config_load: ConfigLoad) -> Result<()> {
     runtime.block_on(async move {
         let theme = Theme::default();
         if let Some(import_endpoint) = cli_args.import_snapshot.clone() {
-            run_import_mode(root.clone(), config.sorting.mode, import_endpoint, theme).await?;
+            run_import_mode(
+                root.clone(),
+                config.sorting.mode,
+                import_endpoint,
+                theme,
+                cli_args.extended,
+            )
+            .await?;
         } else if cli_args.export_json.is_some() || cli_args.export_binary.is_some() {
             run_export_mode(
                 root.clone(),
@@ -58,10 +65,18 @@ pub fn run(cli_args: CliArgs, config_load: ConfigLoad) -> Result<()> {
                 &config,
                 cli_args.export_json.clone(),
                 cli_args.export_binary.clone(),
+                cli_args.extended,
             )
             .await?;
         } else {
-            run_interactive_mode(root.clone(), exclude_patterns, &config, theme).await?;
+            run_interactive_mode(
+                root.clone(),
+                exclude_patterns,
+                &config,
+                theme,
+                cli_args.extended,
+            )
+            .await?;
         }
         Ok::<(), anyhow::Error>(())
     })?;
@@ -73,6 +88,7 @@ async fn run_interactive_mode(
     exclude_patterns: Vec<String>,
     config: &Config,
     theme: Theme,
+    extended: bool,
 ) -> Result<()> {
     let (scanner_handle, scanner_rx) = fs_scan::start_scan(
         root.clone(),
@@ -81,6 +97,7 @@ async fn run_interactive_mode(
         config.scan.count_hard_links_once,
     );
     let mut state = AppState::new(root.clone(), config.sorting.mode);
+    state.set_extended_mode(extended);
     state.mark_scan_progress(ScanProgress {
         scanned: 0,
         errors: 0,
@@ -94,8 +111,10 @@ async fn run_import_mode(
     sort_mode: crate::config::SortMode,
     endpoint: SnapshotEndpoint,
     theme: Theme,
+    extended: bool,
 ) -> Result<()> {
     let mut state = AppState::new(root.clone(), sort_mode);
+    state.set_extended_mode(extended);
     let default_root = state
         .tree
         .node(state.tree.root())
@@ -114,6 +133,7 @@ async fn run_export_mode(
     config: &Config,
     export_json: Option<SnapshotEndpoint>,
     export_binary: Option<SnapshotEndpoint>,
+    extended: bool,
 ) -> Result<()> {
     let (scanner_handle, mut scanner_rx) = fs_scan::start_scan(
         root.clone(),
@@ -122,6 +142,7 @@ async fn run_export_mode(
         config.scan.count_hard_links_once,
     );
     let mut state = AppState::new(root, config.sorting.mode);
+    state.set_extended_mode(extended);
     state.mark_scan_progress(ScanProgress {
         scanned: 0,
         errors: 0,

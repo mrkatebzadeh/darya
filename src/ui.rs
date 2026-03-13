@@ -390,6 +390,12 @@ fn selected_info_line(state: &AppState) -> String {
         return "info: no node".to_string();
     };
 
+    if state.extended_mode
+        && let Some(line) = format_node_metadata(node)
+    {
+        return line;
+    }
+
     let Ok(metadata) = std::fs::metadata(&node.path) else {
         return format!("info: metadata unavailable for {}", node.path.display());
     };
@@ -423,6 +429,32 @@ fn selected_info_line(state: &AppState) -> String {
             metadata.permissions().readonly()
         )
     }
+}
+
+fn format_node_metadata(node: &crate::tree::TreeNode) -> Option<String> {
+    let modified = node
+        .modified
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_secs().to_string())
+        .unwrap_or_else(|| "-".to_string());
+
+    #[cfg(unix)]
+    {
+        if let (Some(mode), Some(uid), Some(gid)) = (node.permissions, node.uid, node.gid) {
+            return Some(format!(
+                "info: mode={mode:o} uid={uid} gid={gid} mtime={modified}",
+            ));
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        if let Some(mode) = node.permissions {
+            return Some(format!("info: mode={mode:o} mtime={modified}"));
+        }
+    }
+
+    None
 }
 
 fn treemap_scope_name(state: &AppState) -> String {
