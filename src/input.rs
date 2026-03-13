@@ -36,6 +36,7 @@ pub enum InputAction {
     FilterBackspace,
     ApplyFilter,
     ClearFilter,
+    CycleSort,
     Quit,
     None,
 }
@@ -85,6 +86,7 @@ impl InputState {
                 InputAction::StartFilter
             }
             KeyCode::Char('c') => InputAction::ClearFilter,
+            KeyCode::Char('s') => InputAction::CycleSort,
             KeyCode::Char('q') if key_event.modifiers.is_empty() => InputAction::Quit,
             KeyCode::Enter | KeyCode::Tab => InputAction::Select,
             KeyCode::Char('g') => {
@@ -203,6 +205,10 @@ mod tests {
             InputAction::ClearFilter
         );
         assert_eq!(
+            state.process_key(event(KeyCode::Char('s'))),
+            InputAction::CycleSort
+        );
+        assert_eq!(
             state.process_key(event(KeyCode::Enter)),
             InputAction::Select
         );
@@ -210,6 +216,10 @@ mod tests {
         assert_eq!(
             state.process_key(event(KeyCode::Char('/'))),
             InputAction::StartFilter
+        );
+        assert_eq!(
+            state.process_key(event(KeyCode::Char('s'))),
+            InputAction::FilterChar('s')
         );
         assert_eq!(
             state.process_key(event(KeyCode::Enter)),
