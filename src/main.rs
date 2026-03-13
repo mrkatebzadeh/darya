@@ -1,8 +1,5 @@
-mod cli;
-mod config;
-
 use anyhow::Result;
-use cli::CliCommand;
+use dar::{cli::CliCommand, config};
 
 fn run() -> Result<()> {
     let config_load = config::load();
