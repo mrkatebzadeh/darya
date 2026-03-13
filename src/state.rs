@@ -1,0 +1,128 @@
+use crate::{
+    config::SortMode,
+    fs_scan::ScanProgress,
+    tree::{FileTree, NodeId},
+};
+use std::path::PathBuf;
+
+/// Tracks the current phase of the filesystem scanner.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ScanState {
+    Idle,
+    Running(ScanProgress),
+    Completed,
+    Error(String),
+}
+
+/// Central application state shared across the UI and scanner.
+#[derive(Debug)]
+pub struct AppState {
+    pub tree: FileTree,
+    pub sort_mode: SortMode,
+    pub selection: Option<NodeId>,
+    pub scroll_offset: usize,
+    pub scan_state: ScanState,
+    pub status_message: Option<String>,
+}
+
+impl AppState {
+    pub fn new(root: PathBuf, sort_mode: SortMode) -> Self {
+        Self {
+            tree: FileTree::new(root),
+            sort_mode,
+            selection: None,
+            scroll_offset: 0,
+            scan_state: ScanState::Idle,
+            status_message: None,
+        }
+    }
+
+    pub fn select_node(&mut self, node: NodeId) {
+        self.selection = Some(node);
+    }
+
+    pub fn clear_selection(&mut self) {
+        self.selection = None;
+    }
+
+    pub fn set_scroll_offset(&mut self, offset: usize) {
+        self.scroll_offset = offset;
+    }
+
+    pub fn update_status(&mut self, message: impl Into<String>) {
+        self.status_message = Some(message.into());
+    }
+
+    pub fn clear_status(&mut self) {
+        self.status_message = None;
+    }
+
+    pub fn set_sort_mode(&mut self, mode: SortMode) {
+        self.sort_mode = mode;
+        self.tree.sort_children(self.tree.root(), mode);
+    }
+
+    pub fn mark_scan_progress(&mut self, progress: ScanProgress) {
+        self.scan_state = ScanState::Running(progress);
+    }
+
+    pub fn mark_scan_complete(&mut self) {
+        self.scan_state = ScanState::Completed;
+    }
+
+    pub fn mark_scan_error(&mut self, message: impl Into<String>) {
+        self.scan_state = ScanState::Error(message.into());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn state() -> AppState {
+        AppState::new(PathBuf::from("/"), SortMode::SizeDesc)
+    }
+
+    #[test]
+    fn new_state_is_idle() {
+        let state = state();
+        assert_eq!(state.scan_state, ScanState::Idle);
+        assert!(state.selection.is_none());
+        assert_eq!(state.sort_mode, SortMode::SizeDesc);
+    }
+
+    #[test]
+    fn selection_and_scroll_updated() {
+        let mut state = state();
+        state.select_node(2);
+        assert_eq!(state.selection, Some(2));
+        state.set_scroll_offset(10);
+        assert_eq!(state.scroll_offset, 10);
+        state.clear_selection();
+        assert!(state.selection.is_none());
+    }
+
+    #[test]
+    fn scan_state_transitions() {
+        let mut state = state();
+        state.mark_scan_progress(ScanProgress {
+            scanned: 1,
+            errors: 0,
+        });
+        assert!(matches!(state.scan_state, ScanState::Running(_)));
+        state.mark_scan_complete();
+        assert_eq!(state.scan_state, ScanState::Completed);
+        state.mark_scan_error("oops");
+        assert!(matches!(state.scan_state, ScanState::Error(_)));
+    }
+
+    #[test]
+    fn status_message_behaves() {
+        let mut state = state();
+        state.update_status("hello");
+        assert_eq!(state.status_message.as_deref(), Some("hello"));
+        state.clear_status();
+        assert!(state.status_message.is_none());
+    }
+}

@@ -29,7 +29,7 @@ pub struct ScanNode {
 }
 
 /// Progress metrics emitted regularly while scanning.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScanProgress {
     pub scanned: u64,
     pub errors: u64,
