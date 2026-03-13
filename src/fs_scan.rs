@@ -1,0 +1,192 @@
+use crate::tree::NodeType;
+use std::{
+    path::PathBuf,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::SystemTime,
+};
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
+use walkdir::{Error as WalkError, WalkDir};
+
+/// Indicates the events emitted by the background scanner.
+#[derive(Debug)]
+pub enum ScanEvent {
+    Node(ScanNode),
+    Progress(ScanProgress),
+    Error(ScanError),
+    Completed,
+}
+
+/// Provides details about a single filesystem entry discovered by the scanner.
+#[derive(Debug)]
+pub struct ScanNode {
+    pub path: PathBuf,
+    pub kind: NodeType,
+    pub size: u64,
+    pub modified: Option<SystemTime>,
+}
+
+/// Progress metrics emitted regularly while scanning.
+#[derive(Debug)]
+pub struct ScanProgress {
+    pub scanned: u64,
+    pub errors: u64,
+}
+
+/// Errors emitted during scanning.
+#[derive(Debug)]
+pub struct ScanError {
+    pub path: PathBuf,
+    pub source: WalkError,
+}
+
+/// Control handle for the background scanner.
+#[derive(Clone, Debug)]
+pub struct ScannerHandle {
+    cancel: Arc<AtomicBool>,
+}
+
+impl ScannerHandle {
+    pub(crate) fn new(cancel: Arc<AtomicBool>) -> Self {
+        Self { cancel }
+    }
+
+    pub fn cancel(&self) {
+        self.cancel.store(true, Ordering::SeqCst);
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.cancel.load(Ordering::SeqCst)
+    }
+}
+
+/// Start scanning `root` on a background worker and return a receiver for scan events.
+pub fn start_scan(
+    root: PathBuf,
+    follow_symlinks: bool,
+) -> (ScannerHandle, UnboundedReceiver<ScanEvent>) {
+    let (tx, rx) = unbounded_channel();
+    let cancel = Arc::new(AtomicBool::new(false));
+    let cancel_clone = cancel.clone();
+    tokio::task::spawn_blocking(move || run_scan(root, follow_symlinks, tx, cancel_clone));
+    (ScannerHandle::new(cancel), rx)
+}
+
+fn run_scan(
+    root: PathBuf,
+    follow_symlinks: bool,
+    tx: UnboundedSender<ScanEvent>,
+    cancel: Arc<AtomicBool>,
+) {
+    let mut scanned = 0;
+    let mut errors = 0;
+
+    for entry in WalkDir::new(&root)
+        .follow_links(follow_symlinks)
+        .into_iter()
+    {
+        if cancel.load(Ordering::Relaxed) {
+            let _ = tx.send(ScanEvent::Completed);
+            return;
+        }
+
+        match entry {
+            Ok(entry) => {
+                scanned += 1;
+                match entry.metadata() {
+                    Ok(metadata) => {
+                        let node = ScanNode {
+                            path: entry.path().to_path_buf(),
+                            kind: classify(&entry),
+                            size: metadata.len(),
+                            modified: metadata.modified().ok(),
+                        };
+                        let _ = tx.send(ScanEvent::Node(node));
+                    }
+                    Err(err) => {
+                        errors += 1;
+                        let _ = tx.send(ScanEvent::Error(ScanError {
+                            path: entry.path().to_path_buf(),
+                            source: err,
+                        }));
+                    }
+                }
+                let _ = tx.send(ScanEvent::Progress(ScanProgress { scanned, errors }));
+            }
+            Err(err) => {
+                errors += 1;
+                let _ = tx.send(ScanEvent::Error(ScanError {
+                    path: err
+                        .path()
+                        .map(PathBuf::from)
+                        .unwrap_or_else(|| root.clone()),
+                    source: err,
+                }));
+                let _ = tx.send(ScanEvent::Progress(ScanProgress { scanned, errors }));
+            }
+        }
+    }
+
+    let _ = tx.send(ScanEvent::Completed);
+}
+
+fn classify(entry: &walkdir::DirEntry) -> NodeType {
+    let file_type = entry.file_type();
+    if file_type.is_dir() {
+        NodeType::Directory
+    } else if file_type.is_symlink() {
+        NodeType::Symlink
+    } else {
+        NodeType::File
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{
+        fs::{self, File},
+        io::Write,
+        path::Path,
+    };
+
+    fn create_tmp_dir(name: &str) -> PathBuf {
+        let base = std::env::temp_dir().join(format!(
+            "{name}-{ts}",
+            ts = SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos(),
+            name = name
+        ));
+        fs::create_dir_all(&base).unwrap();
+        base
+    }
+
+    fn write_file(path: &Path, size: usize) {
+        let mut file = File::create(path).unwrap();
+        file.write_all(&vec![0u8; size]).unwrap();
+    }
+
+    #[tokio::test]
+    async fn scanner_emits_events() {
+        let base = create_tmp_dir("dar-scan");
+        let file = base.join("file.txt");
+        write_file(&file, 4);
+
+        let (_handle, mut rx) = start_scan(base.clone(), false);
+        let mut nodes = 0;
+        while let Some(event) = rx.recv().await {
+            match event {
+                ScanEvent::Node(_) => nodes += 1,
+                ScanEvent::Completed => break,
+                _ => {}
+            }
+        }
+
+        assert!(nodes >= 1);
+        let _ = fs::remove_dir_all(base);
+    }
+}
