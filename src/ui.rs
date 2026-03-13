@@ -474,7 +474,7 @@ fn selection_highlight_overlays(
     path: &[usize],
     state: &AppState,
 ) -> Vec<Rect> {
-    if path.len() <= 1 {
+    if path.is_empty() {
         return Vec::new();
     }
 
@@ -488,21 +488,19 @@ fn selection_highlight_overlays(
     let mut parent_id = path[0];
 
     for &child_id in &path[1..] {
-        let parent_node = state.tree.node(parent_id);
-        let child_node = state.tree.node(child_id);
+        let children = gather_child_nodes(parent_id, state);
+        if children.is_empty() {
+            break;
+        }
 
-        if let (Some(parent_node), Some(child_node)) = (parent_node, child_node) {
-            let parent_size = node_size(parent_node, state.size_mode);
-            let child_size = node_size(child_node, state.size_mode);
-            if let Some(rect) =
-                child_highlight_rect(current_rect, parent_size, child_size, child_id)
-            {
-                overlays.push(rect);
-                current_rect = rect;
-                parent_id = child_id;
-            } else {
-                break;
-            }
+        let child_tiles = squarified_treemap(&children, current_rect, children.len().max(1));
+        if let Some(child_tile) = child_tiles
+            .into_iter()
+            .find(|tile| tile.node.node_id == child_id)
+        {
+            overlays.push(child_tile.rect);
+            current_rect = child_tile.rect;
+            parent_id = child_id;
         } else {
             break;
         }
@@ -511,40 +509,32 @@ fn selection_highlight_overlays(
     overlays
 }
 
-fn child_highlight_rect(
-    bounds: Rect,
-    parent_size: u64,
-    child_size: u64,
-    child_id: usize,
-) -> Option<Rect> {
-    if bounds.width == 0 || bounds.height == 0 || child_size == 0 || parent_size == 0 {
-        return None;
+fn gather_child_nodes(parent_id: usize, state: &AppState) -> Vec<TreemapNode> {
+    let mut nodes = Vec::new();
+    let parent = match state.tree.node(parent_id) {
+        Some(node) => node,
+        None => return nodes,
+    };
+
+    for &child_id in &parent.children {
+        if let Some(child) = state.tree.node(child_id) {
+            let size = node_size(child, state.size_mode);
+            if size == 0 {
+                continue;
+            }
+
+            nodes.push(TreemapNode {
+                node_id: child.id,
+                name: child.name.clone(),
+                size,
+                is_directory: child.file_type == NodeType::Directory,
+            });
+        }
     }
 
-    let highlight_size = child_size.min(parent_size);
-    let remainder = parent_size.saturating_sub(highlight_size);
-
-    let mut nodes = vec![TreemapNode {
-        node_id: child_id,
-        name: String::new(),
-        size: highlight_size,
-        is_directory: true,
-    }];
-
-    if remainder > 0 {
-        nodes.push(TreemapNode {
-            node_id: usize::MAX,
-            name: String::new(),
-            size: remainder,
-            is_directory: false,
-        });
-    }
-
-    let tiles = squarified_treemap(&nodes, bounds, nodes.len().max(1));
-    tiles
-        .into_iter()
-        .find(|tile| tile.node.node_id == child_id)
-        .map(|tile| tile.rect)
+    nodes.sort_unstable_by(|a, b| b.size.cmp(&a.size).then_with(|| a.name.cmp(&b.name)));
+    nodes.truncate(200);
+    nodes
 }
 
 fn node_size(node: &TreeNode, mode: SizeDisplayMode) -> u64 {
