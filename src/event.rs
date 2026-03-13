@@ -18,6 +18,7 @@ use crate::{
     input::{InputAction, InputState},
     layout,
     size::normalize_path,
+    snapshot,
     state::AppState,
     theme::Theme,
     tree::NodeType,
@@ -37,6 +38,7 @@ use tokio::sync::mpsc::UnboundedReceiver;
 
 const TICK_RATE: Duration = Duration::from_millis(250);
 const MAX_SCAN_EVENTS_PER_CYCLE: usize = 256;
+const SNAPSHOT_PATH: &str = "/tmp/dar-scan.json";
 
 /// Runs the terminal event loop until the user quits or scanning completes.
 pub fn run_event_loop(
@@ -108,6 +110,8 @@ fn handle_input_action(action: InputAction, state: &mut AppState) {
         InputAction::Delete => delete_selection(state),
         InputAction::Open => open_selection(state),
         InputAction::ToggleSizeMode => state.toggle_size_mode(),
+        InputAction::ExportScan => export_scan(state),
+        InputAction::ImportScan => import_scan(state),
         InputAction::Collapse => collapse_selection(state),
         _ => {}
     }
@@ -252,6 +256,32 @@ fn open_selection(state: &mut AppState) {
     match command.spawn() {
         Ok(_) => state.update_status(format!("opened {}", path.display())),
         Err(err) => state.update_status(format!("open failed for {}: {err}", path.display())),
+    }
+}
+
+fn export_scan(state: &mut AppState) {
+    let snapshot_path = std::path::Path::new(SNAPSHOT_PATH);
+    match snapshot::export_tree(&state.tree, snapshot_path) {
+        Ok(()) => state.update_status(format!("scan exported to {}", snapshot_path.display())),
+        Err(err) => state.update_status(format!("export failed: {err}")),
+    }
+}
+
+fn import_scan(state: &mut AppState) {
+    let snapshot_path = std::path::Path::new(SNAPSHOT_PATH);
+    let default_root = state
+        .tree
+        .node(state.tree.root())
+        .map(|node| node.path.clone())
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+
+    match snapshot::import_tree(snapshot_path, &default_root) {
+        Ok(tree) => {
+            state.tree = tree;
+            state.selection = Some(state.tree.root());
+            state.update_status(format!("scan imported from {}", snapshot_path.display()));
+        }
+        Err(err) => state.update_status(format!("import failed: {err}")),
     }
 }
 
