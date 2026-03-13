@@ -34,23 +34,18 @@ pub fn run(root: PathBuf, config_load: ConfigLoad) -> Result<()> {
     }
 
     let root = normalize_path(root);
-    if !(io::stdout().is_tty() && io::stdin().is_tty()) {
-        return Err(anyhow::anyhow!(
-            "dar requires a terminal to run interactively"
-        ));
-    }
     let guard = TerminalGuard::enter()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
     terminal.hide_cursor()?;
 
     let runtime = Runtime::new()?;
-    let (scanner_handle, mut scanner_rx) =
-        fs_scan::start_scan(root.clone(), config.scan.follow_symlinks);
-    let mut state = AppState::new(root.clone(), config.sorting.mode);
-    state.update_status(format!("scanning {}", root.display()));
-
-    let theme = Theme::default();
     let loop_result = runtime.block_on(async {
+        let (scanner_handle, mut scanner_rx) =
+            fs_scan::start_scan(root.clone(), config.scan.follow_symlinks);
+        let mut state = AppState::new(root.clone(), config.sorting.mode);
+        state.update_status(format!("scanning {}", root.display()));
+
+        let theme = Theme::default();
         event::run_event_loop(
             &mut terminal,
             &mut state,
@@ -73,8 +68,15 @@ struct TerminalGuard;
 
 impl TerminalGuard {
     fn enter() -> Result<Self> {
+        let stdin_tty = io::stdin().is_tty();
+        let stdout_tty = io::stdout().is_tty();
+
         enable_raw_mode()?;
-        execute!(io::stdout(), EnterAlternateScreen)?;
+        execute!(io::stdout(), EnterAlternateScreen).map_err(|err| {
+            anyhow::anyhow!(
+                "failed to enter alternate screen (stdin_tty={stdin_tty}, stdout_tty={stdout_tty}): {err}"
+            )
+        })?;
         Ok(Self)
     }
 }

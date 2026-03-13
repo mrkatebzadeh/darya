@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 
 /// Actions exposed by input handling that the rest of the application understands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,6 +41,10 @@ impl InputState {
     }
 
     pub fn process_key(&mut self, key_event: KeyEvent) -> InputAction {
+        if key_event.kind != KeyEventKind::Press && key_event.kind != KeyEventKind::Repeat {
+            return InputAction::None;
+        }
+
         let action = match key_event.code {
             KeyCode::Char('k') | KeyCode::Up => InputAction::MoveUp,
             KeyCode::Char('j') | KeyCode::Down => InputAction::MoveDown,
