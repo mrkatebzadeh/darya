@@ -10,4 +10,5 @@ pub mod snapshot;
 pub mod state;
 pub mod theme;
 pub mod tree;
+pub mod treemap;
 pub mod ui;

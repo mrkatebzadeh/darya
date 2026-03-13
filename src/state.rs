@@ -16,7 +16,8 @@
 use crate::{
     config::SortMode,
     fs_scan::ScanProgress,
-    tree::{FileTree, NodeId},
+    tree::{FileTree, NodeId, NodeType},
+    treemap::TreemapNode,
 };
 use std::path::PathBuf;
 
@@ -50,6 +51,7 @@ pub struct AppState {
     pub filter_query: String,
     pub filter_active: bool,
     pub show_help: bool,
+    pub treemap_nodes: Vec<TreemapNode>,
 }
 
 impl AppState {
@@ -67,6 +69,7 @@ impl AppState {
             filter_query: String::new(),
             filter_active: false,
             show_help: false,
+            treemap_nodes: Vec::new(),
         }
     }
 
@@ -124,6 +127,48 @@ impl AppState {
         self.filter_query.clear();
         self.filter_active = false;
     }
+
+    pub fn refresh_treemap_nodes(&mut self) {
+        let selected = self.selection.unwrap_or_else(|| self.tree.root());
+
+        let source_id = self
+            .tree
+            .node(selected)
+            .and_then(|node| {
+                if node.file_type == NodeType::Directory {
+                    Some(node.id)
+                } else {
+                    node.parent
+                }
+            })
+            .unwrap_or_else(|| self.tree.root());
+
+        let Some(source) = self.tree.node(source_id) else {
+            self.treemap_nodes.clear();
+            return;
+        };
+
+        let mut nodes: Vec<TreemapNode> = source
+            .children
+            .iter()
+            .filter_map(|child_id| self.tree.node(*child_id))
+            .filter_map(|child| {
+                let size = match self.size_mode {
+                    SizeDisplayMode::Apparent => child.size,
+                    SizeDisplayMode::Disk => child.disk_size,
+                };
+
+                (size > 0).then(|| TreemapNode {
+                    name: child.name.clone(),
+                    size,
+                    is_directory: child.file_type == NodeType::Directory,
+                })
+            })
+            .collect();
+
+        nodes.sort_unstable_by(|a, b| b.size.cmp(&a.size).then_with(|| a.name.cmp(&b.name)));
+        self.treemap_nodes = nodes;
+    }
 }
 
 #[cfg(test)]
@@ -141,6 +186,7 @@ mod tests {
         assert_eq!(state.scan_state, ScanState::Idle);
         assert!(state.selection.is_none());
         assert_eq!(state.sort_mode, SortMode::SizeDesc);
+        assert!(state.treemap_nodes.is_empty());
     }
 
     #[test]

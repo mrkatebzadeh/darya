@@ -58,6 +58,7 @@ pub fn run_event_loop(
     if state.selection.is_none() {
         state.selection = Some(state.tree.root());
     }
+    state.refresh_treemap_nodes();
 
     while !should_quit {
         if event::poll(Duration::from_millis(50))? {
@@ -154,6 +155,8 @@ fn handle_input_action(action: InputAction, state: &mut AppState) {
         InputAction::Collapse => collapse_selection(state),
         _ => {}
     }
+
+    state.refresh_treemap_nodes();
 }
 
 fn next_sort_mode(current: SortMode) -> SortMode {
@@ -437,6 +440,8 @@ fn handle_scan_event(state: &mut AppState, event: ScanEvent) {
             state.update_status("scan complete");
         }
     }
+
+    state.refresh_treemap_nodes();
 }
 
 #[cfg(test)]

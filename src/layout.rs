@@ -20,12 +20,14 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 pub struct LayoutRegions {
     pub header: Rect,
     pub tree: Rect,
+    pub treemap: Rect,
+    pub details: Rect,
     pub footer: Rect,
 }
 
-/// Split the available `area` into header, tree, and footer regions.
+/// Split the available `area` into header, body panels, and footer regions.
 pub fn split_layout(area: Rect) -> LayoutRegions {
-    let chunks = Layout::default()
+    let vertical = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
@@ -34,10 +36,22 @@ pub fn split_layout(area: Rect) -> LayoutRegions {
         ])
         .split(area);
 
+    let body = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
+        .split(vertical[1]);
+
+    let right = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
+        .split(body[1]);
+
     LayoutRegions {
-        header: chunks[0],
-        tree: chunks[1],
-        footer: chunks[2],
+        header: vertical[0],
+        tree: body[0],
+        treemap: right[0],
+        details: right[1],
+        footer: vertical[2],
     }
 }
 
@@ -52,6 +66,13 @@ mod tests {
         assert_eq!(regions.header.height, 3);
         assert_eq!(regions.footer.height, 3);
         assert_eq!(regions.tree.height, 18);
+        assert_eq!(regions.tree.width, 32);
+        assert_eq!(regions.treemap.width, 48);
+        assert_eq!(regions.details.width, 48);
+        assert_eq!(
+            regions.treemap.height + regions.details.height,
+            regions.tree.height
+        );
         assert_eq!(regions.tree.y, regions.header.height);
         assert_eq!(regions.footer.y, area.height - regions.footer.height);
     }

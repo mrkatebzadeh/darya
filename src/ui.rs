@@ -19,9 +19,10 @@ use crate::{
     state::{AppState, ScanState, SizeDisplayMode},
     theme::Theme,
     tree::{FileTree, NodeType},
+    treemap::{TreemapTile, squarified_treemap},
 };
 use ratatui::{
-    layout::{Constraint, Rect},
+    layout::{Alignment, Constraint, Rect},
     style::Style,
     terminal::Frame,
     text::{Line, Span},
@@ -43,6 +44,8 @@ impl Ui {
     ) {
         self.draw_header(frame, layout.header, state, theme);
         self.draw_tree(frame, layout.tree, state, theme);
+        self.draw_treemap(frame, layout.treemap, state, theme);
+        self.draw_details(frame, layout.details, theme);
         self.draw_footer(frame, layout.footer, state, theme);
         if state.show_help {
             self.draw_help_modal(frame, state, theme);
@@ -133,6 +136,79 @@ impl Ui {
         .style(Style::default().bg(theme.background));
 
         frame.render_widget(footer, area);
+    }
+
+    fn draw_treemap(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
+        let title = format!("treemap ({})", selected_scope_name(state));
+        let panel = Block::default().borders(Borders::ALL).title(title);
+        let inner = panel.inner(area);
+        frame.render_widget(panel, area);
+
+        if inner.width < 2 || inner.height < 2 {
+            return;
+        }
+
+        let tiles = squarified_treemap(&state.treemap_nodes, inner, 200);
+        if tiles.is_empty() {
+            frame.render_widget(
+                Paragraph::new("No sized children")
+                    .alignment(Alignment::Center)
+                    .style(Style::default().fg(theme.foreground).bg(theme.background)),
+                inner,
+            );
+            return;
+        }
+
+        for tile in tiles {
+            self.draw_treemap_tile(frame, tile, theme);
+        }
+    }
+
+    fn draw_treemap_tile(&self, frame: &mut Frame<'_>, tile: TreemapTile, theme: Theme) {
+        if tile.rect.width < 2 || tile.rect.height < 2 {
+            return;
+        }
+
+        let color = if tile.node.is_directory {
+            theme.directory
+        } else {
+            theme.file
+        };
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .style(Style::default().fg(color).bg(theme.background));
+        let inner = block.inner(tile.rect);
+        frame.render_widget(block, tile.rect);
+
+        if inner.width < 2 || inner.height < 1 {
+            return;
+        }
+
+        let mut lines = vec![Line::from(truncate_text(
+            &tile.node.name,
+            inner.width as usize,
+        ))];
+        if inner.height >= 2 && inner.width >= 12 {
+            lines.push(Line::from(truncate_text(
+                &format_size(tile.node.size),
+                inner.width as usize,
+            )));
+        }
+
+        frame.render_widget(
+            Paragraph::new(lines).style(Style::default().fg(theme.foreground)),
+            inner,
+        );
+    }
+
+    fn draw_details(&self, frame: &mut Frame<'_>, area: Rect, theme: Theme) {
+        let panel = Paragraph::new("Details")
+            .alignment(Alignment::Center)
+            .block(Block::default().borders(Borders::ALL).title("Details"))
+            .style(Style::default().fg(theme.foreground).bg(theme.background));
+
+        frame.render_widget(panel, area);
     }
 
     fn draw_help_modal(&self, frame: &mut Frame<'_>, _state: &AppState, theme: Theme) {
@@ -355,6 +431,37 @@ fn selected_info_line(state: &AppState) -> String {
             metadata.permissions().readonly()
         )
     }
+}
+
+fn selected_scope_name(state: &AppState) -> String {
+    let Some(selected_id) = state.selection else {
+        return "root".to_string();
+    };
+
+    let Some(selected) = state.tree.node(selected_id) else {
+        return "root".to_string();
+    };
+
+    if selected.file_type == NodeType::Directory {
+        selected.name.clone()
+    } else {
+        selected
+            .parent
+            .and_then(|parent| state.tree.node(parent))
+            .map(|node| node.name.clone())
+            .unwrap_or_else(|| "root".to_string())
+    }
+}
+
+fn truncate_text(text: &str, max_width: usize) -> String {
+    if max_width == 0 {
+        return String::new();
+    }
+    let mut out = String::new();
+    for ch in text.chars().take(max_width) {
+        out.push(ch);
+    }
+    out
 }
 
 #[cfg(test)]
