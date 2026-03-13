@@ -1,6 +1,7 @@
 use crate::config::SortMode;
 use std::{
     cmp::Ordering,
+    collections::HashMap,
     path::{Path, PathBuf},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -12,18 +13,23 @@ pub type NodeId = usize;
 pub struct FileTree {
     nodes: Vec<TreeNode>,
     pub navigation: NavigationState,
+    path_index: HashMap<PathBuf, NodeId>,
 }
 
 impl FileTree {
     /// Create a tree containing only the root node.
     pub fn new(root_path: PathBuf) -> Self {
-        let mut root = TreeNode::new(root_path, NodeType::Directory);
+        let mut root = TreeNode::new(root_path.clone(), NodeType::Directory);
         root.id = 0;
         root.expanded = true;
+
+        let mut path_index = HashMap::new();
+        path_index.insert(root_path.clone(), 0);
 
         Self {
             nodes: vec![root],
             navigation: NavigationState::default(),
+            path_index,
         }
     }
 
@@ -47,6 +53,7 @@ impl FileTree {
         let id = self.nodes.len();
         node.id = id;
         node.parent = Some(parent);
+        self.path_index.insert(node.path.clone(), id);
         self.nodes.push(node);
         if let Some(parent_node) = self.nodes.get_mut(parent) {
             parent_node.children.push(id);
@@ -65,6 +72,59 @@ impl FileTree {
 
             if let Some(parent_node) = self.nodes.get_mut(parent) {
                 parent_node.children = sorted;
+            }
+        }
+    }
+
+    pub fn visible_ids(&self) -> Vec<NodeId> {
+        let mut ids = Vec::new();
+        self.collect_visible(self.root(), &mut ids);
+        ids
+    }
+
+    pub fn ensure_node(&mut self, path: PathBuf, kind: NodeType) -> NodeId {
+        if let Some(&id) = self.path_index.get(&path) {
+            return id;
+        }
+
+        if path == self.nodes[self.root()].path {
+            return self.root();
+        }
+
+        let parent_path = path
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| self.nodes[self.root()].path.clone());
+        let parent_id = self.ensure_node(parent_path, NodeType::Directory);
+
+        let mut node = TreeNode::new(path.clone(), kind);
+        node.expanded = kind == NodeType::Directory && path == self.nodes[self.root()].path;
+        self.add_child(parent_id, node)
+    }
+
+    pub fn add_size(&mut self, node_id: NodeId, size: u64) {
+        let mut current = Some(node_id);
+        while let Some(id) = current {
+            if let Some(node) = self.nodes.get_mut(id) {
+                node.size = node.size.saturating_add(size);
+                current = node.parent;
+            } else {
+                break;
+            }
+        }
+    }
+
+    pub fn node_id_for_path(&self, path: &Path) -> Option<NodeId> {
+        self.path_index.get(path).copied()
+    }
+
+    fn collect_visible(&self, node_id: NodeId, ids: &mut Vec<NodeId>) {
+        ids.push(node_id);
+        if let Some(node) = self.nodes.get(node_id)
+            && node.expanded
+        {
+            for &child in &node.children {
+                self.collect_visible(child, ids);
             }
         }
     }
