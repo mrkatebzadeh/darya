@@ -51,7 +51,7 @@ impl InputState {
             KeyCode::Char('h') | KeyCode::Left => InputAction::Collapse,
             KeyCode::Char('l') | KeyCode::Right => InputAction::Expand,
             KeyCode::Char('q') if key_event.modifiers.is_empty() => InputAction::Quit,
-            KeyCode::Enter => InputAction::Select,
+            KeyCode::Enter | KeyCode::Tab => InputAction::Select,
             KeyCode::Char('g') => {
                 if self.pending_gg {
                     InputAction::JumpTop
@@ -143,5 +143,6 @@ mod tests {
             state.process_key(event(KeyCode::Enter)),
             InputAction::Select
         );
+        assert_eq!(state.process_key(event(KeyCode::Tab)), InputAction::Select);
     }
 }

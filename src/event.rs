@@ -101,7 +101,8 @@ fn handle_input_action(action: InputAction, state: &mut AppState) {
         InputAction::MoveDown => select_next(state),
         InputAction::JumpTop => select_first(state),
         InputAction::JumpBottom => select_last(state),
-        InputAction::Expand | InputAction::Select => expand_selection(state),
+        InputAction::Expand => expand_selection(state),
+        InputAction::Select => toggle_selection(state),
         InputAction::Collapse => collapse_selection(state),
         _ => {}
     }
@@ -179,6 +180,15 @@ fn collapse_selection(state: &mut AppState) {
     }
 }
 
+fn toggle_selection(state: &mut AppState) {
+    if let Some(id) = state.selection
+        && let Some(node) = state.tree.node_mut(id)
+        && node.file_type == NodeType::Directory
+    {
+        node.expanded = !node.expanded;
+    }
+}
+
 fn handle_scan_event(state: &mut AppState, event: ScanEvent) {
     match event {
         ScanEvent::Node(node) => {
@@ -241,5 +251,21 @@ mod tests {
         state.selection = Some(1);
         handle_input_action(InputAction::MoveUp, &mut state);
         assert_eq!(state.selection, Some(0));
+    }
+
+    #[test]
+    fn select_toggles_directory_expansion() {
+        let mut state = AppState::new(PathBuf::from("/"), default_sort_mode());
+        let dir_id = state.tree.add_child(
+            0,
+            TreeNode::new(PathBuf::from("/dir"), NodeType::Directory).collapsed(),
+        );
+        state.selection = Some(dir_id);
+
+        handle_input_action(InputAction::Select, &mut state);
+        assert!(state.tree.node(dir_id).unwrap().expanded);
+
+        handle_input_action(InputAction::Select, &mut state);
+        assert!(!state.tree.node(dir_id).unwrap().expanded);
     }
 }
