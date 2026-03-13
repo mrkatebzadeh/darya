@@ -30,7 +30,7 @@ pub fn split_layout(area: Rect) -> LayoutRegions {
         .constraints([
             Constraint::Length(3),
             Constraint::Min(0),
-            Constraint::Length(2),
+            Constraint::Length(3),
         ])
         .split(area);
 
@@ -50,8 +50,8 @@ mod tests {
         let area = Rect::new(0, 0, 80, 24);
         let regions = split_layout(area);
         assert_eq!(regions.header.height, 3);
-        assert_eq!(regions.footer.height, 2);
-        assert_eq!(regions.tree.height, 19);
+        assert_eq!(regions.footer.height, 3);
+        assert_eq!(regions.tree.height, 18);
         assert_eq!(regions.tree.y, regions.header.height);
         assert_eq!(regions.footer.y, area.height - regions.footer.height);
     }
