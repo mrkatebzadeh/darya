@@ -38,6 +38,7 @@ const HELP_TEXT: &str = concat!(
     "    -O FILE  Export scan tree to FILE in binary format\n",
     "    -e, --extended  Enable extended metadata mode for owner/permissions/mtime\n",
     "    --no-extended  Disable extended metadata mode\n",
+    "    --ignore-config  Do not load configuration files\n",
     "    --exclude PATTERN  Exclude files/directories by glob pattern (repeatable)\n"
 );
 
@@ -74,6 +75,7 @@ impl CliCommand {
         let mut export_json = None;
         let mut export_binary = None;
         let mut extended = false;
+        let mut ignore_config = false;
 
         while let Some(arg) = args.next() {
             match arg.to_str() {
@@ -99,6 +101,9 @@ impl CliCommand {
                 Some("--no-extended") => {
                     extended = false;
                 }
+                Some("--ignore-config") => {
+                    ignore_config = true;
+                }
                 Some(value) if value.starts_with('-') => {
                     return Err(CliParseError::UnknownOption(value.to_string()));
                 }
@@ -120,6 +125,7 @@ impl CliCommand {
                 import_snapshot,
                 export_json,
                 export_binary,
+                ignore_config,
             }
         } else {
             let mut cli = CliArgs::from_current_dir()?;
@@ -128,6 +134,7 @@ impl CliCommand {
             cli.import_snapshot = import_snapshot;
             cli.export_json = export_json;
             cli.export_binary = export_binary;
+            cli.ignore_config = ignore_config;
             cli
         };
         Ok(Self::Run(cli))
@@ -152,6 +159,7 @@ pub struct CliArgs {
     pub import_snapshot: Option<SnapshotEndpoint>,
     pub export_json: Option<SnapshotEndpoint>,
     pub export_binary: Option<SnapshotEndpoint>,
+    pub ignore_config: bool,
 }
 
 impl CliArgs {
@@ -164,6 +172,7 @@ impl CliArgs {
             import_snapshot: None,
             export_json: None,
             export_binary: None,
+            ignore_config: false,
         })
     }
 }
@@ -266,6 +275,16 @@ mod tests {
         let args = vec![OsString::from("--no-extended"), OsString::from("/tmp")];
         if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
             assert!(!cli.extended);
+        } else {
+            panic!("expected run command");
+        }
+    }
+
+    #[test]
+    fn parse_ignore_config_presets_flag() {
+        let args = vec![OsString::from("--ignore-config")];
+        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
+            assert!(cli.ignore_config);
         } else {
             panic!("expected run command");
         }

@@ -99,19 +99,55 @@ pub enum ConfigError {
     },
 }
 
+fn config_file_paths() -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    if let Some(path) = system_config_path() {
+        paths.push(path);
+    }
+    if let Some(path) = ncdu_config_path() {
+        paths.push(path);
+    }
+    if let Some(path) = config_file_path() {
+        paths.push(path);
+    }
+    paths
+}
+
+fn system_config_path() -> Option<PathBuf> {
+    let path = PathBuf::from("/etc/dar/config");
+    if path.exists() { Some(path) } else { None }
+}
+
+fn ncdu_config_path() -> Option<PathBuf> {
+    let path = PathBuf::from("/etc/ncdu.conf");
+    if path.exists() { Some(path) } else { None }
+}
+
 /// Load the configuration, returning defaults when the file is absent or invalid.
-pub fn load() -> ConfigLoad {
-    let config_path = config_file_path();
+pub fn load(ignore_config: bool) -> ConfigLoad {
     let mut load = ConfigLoad {
         config: Config::default(),
-        config_path: config_path.clone(),
+        config_path: None,
         error: None,
     };
 
-    if let Some(path) = config_path.as_deref().filter(|path| path.exists()) {
-        match parse_config_file(path) {
-            Ok(config) => load.config = config,
-            Err(err) => load.error = Some(err),
+    if ignore_config {
+        return load;
+    }
+
+    for path in config_file_paths() {
+        match parse_config_file(&path) {
+            Ok(config) => {
+                load.config = config;
+                load.config_path = Some(path);
+                load.error = None;
+            }
+            Err(err) => {
+                if load.error.is_none() {
+                    load.error = Some(err);
+                    load.config_path = Some(path);
+                }
+            }
         }
     }
 
