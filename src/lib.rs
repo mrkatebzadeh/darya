@@ -6,6 +6,7 @@ pub mod fs_scan;
 pub mod input;
 pub mod layout;
 pub mod size;
+pub mod snapshot;
 pub mod state;
 pub mod theme;
 pub mod tree;
