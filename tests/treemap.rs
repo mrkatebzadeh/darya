@@ -19,26 +19,31 @@ use ratatui::layout::Rect;
 fn sample_nodes() -> Vec<TreemapNode> {
     vec![
         TreemapNode {
+            node_id: 1,
             name: "alpha".to_string(),
             size: 400,
             is_directory: true,
         },
         TreemapNode {
+            node_id: 2,
             name: "beta".to_string(),
             size: 250,
             is_directory: false,
         },
         TreemapNode {
+            node_id: 3,
             name: "gamma".to_string(),
             size: 200,
             is_directory: true,
         },
         TreemapNode {
+            node_id: 4,
             name: "delta".to_string(),
             size: 100,
             is_directory: false,
         },
         TreemapNode {
+            node_id: 5,
             name: "zero".to_string(),
             size: 0,
             is_directory: false,
@@ -101,4 +106,24 @@ fn respects_max_node_limit() {
     let bounds = Rect::new(0, 0, 100, 20);
     let tiles = squarified_treemap(&sample_nodes(), bounds, 2);
     assert_eq!(tiles.len(), 2);
+}
+
+#[test]
+fn small_panel_never_overflows() {
+    let mut nodes = Vec::new();
+    for i in 0..64 {
+        nodes.push(TreemapNode {
+            node_id: i,
+            name: format!("n{i}"),
+            size: 1,
+            is_directory: false,
+        });
+    }
+
+    let bounds = Rect::new(0, 0, 8, 4);
+    let tiles = squarified_treemap(&nodes, bounds, 200);
+    for tile in tiles {
+        assert!(tile.rect.x + tile.rect.width <= bounds.x + bounds.width);
+        assert!(tile.rect.y + tile.rect.height <= bounds.y + bounds.height);
+    }
 }

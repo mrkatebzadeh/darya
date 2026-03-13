@@ -18,12 +18,12 @@ use crate::{
     layout::LayoutRegions,
     state::{AppState, ScanState, SizeDisplayMode},
     theme::Theme,
-    tree::{FileTree, NodeType},
-    treemap::{TreemapTile, squarified_treemap},
+    tree::{FileTree, NodeType, TreeNode},
+    treemap::{TreemapNode, TreemapTile, squarified_treemap},
 };
 use ratatui::{
     layout::{Alignment, Constraint, Rect},
-    style::Style,
+    style::{Color, Style},
     terminal::Frame,
     text::{Line, Span},
     widgets::{Block, Borders, Cell, Clear, Paragraph, Row, Table},
@@ -139,7 +139,7 @@ impl Ui {
     }
 
     fn draw_treemap(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
-        let title = format!("treemap ({})", selected_scope_name(state));
+        let title = format!("treemap ({})", treemap_scope_name(state));
         let panel = Block::default().borders(Borders::ALL).title(title);
         let inner = panel.inner(area);
         frame.render_widget(panel, area);
@@ -148,7 +148,9 @@ impl Ui {
             return;
         }
 
-        let tiles = squarified_treemap(&state.treemap_nodes, inner, 200);
+        let max_tiles_for_panel = usize::from(inner.width) * usize::from(inner.height) / 2;
+        let max_tiles = 200_usize.min(max_tiles_for_panel.max(1));
+        let tiles = squarified_treemap(&state.treemap_nodes, inner, max_tiles);
         if tiles.is_empty() {
             frame.render_widget(
                 Paragraph::new("No sized children")
@@ -159,47 +161,37 @@ impl Ui {
             return;
         }
 
+        let path = selection_path(state);
+        let highlighted_id = path.first().copied();
+        let overlays = selection_highlight_overlays(&tiles, &path, state);
+
         for tile in tiles {
-            self.draw_treemap_tile(frame, tile, theme);
+            let is_highlighted = Some(tile.node.node_id) == highlighted_id;
+            self.draw_treemap_tile(frame, tile, theme, is_highlighted);
+        }
+
+        for overlay in overlays {
+            fill_rect(frame, overlay, theme.selection, theme.background);
         }
     }
 
-    fn draw_treemap_tile(&self, frame: &mut Frame<'_>, tile: TreemapTile, theme: Theme) {
-        if tile.rect.width < 2 || tile.rect.height < 2 {
+    fn draw_treemap_tile(
+        &self,
+        frame: &mut Frame<'_>,
+        tile: TreemapTile,
+        theme: Theme,
+        is_highlighted: bool,
+    ) {
+        if tile.rect.width == 0 || tile.rect.height == 0 {
             return;
         }
 
-        let color = if tile.node.is_directory {
-            theme.directory
+        let color = if is_highlighted {
+            theme.selection
         } else {
-            theme.file
+            theme.bar
         };
-
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .style(Style::default().fg(color).bg(theme.background));
-        let inner = block.inner(tile.rect);
-        frame.render_widget(block, tile.rect);
-
-        if inner.width < 2 || inner.height < 1 {
-            return;
-        }
-
-        let mut lines = vec![Line::from(truncate_text(
-            &tile.node.name,
-            inner.width as usize,
-        ))];
-        if inner.height >= 2 && inner.width >= 12 {
-            lines.push(Line::from(truncate_text(
-                &format_size(tile.node.size),
-                inner.width as usize,
-            )));
-        }
-
-        frame.render_widget(
-            Paragraph::new(lines).style(Style::default().fg(theme.foreground)),
-            inner,
-        );
+        fill_rect(frame, tile.rect, color, theme.background);
     }
 
     fn draw_details(&self, frame: &mut Frame<'_>, area: Rect, theme: Theme) {
@@ -433,35 +425,133 @@ fn selected_info_line(state: &AppState) -> String {
     }
 }
 
-fn selected_scope_name(state: &AppState) -> String {
-    let Some(selected_id) = state.selection else {
+fn treemap_scope_name(state: &AppState) -> String {
+    let Some(root) = state.tree.node(state.tree.root()) else {
         return "root".to_string();
     };
 
-    let Some(selected) = state.tree.node(selected_id) else {
-        return "root".to_string();
-    };
+    root.name.clone()
+}
 
-    if selected.file_type == NodeType::Directory {
-        selected.name.clone()
-    } else {
-        selected
-            .parent
-            .and_then(|parent| state.tree.node(parent))
-            .map(|node| node.name.clone())
-            .unwrap_or_else(|| "root".to_string())
+fn fill_rect(frame: &mut Frame<'_>, rect: Rect, fg: Color, bg: Color) {
+    let buf = frame.buffer_mut();
+    let x_end = rect.x.saturating_add(rect.width);
+    let y_end = rect.y.saturating_add(rect.height);
+
+    for y in rect.y..y_end {
+        for x in rect.x..x_end {
+            let cell = buf.get_mut(x, y);
+            cell.set_symbol("█");
+            cell.set_fg(fg);
+            cell.set_bg(bg);
+        }
     }
 }
 
-fn truncate_text(text: &str, max_width: usize) -> String {
-    if max_width == 0 {
-        return String::new();
+fn selection_path(state: &AppState) -> Vec<usize> {
+    let Some(mut current) = state.selection else {
+        return Vec::new();
+    };
+    let root = state.tree.root();
+    let mut stack = Vec::new();
+
+    while current != root {
+        stack.push(current);
+        let parent = state.tree.node(current).and_then(|node| node.parent);
+        if let Some(parent) = parent {
+            current = parent;
+        } else {
+            break;
+        }
     }
-    let mut out = String::new();
-    for ch in text.chars().take(max_width) {
-        out.push(ch);
+
+    stack.reverse();
+    stack
+}
+
+fn selection_highlight_overlays(
+    tiles: &[TreemapTile],
+    path: &[usize],
+    state: &AppState,
+) -> Vec<Rect> {
+    if path.len() <= 1 {
+        return Vec::new();
     }
-    out
+
+    let root_tile = tiles.iter().find(|tile| tile.node.node_id == path[0]);
+    let mut current_rect = match root_tile {
+        Some(tile) => tile.rect,
+        None => return Vec::new(),
+    };
+
+    let mut overlays = Vec::new();
+    let mut parent_id = path[0];
+
+    for &child_id in &path[1..] {
+        let parent_node = state.tree.node(parent_id);
+        let child_node = state.tree.node(child_id);
+
+        if let (Some(parent_node), Some(child_node)) = (parent_node, child_node) {
+            let parent_size = node_size(parent_node, state.size_mode);
+            let child_size = node_size(child_node, state.size_mode);
+            if let Some(rect) =
+                child_highlight_rect(current_rect, parent_size, child_size, child_id)
+            {
+                overlays.push(rect);
+                current_rect = rect;
+                parent_id = child_id;
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
+
+    overlays
+}
+
+fn child_highlight_rect(
+    bounds: Rect,
+    parent_size: u64,
+    child_size: u64,
+    child_id: usize,
+) -> Option<Rect> {
+    if bounds.width == 0 || bounds.height == 0 || child_size == 0 || parent_size == 0 {
+        return None;
+    }
+
+    let highlight_size = child_size.min(parent_size);
+    let remainder = parent_size.saturating_sub(highlight_size);
+
+    let mut nodes = vec![TreemapNode {
+        node_id: child_id,
+        name: String::new(),
+        size: highlight_size,
+        is_directory: true,
+    }];
+
+    if remainder > 0 {
+        nodes.push(TreemapNode {
+            node_id: usize::MAX,
+            name: String::new(),
+            size: remainder,
+            is_directory: false,
+        });
+    }
+
+    let tiles = squarified_treemap(&nodes, bounds, nodes.len().max(1));
+    tiles
+        .into_iter()
+        .find(|tile| tile.node.node_id == child_id)
+        .map(|tile| tile.rect)
+}
+
+fn node_size(node: &TreeNode, mode: SizeDisplayMode) -> u64 {
+    match mode {
+        SizeDisplayMode::Apparent => node.size,
+        SizeDisplayMode::Disk => node.disk_size,
+    }
 }
 
 #[cfg(test)]
@@ -536,5 +626,37 @@ mod tests {
         assert!(inner.height < outer.height);
         assert!(inner.x > outer.x);
         assert!(inner.y > outer.y);
+    }
+
+    #[test]
+    fn deep_selection_highlight_overlays_for_nested_entry() {
+        use crate::treemap::squarified_treemap;
+
+        let mut state =
+            crate::state::AppState::new(PathBuf::from("/root"), crate::config::SortMode::SizeDesc);
+        let top = state.tree.add_child(
+            0,
+            TreeNode::new(PathBuf::from("/root/top"), NodeType::Directory),
+        );
+        let deep = state.tree.add_child(
+            top,
+            TreeNode::new(PathBuf::from("/root/top/deep"), NodeType::File),
+        );
+
+        if let Some(node) = state.tree.node_mut(top) {
+            node.size = 10;
+        }
+        if let Some(node) = state.tree.node_mut(deep) {
+            node.size = 3;
+        }
+
+        state.selection = Some(deep);
+        state.refresh_treemap_nodes();
+
+        let tiles = squarified_treemap(&state.treemap_nodes, Rect::new(0, 0, 80, 20), 200);
+        let path = selection_path(&state);
+        let overlays = selection_highlight_overlays(&tiles, &path, &state);
+
+        assert!(!overlays.is_empty());
     }
 }

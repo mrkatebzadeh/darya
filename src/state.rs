@@ -129,19 +129,7 @@ impl AppState {
     }
 
     pub fn refresh_treemap_nodes(&mut self) {
-        let selected = self.selection.unwrap_or_else(|| self.tree.root());
-
-        let source_id = self
-            .tree
-            .node(selected)
-            .and_then(|node| {
-                if node.file_type == NodeType::Directory {
-                    Some(node.id)
-                } else {
-                    node.parent
-                }
-            })
-            .unwrap_or_else(|| self.tree.root());
+        let source_id = self.tree.root();
 
         let Some(source) = self.tree.node(source_id) else {
             self.treemap_nodes.clear();
@@ -159,6 +147,7 @@ impl AppState {
                 };
 
                 (size > 0).then(|| TreemapNode {
+                    node_id: child.id,
                     name: child.name.clone(),
                     size,
                     is_directory: child.file_type == NodeType::Directory,

@@ -17,6 +17,7 @@ use ratatui::layout::Rect;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TreemapNode {
+    pub node_id: usize,
     pub name: String,
     pub size: u64,
     pub is_directory: bool,
@@ -43,7 +44,12 @@ pub fn squarified_treemap(
         return Vec::new();
     }
 
-    let mut weighted = normalize_areas(nodes, bounds, max_nodes)
+    let total_cells = u32::from(bounds.width) * u32::from(bounds.height);
+    let min_tile_area_cells = 2_u32;
+    let max_by_area = (total_cells / min_tile_area_cells).max(1) as usize;
+    let effective_max_nodes = max_nodes.min(max_by_area);
+
+    let mut weighted = normalize_areas(nodes, bounds, effective_max_nodes)
         .into_iter()
         .map(|(node, area)| WeightedNode { node, area })
         .collect::<Vec<_>>();
@@ -185,16 +191,22 @@ fn layout_row(
         let mut remaining_width = area.width;
 
         for (idx, item) in row.iter().enumerate() {
+            if remaining_width == 0 {
+                break;
+            }
             let remaining_items = (row.len() - idx) as u16;
             let width = if idx + 1 == row.len() {
                 remaining_width
             } else {
-                let estimated =
-                    ((f64::from(item.area) / f64::from(row_height.max(1))).round() as u16).max(1);
-                estimated.clamp(
-                    1,
-                    remaining_width.saturating_sub(remaining_items - 1).max(1),
-                )
+                let max_allowed = remaining_width.saturating_sub(remaining_items - 1);
+                if max_allowed == 0 {
+                    0
+                } else {
+                    let estimated = ((f64::from(item.area) / f64::from(row_height.max(1))).round()
+                        as u16)
+                        .max(1);
+                    estimated.clamp(1, max_allowed)
+                }
             };
 
             output.push(TreemapTile {
@@ -226,16 +238,22 @@ fn layout_row(
         let mut remaining_height = area.height;
 
         for (idx, item) in row.iter().enumerate() {
+            if remaining_height == 0 {
+                break;
+            }
             let remaining_items = (row.len() - idx) as u16;
             let height = if idx + 1 == row.len() {
                 remaining_height
             } else {
-                let estimated =
-                    ((f64::from(item.area) / f64::from(row_width.max(1))).round() as u16).max(1);
-                estimated.clamp(
-                    1,
-                    remaining_height.saturating_sub(remaining_items - 1).max(1),
-                )
+                let max_allowed = remaining_height.saturating_sub(remaining_items - 1);
+                if max_allowed == 0 {
+                    0
+                } else {
+                    let estimated = ((f64::from(item.area) / f64::from(row_width.max(1))).round()
+                        as u16)
+                        .max(1);
+                    estimated.clamp(1, max_allowed)
+                }
             };
 
             output.push(TreemapTile {
