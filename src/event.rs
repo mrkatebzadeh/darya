@@ -143,6 +143,14 @@ fn handle_input_action(action: InputAction, state: &mut AppState) {
             state.set_sort_mode(next);
             state.update_status(format!("sort mode: {}", sort_mode_label(next)));
         }
+        InputAction::ToggleHelp => {
+            state.show_help = !state.show_help;
+            if state.show_help {
+                state.update_status("help opened");
+            } else {
+                state.update_status("help closed");
+            }
+        }
         InputAction::Collapse => collapse_selection(state),
         _ => {}
     }
