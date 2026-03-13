@@ -16,7 +16,8 @@
 use crate::snapshot::SnapshotEndpoint;
 use std::env;
 use std::ffi::{OsStr, OsString};
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 const VERSION_TEXT: &str = concat!(env!("CARGO_PKG_NAME"), " ", env!("CARGO_PKG_VERSION"));
 const HELP_TEXT: &str = concat!(
@@ -38,6 +39,15 @@ const HELP_TEXT: &str = concat!(
     "    -O FILE  Export scan tree to FILE in binary format\n",
     "    -e, --extended  Enable extended metadata mode for owner/permissions/mtime\n",
     "    --no-extended  Disable extended metadata mode\n",
+    "    -x, --one-file-system  Stay on the starting filesystem\n",
+    "    --cross-file-system  Allow crossing filesystem boundaries\n",
+    "    -L, --follow-symlinks  Follow symbolic links while scanning\n",
+    "    --no-follow-symlinks  Do not follow symlinks\n",
+    "    --include-caches  Explicitly include cache directories\n",
+    "    --exclude-caches  Skip directories named cache\n",
+    "    --include-kernfs  Include kernfs-mounted directories\n",
+    "    --exclude-kernfs  Skip kernfs namespaces\n",
+    "    -t N  Limit the runtime worker threads to N\n",
     "    --ignore-config  Do not load configuration files\n",
     "    --exclude PATTERN  Exclude files/directories by glob pattern (repeatable)\n"
 );
@@ -76,12 +86,23 @@ impl CliCommand {
         let mut export_binary = None;
         let mut extended = false;
         let mut ignore_config = false;
+        let mut same_fs_override: Option<bool> = None;
+        let mut cache_policy: Option<bool> = None;
+        let mut kernfs_policy: Option<bool> = None;
+        let mut thread_count: Option<usize> = None;
+        let mut follow_override: Option<bool> = None;
 
         while let Some(arg) = args.next() {
             match arg.to_str() {
                 Some("--exclude") => {
                     let value = take_option_value(&mut args, "--exclude")?;
                     exclude_patterns.push(value.to_string_lossy().into_owned());
+                }
+                Some("-X") | Some("--exclude-from") => {
+                    let value = take_option_value(&mut args, arg.to_str().unwrap())?;
+                    let path = PathBuf::from(value);
+                    let patterns = read_patterns_from_file(&path)?;
+                    exclude_patterns.extend(patterns);
                 }
                 Some("-f") => {
                     let value = take_option_value(&mut args, "-f")?;
@@ -100,6 +121,34 @@ impl CliCommand {
                 }
                 Some("--no-extended") => {
                     extended = false;
+                }
+                Some("-x") | Some("--one-file-system") => {
+                    same_fs_override = Some(true);
+                }
+                Some("--cross-file-system") => {
+                    same_fs_override = Some(false);
+                }
+                Some("--include-caches") => {
+                    cache_policy = Some(true);
+                }
+                Some("--exclude-caches") => {
+                    cache_policy = Some(false);
+                }
+                Some("--include-kernfs") => {
+                    kernfs_policy = Some(true);
+                }
+                Some("--exclude-kernfs") => {
+                    kernfs_policy = Some(false);
+                }
+                Some("-t") => {
+                    let value = take_option_value(&mut args, "-t")?;
+                    thread_count = Some(parse_thread_count(&value)?);
+                }
+                Some("-L") | Some("--follow-symlinks") => {
+                    follow_override = Some(true);
+                }
+                Some("--no-follow-symlinks") => {
+                    follow_override = Some(false);
                 }
                 Some("--ignore-config") => {
                     ignore_config = true;
@@ -126,6 +175,11 @@ impl CliCommand {
                 export_json,
                 export_binary,
                 ignore_config,
+                same_fs_override,
+                cache_policy,
+                kernfs_policy,
+                thread_count,
+                follow_symlinks_override: follow_override,
             }
         } else {
             let mut cli = CliArgs::from_current_dir()?;
@@ -135,6 +189,11 @@ impl CliCommand {
             cli.export_json = export_json;
             cli.export_binary = export_binary;
             cli.ignore_config = ignore_config;
+            cli.same_fs_override = same_fs_override;
+            cli.cache_policy = cache_policy;
+            cli.kernfs_policy = kernfs_policy;
+            cli.thread_count = thread_count;
+            cli.follow_symlinks_override = follow_override;
             cli
         };
         Ok(Self::Run(cli))
@@ -160,6 +219,11 @@ pub struct CliArgs {
     pub export_json: Option<SnapshotEndpoint>,
     pub export_binary: Option<SnapshotEndpoint>,
     pub ignore_config: bool,
+    pub same_fs_override: Option<bool>,
+    pub cache_policy: Option<bool>,
+    pub kernfs_policy: Option<bool>,
+    pub thread_count: Option<usize>,
+    pub follow_symlinks_override: Option<bool>,
 }
 
 impl CliArgs {
@@ -173,6 +237,11 @@ impl CliArgs {
             export_json: None,
             export_binary: None,
             ignore_config: false,
+            same_fs_override: None,
+            cache_policy: None,
+            kernfs_policy: None,
+            thread_count: None,
+            follow_symlinks_override: None,
         })
     }
 }
@@ -193,6 +262,28 @@ fn parse_endpoint(value: &OsStr) -> SnapshotEndpoint {
     }
 }
 
+fn read_patterns_from_file(path: &Path) -> Result<Vec<String>, CliParseError> {
+    let contents = fs::read_to_string(path)
+        .map_err(|err| CliParseError::ExcludeFile(path.to_path_buf(), err))?;
+    Ok(contents
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .map(|line| line.to_string())
+        .collect())
+}
+
+fn parse_thread_count(value: &OsStr) -> Result<usize, CliParseError> {
+    let text = value.to_string_lossy().to_string();
+    let parsed = text
+        .parse::<usize>()
+        .map_err(|_| CliParseError::InvalidThreadCount(text.clone()))?;
+    if parsed == 0 {
+        return Err(CliParseError::InvalidThreadCount(text));
+    }
+    Ok(parsed)
+}
+
 fn is_help_flag(arg: &OsStr) -> bool {
     matches!(arg.to_str(), Some("--help") | Some("-h"))
 }
@@ -210,6 +301,10 @@ pub enum CliParseError {
     UnknownOption(String),
     #[error("missing value for option: {0}")]
     MissingOptionValue(String),
+    #[error("invalid thread count: {0}")]
+    InvalidThreadCount(String),
+    #[error("failed to read exclude-from file {0}: {1}")]
+    ExcludeFile(PathBuf, #[source] std::io::Error),
     #[error("unable to determine current directory: {0}")]
     CurrentDir(#[from] std::io::Error),
 }
@@ -219,6 +314,8 @@ mod tests {
     use super::*;
     use crate::snapshot::SnapshotEndpoint;
     use std::ffi::OsString;
+    use std::fs::File;
+    use std::io::Write;
 
     #[test]
     fn parse_help_flag_returns_help() {
@@ -258,6 +355,68 @@ mod tests {
         } else {
             panic!("expected run command");
         }
+    }
+
+    #[test]
+    fn parse_one_file_system_sets_override() {
+        let args = vec![OsString::from("-x")];
+        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
+            assert_eq!(cli.same_fs_override, Some(true));
+        } else {
+            panic!("expected run command");
+        }
+    }
+
+    #[test]
+    fn parse_cross_file_system_sets_override() {
+        let args = vec![OsString::from("--cross-file-system")];
+        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
+            assert_eq!(cli.same_fs_override, Some(false));
+        } else {
+            panic!("expected run command");
+        }
+    }
+
+    #[test]
+    fn parse_follow_symlinks_sets_override() {
+        let args = vec![OsString::from("-L")];
+        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
+            assert_eq!(cli.follow_symlinks_override, Some(true));
+        } else {
+            panic!("expected run command");
+        }
+    }
+
+    #[test]
+    fn parse_thread_count_sets_override() {
+        let args = vec![OsString::from("-t"), OsString::from("3")];
+        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
+            assert_eq!(cli.thread_count, Some(3));
+        } else {
+            panic!("expected run command");
+        }
+    }
+
+    #[test]
+    fn parse_exclude_from_reads_patterns() {
+        let path = std::env::temp_dir().join("dar-exclude.tmp");
+        let mut file = File::create(&path).unwrap();
+        writeln!(file, "ignored").unwrap();
+        writeln!(file, "foo").unwrap();
+        writeln!(file, "# comment").unwrap();
+        file.flush().unwrap();
+
+        let args = vec![
+            OsString::from("-X"),
+            OsString::from(path.to_string_lossy().into_owned()),
+        ];
+        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
+            assert_eq!(cli.exclude_patterns, vec!["ignored", "foo"]);
+        } else {
+            panic!("expected run command");
+        }
+
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]

@@ -16,6 +16,7 @@
 use crate::tree::NodeType;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use std::collections::HashSet;
+use std::ffi::OsStr;
 use std::{
     path::PathBuf,
     sync::{
@@ -25,7 +26,7 @@ use std::{
     time::SystemTime,
 };
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
-use walkdir::{Error as WalkError, WalkDir};
+use walkdir::{DirEntry, Error as WalkError, WalkDir};
 
 /// Indicates the events emitted by the background scanner.
 #[derive(Debug)]
@@ -63,6 +64,15 @@ pub struct ScanError {
     pub source: WalkError,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct ScanOptions {
+    pub follow_symlinks: bool,
+    pub count_hard_links_once: bool,
+    pub same_file_system: bool,
+    pub skip_caches: bool,
+    pub skip_kernfs: bool,
+}
+
 /// Control handle for the background scanner.
 #[derive(Clone, Debug)]
 pub struct ScannerHandle {
@@ -86,23 +96,15 @@ impl ScannerHandle {
 /// Start scanning `root` on a background worker and return a receiver for scan events.
 pub fn start_scan(
     root: PathBuf,
-    follow_symlinks: bool,
+    options: ScanOptions,
     exclude_patterns: Vec<String>,
-    count_hard_links_once: bool,
 ) -> (ScannerHandle, UnboundedReceiver<ScanEvent>) {
     let (tx, rx) = unbounded_channel();
     let cancel = Arc::new(AtomicBool::new(false));
     let cancel_clone = cancel.clone();
     tokio::task::spawn_blocking(move || {
         let excludes = build_excludes(&exclude_patterns);
-        run_scan(
-            root,
-            follow_symlinks,
-            excludes,
-            count_hard_links_once,
-            tx,
-            cancel_clone,
-        )
+        run_scan(root, options, excludes, tx, cancel_clone)
     });
     (ScannerHandle::new(cancel), rx)
 }
@@ -116,9 +118,8 @@ pub fn dummy_scanner() -> (ScannerHandle, UnboundedReceiver<ScanEvent>) {
 
 fn run_scan(
     root: PathBuf,
-    follow_symlinks: bool,
+    options: ScanOptions,
     excludes: Option<GlobSet>,
-    count_hard_links_once: bool,
     tx: UnboundedSender<ScanEvent>,
     cancel: Arc<AtomicBool>,
 ) {
@@ -126,10 +127,14 @@ fn run_scan(
     let mut errors = 0;
     let mut seen_links: HashSet<(u64, u64)> = HashSet::new();
 
-    for entry in WalkDir::new(&root)
-        .follow_links(follow_symlinks)
-        .into_iter()
-    {
+    let walker = WalkDir::new(&root).follow_links(options.follow_symlinks);
+    let walker = if options.same_file_system {
+        walker.same_file_system(true)
+    } else {
+        walker
+    };
+
+    for entry in walker.into_iter() {
         if cancel.load(Ordering::Relaxed) {
             let _ = tx.send(ScanEvent::Completed);
             return;
@@ -143,12 +148,18 @@ fn run_scan(
                 {
                     continue;
                 }
+                if options.skip_caches && is_cache_entry(&entry) {
+                    continue;
+                }
+                if options.skip_kernfs && is_kernfs_entry(&entry) {
+                    continue;
+                }
                 scanned += 1;
                 match entry.metadata() {
                     Ok(metadata) => {
                         let mut size = metadata.len();
                         let mut disk_size = disk_usage_bytes(&metadata);
-                        if count_hard_links_once
+                        if options.count_hard_links_once
                             && entry.file_type().is_file()
                             && let Some(key) = hard_link_key(&metadata)
                             && !seen_links.insert(key)
@@ -244,6 +255,27 @@ fn disk_usage_bytes(metadata: &std::fs::Metadata) -> u64 {
     metadata.len()
 }
 
+fn is_cache_entry(entry: &DirEntry) -> bool {
+    entry
+        .path()
+        .components()
+        .any(|component| eq_component(component.as_os_str(), "cache"))
+}
+
+fn is_kernfs_entry(entry: &DirEntry) -> bool {
+    entry
+        .path()
+        .components()
+        .any(|component| eq_component(component.as_os_str(), "kernfs"))
+}
+
+fn eq_component(component: &OsStr, pattern: &str) -> bool {
+    component
+        .to_str()
+        .map(|value| value.eq_ignore_ascii_case(pattern))
+        .unwrap_or(false)
+}
+
 fn classify(entry: &walkdir::DirEntry) -> NodeType {
     let file_type = entry.file_type();
     if file_type.is_dir() {
@@ -288,7 +320,14 @@ mod tests {
         let file = base.join("file.txt");
         write_file(&file, 4);
 
-        let (_handle, mut rx) = start_scan(base.clone(), false, Vec::new(), true);
+        let options = ScanOptions {
+            follow_symlinks: false,
+            count_hard_links_once: true,
+            same_file_system: false,
+            skip_caches: false,
+            skip_kernfs: false,
+        };
+        let (_handle, mut rx) = start_scan(base.clone(), options, Vec::new());
         let mut nodes = 0;
         while let Some(event) = rx.recv().await {
             match event {

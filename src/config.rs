@@ -49,6 +49,10 @@ pub struct ScanConfig {
     pub max_depth: usize,
     pub exclude_patterns: Vec<String>,
     pub count_hard_links_once: bool,
+    pub one_file_system: bool,
+    pub exclude_caches: bool,
+    pub exclude_kernfs: bool,
+    pub thread_count: Option<usize>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq, Default)]

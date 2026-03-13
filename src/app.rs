@@ -17,7 +17,7 @@ use crate::{
     cli::CliArgs,
     config::{Config, ConfigLoad},
     event,
-    fs_scan::{self, ScanEvent, ScanProgress, ScannerHandle, dummy_scanner},
+    fs_scan::{self, ScanEvent, ScanOptions, ScanProgress, ScannerHandle, dummy_scanner},
     size::normalize_path,
     snapshot::{self, SnapshotEndpoint, SnapshotFormat},
     state::{AppState, ScanState},
@@ -33,7 +33,7 @@ use ratatui::{Terminal, backend::CrosstermBackend};
 use std::io;
 use std::path::PathBuf;
 use std::thread;
-use tokio::runtime::Runtime;
+use tokio::runtime::Builder;
 use tokio::sync::{mpsc::UnboundedReceiver, oneshot};
 
 pub fn run(cli_args: CliArgs, config_load: ConfigLoad) -> Result<()> {
@@ -44,11 +44,43 @@ pub fn run(cli_args: CliArgs, config_load: ConfigLoad) -> Result<()> {
 
     let root = normalize_path(cli_args.root.clone());
     let mut exclude_patterns = config.scan.exclude_patterns.clone();
-    exclude_patterns.extend(cli_args.exclude_patterns.clone());
+    exclude_patterns.extend(cli_args.exclude_patterns.iter().cloned());
 
-    let runtime = Runtime::new()?;
+    let follow_symlinks = cli_args
+        .follow_symlinks_override
+        .unwrap_or(config.scan.follow_symlinks);
+    let same_file_system = cli_args
+        .same_fs_override
+        .unwrap_or(config.scan.one_file_system);
+    let skip_caches = match cli_args.cache_policy {
+        Some(true) => false,
+        Some(false) => true,
+        None => config.scan.exclude_caches,
+    };
+    let skip_kernfs = match cli_args.kernfs_policy {
+        Some(true) => false,
+        Some(false) => true,
+        None => config.scan.exclude_kernfs,
+    };
+
+    let scan_options = ScanOptions {
+        follow_symlinks,
+        count_hard_links_once: config.scan.count_hard_links_once,
+        same_file_system,
+        skip_caches,
+        skip_kernfs,
+    };
+
+    let theme = Theme::default();
+    let thread_count = cli_args.thread_count.or(config.scan.thread_count);
+    let mut builder = Builder::new_multi_thread();
+    if let Some(threads) = thread_count
+        && threads > 0
+    {
+        builder.worker_threads(threads);
+    }
+    let runtime = builder.enable_all().build()?;
     runtime.block_on(async move {
-        let theme = Theme::default();
         if let Some(import_endpoint) = cli_args.import_snapshot.clone() {
             run_import_mode(
                 root.clone(),
@@ -66,6 +98,7 @@ pub fn run(cli_args: CliArgs, config_load: ConfigLoad) -> Result<()> {
                 cli_args.export_json.clone(),
                 cli_args.export_binary.clone(),
                 cli_args.extended,
+                scan_options,
             )
             .await?;
         } else {
@@ -75,6 +108,7 @@ pub fn run(cli_args: CliArgs, config_load: ConfigLoad) -> Result<()> {
                 &config,
                 theme,
                 cli_args.extended,
+                scan_options,
             )
             .await?;
         }
@@ -89,13 +123,10 @@ async fn run_interactive_mode(
     config: &Config,
     theme: Theme,
     extended: bool,
+    scan_options: ScanOptions,
 ) -> Result<()> {
-    let (scanner_handle, scanner_rx) = fs_scan::start_scan(
-        root.clone(),
-        config.scan.follow_symlinks,
-        exclude_patterns,
-        config.scan.count_hard_links_once,
-    );
+    let (scanner_handle, scanner_rx) =
+        fs_scan::start_scan(root.clone(), scan_options, exclude_patterns);
     let mut state = AppState::new(root.clone(), config.sorting.mode);
     state.set_extended_mode(extended);
     state.mark_scan_progress(ScanProgress {
@@ -134,13 +165,10 @@ async fn run_export_mode(
     export_json: Option<SnapshotEndpoint>,
     export_binary: Option<SnapshotEndpoint>,
     extended: bool,
+    scan_options: ScanOptions,
 ) -> Result<()> {
-    let (scanner_handle, mut scanner_rx) = fs_scan::start_scan(
-        root.clone(),
-        config.scan.follow_symlinks,
-        exclude_patterns,
-        config.scan.count_hard_links_once,
-    );
+    let (scanner_handle, mut scanner_rx) =
+        fs_scan::start_scan(root.clone(), scan_options, exclude_patterns);
     let mut state = AppState::new(root, config.sorting.mode);
     state.set_extended_mode(extended);
     state.mark_scan_progress(ScanProgress {
