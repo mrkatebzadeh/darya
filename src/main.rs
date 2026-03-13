@@ -9,6 +9,11 @@ fn run() -> Result<()> {
         }
         CliCommand::Help => {
             println!("{}", CliCommand::help_text());
+            return Ok(());
+        }
+        CliCommand::Version => {
+            println!("{}", CliCommand::version_text());
+            return Ok(());
         }
     }
 
