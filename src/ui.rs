@@ -14,6 +14,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
+    config::SortMode,
     layout::LayoutRegions,
     state::{AppState, ScanState, SizeDisplayMode},
     theme::Theme,
@@ -68,7 +69,7 @@ impl Ui {
         let header = Paragraph::new(Line::from(vec![
             Span::styled("root: ", Style::default().fg(theme.directory)),
             Span::styled(root_label, Style::default().fg(theme.foreground)),
-            Span::raw(" "),
+            Span::raw(format!(" | sort:{} ", sort_mode_label(state.sort_mode))),
             Span::styled(progress_label, Style::default().fg(theme.selection)),
         ]))
         .block(Block::default().borders(Borders::ALL).title("dar"))
@@ -122,7 +123,7 @@ impl Ui {
             ]),
             Line::from(Span::raw(selected_info_line(state))),
             Line::from(Span::raw(
-                "hjkl: move │ gg/G: jump │ enter/tab: toggle │ d: delete │ o: open │ /: filter │ c: clear filter │ r: rescan │ b: size mode │ E/I: export/import │ q: quit",
+                "hjkl: move │ gg/G: jump │ enter/tab: toggle │ d: delete │ o: open │ /: filter │ c: clear filter │ r: rescan │ b: size mode │ s: cycle sort │ E/I: export/import │ q: quit",
             )),
         ])
         .block(Block::default().borders(Borders::ALL))
@@ -248,6 +249,15 @@ fn chosen_size(row: &TreeRow, mode: SizeDisplayMode) -> u64 {
     match mode {
         SizeDisplayMode::Apparent => row.size,
         SizeDisplayMode::Disk => row.disk_size,
+    }
+}
+
+fn sort_mode_label(mode: SortMode) -> &'static str {
+    match mode {
+        SortMode::SizeDesc => "size_desc",
+        SortMode::SizeAsc => "size_asc",
+        SortMode::Name => "name",
+        SortMode::ModifiedTime => "modified_time",
     }
 }
 

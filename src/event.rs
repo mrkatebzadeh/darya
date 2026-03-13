@@ -15,6 +15,7 @@ use crate::fs_scan::{ScanEvent, ScannerHandle};
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
+    config::SortMode,
     input::{InputAction, InputState},
     layout,
     size::{normalize_path, total_size},
@@ -137,8 +138,31 @@ fn handle_input_action(action: InputAction, state: &mut AppState) {
             state.clear_filter();
             state.update_status("filter cleared");
         }
+        InputAction::CycleSort => {
+            let next = next_sort_mode(state.sort_mode);
+            state.set_sort_mode(next);
+            state.update_status(format!("sort mode: {}", sort_mode_label(next)));
+        }
         InputAction::Collapse => collapse_selection(state),
         _ => {}
+    }
+}
+
+fn next_sort_mode(current: SortMode) -> SortMode {
+    match current {
+        SortMode::SizeDesc => SortMode::SizeAsc,
+        SortMode::SizeAsc => SortMode::Name,
+        SortMode::Name => SortMode::ModifiedTime,
+        SortMode::ModifiedTime => SortMode::SizeDesc,
+    }
+}
+
+fn sort_mode_label(mode: SortMode) -> &'static str {
+    match mode {
+        SortMode::SizeDesc => "size_desc",
+        SortMode::SizeAsc => "size_asc",
+        SortMode::Name => "name",
+        SortMode::ModifiedTime => "modified_time",
     }
 }
 
@@ -489,5 +513,13 @@ mod tests {
         adjust_ancestors_after_rescan(&mut state, Some(0), 10, 25);
         assert_eq!(state.tree.node(0).unwrap().size, 25);
         assert_eq!(dir_id, 1);
+    }
+
+    #[test]
+    fn next_sort_mode_cycles() {
+        assert_eq!(next_sort_mode(SortMode::SizeDesc), SortMode::SizeAsc);
+        assert_eq!(next_sort_mode(SortMode::SizeAsc), SortMode::Name);
+        assert_eq!(next_sort_mode(SortMode::Name), SortMode::ModifiedTime);
+        assert_eq!(next_sort_mode(SortMode::ModifiedTime), SortMode::SizeDesc);
     }
 }
