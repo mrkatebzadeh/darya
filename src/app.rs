@@ -21,6 +21,7 @@ use crossterm::execute;
 use crossterm::terminal::{
     EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
+use crossterm::tty::IsTty;
 use ratatui::{Terminal, backend::CrosstermBackend};
 use std::{io, path::PathBuf};
 use tokio::runtime::Runtime;
@@ -33,6 +34,11 @@ pub fn run(root: PathBuf, config_load: ConfigLoad) -> Result<()> {
     }
 
     let root = normalize_path(root);
+    if !(io::stdout().is_tty() && io::stdin().is_tty()) {
+        return Err(anyhow::anyhow!(
+            "dar requires a terminal to run interactively"
+        ));
+    }
     let guard = TerminalGuard::enter()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
     terminal.hide_cursor()?;
