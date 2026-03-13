@@ -115,7 +115,7 @@ impl Ui {
             ]),
             Line::from(Span::raw(selected_info_line(state))),
             Line::from(Span::raw(
-                "hjkl: move │ gg/G: jump │ enter/tab: toggle │ d: delete │ o: open │ b: size mode │ E/I: export/import │ q: quit",
+                "hjkl: move │ gg/G: jump │ enter/tab: toggle │ d: delete │ o: open │ r: rescan │ b: size mode │ E/I: export/import │ q: quit",
             )),
         ])
         .block(Block::default().borders(Borders::ALL))
