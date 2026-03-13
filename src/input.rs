@@ -37,6 +37,7 @@ pub enum InputAction {
     ApplyFilter,
     ClearFilter,
     CycleSort,
+    ToggleHelp,
     Quit,
     None,
 }
@@ -87,6 +88,7 @@ impl InputState {
             }
             KeyCode::Char('c') => InputAction::ClearFilter,
             KeyCode::Char('s') => InputAction::CycleSort,
+            KeyCode::Char('?') => InputAction::ToggleHelp,
             KeyCode::Char('q') if key_event.modifiers.is_empty() => InputAction::Quit,
             KeyCode::Enter | KeyCode::Tab => InputAction::Select,
             KeyCode::Char('g') => {
@@ -207,6 +209,10 @@ mod tests {
         assert_eq!(
             state.process_key(event(KeyCode::Char('s'))),
             InputAction::CycleSort
+        );
+        assert_eq!(
+            state.process_key(event(KeyCode::Char('?'))),
+            InputAction::ToggleHelp
         );
         assert_eq!(
             state.process_key(event(KeyCode::Enter)),

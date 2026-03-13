@@ -49,6 +49,7 @@ pub struct AppState {
     pub size_mode: SizeDisplayMode,
     pub filter_query: String,
     pub filter_active: bool,
+    pub show_help: bool,
 }
 
 impl AppState {
@@ -65,6 +66,7 @@ impl AppState {
             size_mode: SizeDisplayMode::Apparent,
             filter_query: String::new(),
             filter_active: false,
+            show_help: false,
         }
     }
 

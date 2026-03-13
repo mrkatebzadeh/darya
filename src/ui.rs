@@ -25,7 +25,7 @@ use ratatui::{
     style::Style,
     terminal::Frame,
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
+    widgets::{Block, Borders, Cell, Clear, Paragraph, Row, Table},
 };
 use std::time::UNIX_EPOCH;
 use throbber_widgets_tui::BRAILLE_EIGHT;
@@ -44,6 +44,9 @@ impl Ui {
         self.draw_header(frame, layout.header, state, theme);
         self.draw_tree(frame, layout.tree, state, theme);
         self.draw_footer(frame, layout.footer, state, theme);
+        if state.show_help {
+            self.draw_help_modal(frame, state, theme);
+        }
     }
 
     fn draw_header(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
@@ -123,13 +126,42 @@ impl Ui {
             ]),
             Line::from(Span::raw(selected_info_line(state))),
             Line::from(Span::raw(
-                "hjkl: move │ gg/G: jump │ enter/tab: toggle │ d: delete │ o: open │ /: filter │ c: clear filter │ r: rescan │ b: size mode │ s: cycle sort │ E/I: export/import │ q: quit",
+                "hjkl: move │ gg/G: jump │ enter/tab: toggle │ d: delete │ o: open │ /: filter │ c: clear filter │ r: rescan │ b: size mode │ s: cycle sort │ E/I: export/import │ ?: help │ q: quit",
             )),
         ])
         .block(Block::default().borders(Borders::ALL))
         .style(Style::default().bg(theme.background));
 
         frame.render_widget(footer, area);
+    }
+
+    fn draw_help_modal(&self, frame: &mut Frame<'_>, _state: &AppState, theme: Theme) {
+        let area = centered_rect(80, 70, frame.size());
+        let lines = vec![
+            Line::from("██████╗  █████╗ ██████╗"),
+            Line::from("██╔══██╗██╔══██╗██╔══██╗"),
+            Line::from("██║  ██║███████║██████╔╝"),
+            Line::from("██║  ██║██╔══██║██╔══██╗"),
+            Line::from("██████╔╝██║  ██║██║  ██║"),
+            Line::from("╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝"),
+            Line::from(""),
+            Line::from("Keybindings:"),
+            Line::from("  j/k or up/down: move"),
+            Line::from("  enter/tab: toggle folder"),
+            Line::from("  d: delete (with confirmation)"),
+            Line::from("  o: open selected path"),
+            Line::from("  /: start filter, c: clear filter"),
+            Line::from("  b: size mode, s: sort mode, r: rescan"),
+            Line::from("  E/I: export/import snapshot"),
+            Line::from("  ?: toggle this help, q: quit"),
+        ];
+
+        let popup = Paragraph::new(lines)
+            .block(Block::default().title("DAR Help").borders(Borders::ALL))
+            .style(Style::default().fg(theme.foreground).bg(theme.background));
+
+        frame.render_widget(Clear, area);
+        frame.render_widget(popup, area);
     }
 }
 
@@ -261,6 +293,26 @@ fn sort_mode_label(mode: SortMode) -> &'static str {
     }
 }
 
+fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    let popup_layout = ratatui::layout::Layout::default()
+        .direction(ratatui::layout::Direction::Vertical)
+        .constraints([
+            Constraint::Percentage((100 - percent_y) / 2),
+            Constraint::Percentage(percent_y),
+            Constraint::Percentage((100 - percent_y) / 2),
+        ])
+        .split(r);
+
+    ratatui::layout::Layout::default()
+        .direction(ratatui::layout::Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage((100 - percent_x) / 2),
+            Constraint::Percentage(percent_x),
+            Constraint::Percentage((100 - percent_x) / 2),
+        ])
+        .split(popup_layout[1])[1]
+}
+
 fn selected_info_line(state: &AppState) -> String {
     let Some(selected) = state.selection else {
         return "info: no selection".to_string();
@@ -367,5 +419,15 @@ mod tests {
         assert!(info.contains("uid="));
 
         let _ = fs::remove_file(temp);
+    }
+
+    #[test]
+    fn centered_rect_is_inside_parent() {
+        let outer = Rect::new(0, 0, 100, 40);
+        let inner = centered_rect(80, 70, outer);
+        assert!(inner.width < outer.width);
+        assert!(inner.height < outer.height);
+        assert!(inner.x > outer.x);
+        assert!(inner.y > outer.y);
     }
 }
