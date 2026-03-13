@@ -129,6 +129,18 @@ impl FileTree {
         }
     }
 
+    pub fn add_disk_size(&mut self, node_id: NodeId, disk_size: u64) {
+        let mut current = Some(node_id);
+        while let Some(id) = current {
+            if let Some(node) = self.nodes.get_mut(id) {
+                node.disk_size = node.disk_size.saturating_add(disk_size);
+                current = node.parent;
+            } else {
+                break;
+            }
+        }
+    }
+
     pub fn node_id_for_path(&self, path: &Path) -> Option<NodeId> {
         self.path_index.get(path).copied()
     }
@@ -176,6 +188,7 @@ pub struct TreeNode {
     pub name: String,
     pub file_type: NodeType,
     pub size: u64,
+    pub disk_size: u64,
     pub modified: Option<SystemTime>,
     pub expanded: bool,
 }
@@ -191,6 +204,7 @@ impl TreeNode {
             name,
             file_type,
             size: 0,
+            disk_size: 0,
             modified: None,
             expanded: file_type == NodeType::Directory,
         }

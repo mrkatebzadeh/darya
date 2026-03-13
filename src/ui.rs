@@ -15,7 +15,7 @@
 
 use crate::{
     layout::LayoutRegions,
-    state::{AppState, ScanState},
+    state::{AppState, ScanState, SizeDisplayMode},
     theme::Theme,
     tree::{FileTree, NodeType},
 };
@@ -78,7 +78,7 @@ impl Ui {
     }
 
     fn draw_tree(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
-        let rows = build_rows(&state.tree, state.selection, theme);
+        let rows = build_rows(&state.tree, state.selection, theme, state.size_mode);
         let table = Table::new(rows)
             .block(Block::default().borders(Borders::ALL).title("filesystem"))
             .widths(&[
@@ -115,7 +115,7 @@ impl Ui {
             ]),
             Line::from(Span::raw(selected_info_line(state))),
             Line::from(Span::raw(
-                "hjkl: move │ gg/G: jump │ enter/tab: toggle │ d: delete │ o: open │ q: quit",
+                "hjkl: move │ gg/G: jump │ enter/tab: toggle │ d: delete │ o: open │ b: size mode │ q: quit",
             )),
         ])
         .block(Block::default().borders(Borders::ALL))
@@ -130,13 +130,23 @@ struct TreeRow {
     depth: usize,
     name: String,
     size: u64,
+    disk_size: u64,
     kind: NodeType,
 }
 
-fn build_rows(tree: &FileTree, selection: Option<usize>, theme: Theme) -> Vec<Row<'static>> {
+fn build_rows(
+    tree: &FileTree,
+    selection: Option<usize>,
+    theme: Theme,
+    size_mode: SizeDisplayMode,
+) -> Vec<Row<'static>> {
     let mut rows = Vec::new();
     traverse(tree, tree.root(), 0, &mut rows);
-    let max_size = rows.iter().map(|row| row.size).max().unwrap_or(1);
+    let max_size = rows
+        .iter()
+        .map(|row| chosen_size(row, size_mode))
+        .max()
+        .unwrap_or(1);
 
     rows.into_iter()
         .map(|row| {
@@ -156,8 +166,12 @@ fn build_rows(tree: &FileTree, selection: Option<usize>, theme: Theme) -> Vec<Ro
 
             Row::new(vec![
                 Cell::from(format!("{}{} {}", indent, icon, row.name)),
-                Cell::from(format_size(row.size)),
-                Cell::from(draw_bar(row.size, max_size, 12)),
+                Cell::from(format!(
+                    "{} | d:{}",
+                    format_size(row.size),
+                    format_size(row.disk_size)
+                )),
+                Cell::from(draw_bar(chosen_size(&row, size_mode), max_size, 12)),
             ])
             .style(style)
         })
@@ -171,6 +185,7 @@ fn traverse(tree: &FileTree, id: usize, depth: usize, rows: &mut Vec<TreeRow>) {
             depth,
             name: node.name.clone(),
             size: node.size,
+            disk_size: node.disk_size,
             kind: node.file_type,
         });
 
@@ -214,6 +229,13 @@ fn draw_bar(size: u64, max: u64, width: usize) -> String {
 fn spinner_symbol(phase: usize) -> &'static str {
     let symbols = BRAILLE_EIGHT.symbols;
     symbols[phase % symbols.len()]
+}
+
+fn chosen_size(row: &TreeRow, mode: SizeDisplayMode) -> u64 {
+    match mode {
+        SizeDisplayMode::Apparent => row.size,
+        SizeDisplayMode::Disk => row.disk_size,
+    }
 }
 
 fn selected_info_line(state: &AppState) -> String {

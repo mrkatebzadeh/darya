@@ -107,6 +107,7 @@ fn handle_input_action(action: InputAction, state: &mut AppState) {
         InputAction::Select => toggle_selection(state),
         InputAction::Delete => delete_selection(state),
         InputAction::Open => open_selection(state),
+        InputAction::ToggleSizeMode => state.toggle_size_mode(),
         InputAction::Collapse => collapse_selection(state),
         _ => {}
     }
@@ -269,6 +270,7 @@ fn handle_scan_event(state: &mut AppState, event: ScanEvent) {
             let node_id = state.tree.ensure_node(normalized.clone(), node.kind);
             if node.kind == NodeType::File {
                 state.tree.add_size(node_id, node.size);
+                state.tree.add_disk_size(node_id, node.disk_size);
             }
             if let Some(parent) = state.tree.node(node_id).and_then(|node| node.parent) {
                 state.tree.sort_children(parent, state.sort_mode);

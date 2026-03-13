@@ -42,6 +42,7 @@ pub struct ScanNode {
     pub path: PathBuf,
     pub kind: NodeType,
     pub size: u64,
+    pub disk_size: u64,
     pub modified: Option<SystemTime>,
 }
 
@@ -136,18 +137,21 @@ fn run_scan(
                 match entry.metadata() {
                     Ok(metadata) => {
                         let mut size = metadata.len();
+                        let mut disk_size = disk_usage_bytes(&metadata);
                         if count_hard_links_once
                             && entry.file_type().is_file()
                             && let Some(key) = hard_link_key(&metadata)
                             && !seen_links.insert(key)
                         {
                             size = 0;
+                            disk_size = 0;
                         }
 
                         let node = ScanNode {
                             path: entry.path().to_path_buf(),
                             kind: classify(&entry),
                             size,
+                            disk_size,
                             modified: metadata.modified().ok(),
                         };
                         let _ = tx.send(ScanEvent::Node(node));
@@ -202,6 +206,17 @@ fn hard_link_key(metadata: &std::fs::Metadata) -> Option<(u64, u64)> {
 #[cfg(not(unix))]
 fn hard_link_key(_metadata: &std::fs::Metadata) -> Option<(u64, u64)> {
     None
+}
+
+#[cfg(unix)]
+fn disk_usage_bytes(metadata: &std::fs::Metadata) -> u64 {
+    use std::os::unix::fs::MetadataExt;
+    metadata.blocks().saturating_mul(512)
+}
+
+#[cfg(not(unix))]
+fn disk_usage_bytes(metadata: &std::fs::Metadata) -> u64 {
+    metadata.len()
 }
 
 fn classify(entry: &walkdir::DirEntry) -> NodeType {

@@ -29,6 +29,12 @@ pub enum ScanState {
     Error(String),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SizeDisplayMode {
+    Apparent,
+    Disk,
+}
+
 /// Central application state shared across the UI and scanner.
 #[derive(Debug)]
 pub struct AppState {
@@ -40,6 +46,7 @@ pub struct AppState {
     pub status_message: Option<String>,
     pub spinner_phase: usize,
     pub pending_delete: Option<NodeId>,
+    pub size_mode: SizeDisplayMode,
 }
 
 impl AppState {
@@ -53,6 +60,7 @@ impl AppState {
             status_message: None,
             spinner_phase: 0,
             pending_delete: None,
+            size_mode: SizeDisplayMode::Apparent,
         }
     }
 
@@ -97,6 +105,13 @@ impl AppState {
 
     pub fn mark_scan_error(&mut self, message: impl Into<String>) {
         self.scan_state = ScanState::Error(message.into());
+    }
+
+    pub fn toggle_size_mode(&mut self) {
+        self.size_mode = match self.size_mode {
+            SizeDisplayMode::Apparent => SizeDisplayMode::Disk,
+            SizeDisplayMode::Disk => SizeDisplayMode::Apparent,
+        };
     }
 }
 
