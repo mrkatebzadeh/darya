@@ -104,6 +104,13 @@ pub fn start_scan(
     (ScannerHandle::new(cancel), rx)
 }
 
+pub fn dummy_scanner() -> (ScannerHandle, UnboundedReceiver<ScanEvent>) {
+    let (tx, rx) = unbounded_channel();
+    drop(tx);
+    let cancel = Arc::new(AtomicBool::new(true));
+    (ScannerHandle::new(cancel), rx)
+}
+
 fn run_scan(
     root: PathBuf,
     follow_symlinks: bool,

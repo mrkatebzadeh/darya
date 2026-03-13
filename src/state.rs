@@ -52,6 +52,7 @@ pub struct AppState {
     pub filter_active: bool,
     pub show_help: bool,
     pub treemap_nodes: Vec<TreemapNode>,
+    pub allow_modifications: bool,
 }
 
 impl AppState {
@@ -70,6 +71,7 @@ impl AppState {
             filter_active: false,
             show_help: false,
             treemap_nodes: Vec::new(),
+            allow_modifications: true,
         }
     }
 
@@ -176,6 +178,7 @@ mod tests {
         assert!(state.selection.is_none());
         assert_eq!(state.sort_mode, SortMode::SizeDesc);
         assert!(state.treemap_nodes.is_empty());
+        assert!(state.allow_modifications);
     }
 
     #[test]

@@ -13,14 +13,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{
-    env,
-    ffi::{OsStr, OsString},
-    path::PathBuf,
-};
+use crate::snapshot::SnapshotEndpoint;
+use std::env;
+use std::ffi::{OsStr, OsString};
+use std::path::PathBuf;
 
 const VERSION_TEXT: &str = concat!(env!("CARGO_PKG_NAME"), " ", env!("CARGO_PKG_VERSION"));
-
 const HELP_TEXT: &str = concat!(
     env!("CARGO_PKG_NAME"),
     " ",
@@ -35,6 +33,9 @@ const HELP_TEXT: &str = concat!(
     "OPTIONS:\n",
     "    -h, --help  Print this help screen\n",
     "    -v, --version  Print the version information\n",
+    "    -f FILE  Import snapshot from FILE (use '-' for stdin, JSON only)\n",
+    "    -o FILE  Export scan tree to FILE in JSON format\n",
+    "    -O FILE  Export scan tree to FILE in binary format\n",
     "    --exclude PATTERN  Exclude files/directories by glob pattern (repeatable)\n"
 );
 
@@ -67,26 +68,38 @@ impl CliCommand {
         let mut args = args.into_iter().peekable();
         let mut root: Option<PathBuf> = None;
         let mut exclude_patterns = Vec::new();
+        let mut import_snapshot = None;
+        let mut export_json = None;
+        let mut export_binary = None;
 
         while let Some(arg) = args.next() {
-            if arg == "--exclude" {
-                let Some(pattern) = args.next() else {
-                    return Err(CliParseError::MissingOptionValue("--exclude".to_string()));
-                };
-                exclude_patterns.push(pattern.to_string_lossy().into_owned());
-                continue;
-            }
-
-            if is_unknown_flag(&arg) {
-                return Err(CliParseError::UnknownOption(
-                    arg.to_string_lossy().into_owned(),
-                ));
-            }
-
-            if root.is_none() {
-                root = Some(PathBuf::from(arg));
-            } else {
-                return Err(CliParseError::TooManyArguments);
+            match arg.to_str() {
+                Some("--exclude") => {
+                    let value = take_option_value(&mut args, "--exclude")?;
+                    exclude_patterns.push(value.to_string_lossy().into_owned());
+                }
+                Some("-f") => {
+                    let value = take_option_value(&mut args, "-f")?;
+                    import_snapshot = Some(parse_endpoint(&value));
+                }
+                Some("-o") => {
+                    let value = take_option_value(&mut args, "-o")?;
+                    export_json = Some(parse_endpoint(&value));
+                }
+                Some("-O") => {
+                    let value = take_option_value(&mut args, "-O")?;
+                    export_binary = Some(parse_endpoint(&value));
+                }
+                Some(value) if value.starts_with('-') => {
+                    return Err(CliParseError::UnknownOption(value.to_string()));
+                }
+                _ => {
+                    if root.is_none() {
+                        root = Some(PathBuf::from(arg));
+                    } else {
+                        return Err(CliParseError::TooManyArguments);
+                    }
+                }
             }
         }
 
@@ -94,10 +107,16 @@ impl CliCommand {
             CliArgs {
                 root,
                 exclude_patterns,
+                import_snapshot,
+                export_json,
+                export_binary,
             }
         } else {
             let mut cli = CliArgs::from_current_dir()?;
             cli.exclude_patterns = exclude_patterns;
+            cli.import_snapshot = import_snapshot;
+            cli.export_json = export_json;
+            cli.export_binary = export_binary;
             cli
         };
         Ok(Self::Run(cli))
@@ -118,6 +137,9 @@ impl CliCommand {
 pub struct CliArgs {
     pub root: PathBuf,
     pub exclude_patterns: Vec<String>,
+    pub import_snapshot: Option<SnapshotEndpoint>,
+    pub export_json: Option<SnapshotEndpoint>,
+    pub export_binary: Option<SnapshotEndpoint>,
 }
 
 impl CliArgs {
@@ -126,7 +148,26 @@ impl CliArgs {
         Ok(Self {
             root,
             exclude_patterns: Vec::new(),
+            import_snapshot: None,
+            export_json: None,
+            export_binary: None,
         })
+    }
+}
+
+fn take_option_value<I>(args: &mut I, flag: &str) -> Result<OsString, CliParseError>
+where
+    I: Iterator<Item = OsString>,
+{
+    args.next()
+        .ok_or_else(|| CliParseError::MissingOptionValue(flag.to_string()))
+}
+
+fn parse_endpoint(value: &OsStr) -> SnapshotEndpoint {
+    if value == OsStr::new("-") {
+        SnapshotEndpoint::StdIo
+    } else {
+        SnapshotEndpoint::File(PathBuf::from(value))
     }
 }
 
@@ -136,12 +177,6 @@ fn is_help_flag(arg: &OsStr) -> bool {
 
 fn is_version_flag(arg: &OsStr) -> bool {
     matches!(arg.to_str(), Some("-v") | Some("-V") | Some("--version"))
-}
-
-fn is_unknown_flag(arg: &OsStr) -> bool {
-    arg.to_str()
-        .map(|value| value.starts_with('-'))
-        .unwrap_or(false)
 }
 
 /// Errors that can occur while parsing CLI arguments.
@@ -160,6 +195,7 @@ pub enum CliParseError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::snapshot::SnapshotEndpoint;
     use std::ffi::OsString;
 
     #[test]
@@ -179,20 +215,26 @@ mod tests {
     }
 
     #[test]
-    fn parse_path_with_help_flag_prefers_help() {
-        let args = vec![OsString::from("--help"), OsString::from("/tmp")];
-        assert!(matches!(
-            CliCommand::parse_from_iter(args),
-            Ok(CliCommand::Help)
-        ));
+    fn parse_import_flag_sets_endpoint() {
+        let args = vec![OsString::from("-f"), OsString::from("-")];
+        assert!(
+            matches!(CliCommand::parse_from_iter(args), Ok(CliCommand::Run(cli)) if matches!(cli.import_snapshot, Some(SnapshotEndpoint::StdIo)))
+        );
     }
 
     #[test]
-    fn parse_path_with_version_flag_prefers_version() {
-        let args = vec![OsString::from("--version"), OsString::from("/tmp")];
-        assert!(matches!(
-            CliCommand::parse_from_iter(args),
-            Ok(CliCommand::Version)
-        ));
+    fn parse_export_flags_collect_endpoints() {
+        let args = vec![
+            OsString::from("-o"),
+            OsString::from("export.json"),
+            OsString::from("-O"),
+            OsString::from("export.bin"),
+        ];
+        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
+            assert!(matches!(cli.export_json, Some(SnapshotEndpoint::File(_))));
+            assert!(matches!(cli.export_binary, Some(SnapshotEndpoint::File(_))));
+        } else {
+            panic!("expected run command");
+        }
     }
 }

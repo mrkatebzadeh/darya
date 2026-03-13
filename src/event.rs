@@ -19,7 +19,7 @@ use crate::{
     input::{InputAction, InputState},
     layout,
     size::{normalize_path, total_size},
-    snapshot,
+    snapshot::{self, SnapshotEndpoint, SnapshotFormat},
     state::AppState,
     theme::Theme,
     tree::NodeType,
@@ -80,7 +80,7 @@ pub fn run_event_loop(
         for _ in 0..MAX_SCAN_EVENTS_PER_CYCLE {
             match scanner_rx.try_recv() {
                 Ok(scan_event) => {
-                    handle_scan_event(state, scan_event);
+                    process_scan_event(state, scan_event);
                     dirty = true;
                 }
                 Err(_) => break,
@@ -259,6 +259,10 @@ fn toggle_selection(state: &mut AppState) {
 }
 
 fn delete_selection(state: &mut AppState) {
+    if !state.allow_modifications {
+        state.update_status("imported scan is read-only");
+        return;
+    }
     let Some(selected_id) = state.selection else {
         return;
     };
@@ -303,6 +307,10 @@ fn delete_selection(state: &mut AppState) {
 }
 
 fn open_selection(state: &mut AppState) {
+    if !state.allow_modifications {
+        state.update_status("imported scan is read-only");
+        return;
+    }
     let Some(selected_id) = state.selection else {
         return;
     };
@@ -335,7 +343,11 @@ fn import_scan(state: &mut AppState) {
         .map(|node| node.path.clone())
         .unwrap_or_else(|| std::path::PathBuf::from("."));
 
-    match snapshot::import_tree(snapshot_path, &default_root) {
+    match snapshot::import_from_destination(
+        SnapshotEndpoint::File(snapshot_path.to_path_buf()),
+        &default_root,
+        SnapshotFormat::Json,
+    ) {
         Ok(tree) => {
             state.tree = tree;
             state.selection = Some(state.tree.root());
@@ -346,6 +358,10 @@ fn import_scan(state: &mut AppState) {
 }
 
 fn rescan_selection(state: &mut AppState) {
+    if !state.allow_modifications {
+        state.update_status("imported scan is read-only");
+        return;
+    }
     let Some(selected_id) = state.selection else {
         return;
     };
@@ -411,7 +427,7 @@ fn open_command_for_platform() -> Command {
     }
 }
 
-fn handle_scan_event(state: &mut AppState, event: ScanEvent) {
+pub(crate) fn process_scan_event(state: &mut AppState, event: ScanEvent) {
     match event {
         ScanEvent::Node(node) => {
             let normalized = normalize_path(&node.path);
