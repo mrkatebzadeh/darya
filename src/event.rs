@@ -34,6 +34,7 @@ use throbber_widgets_tui::BRAILLE_EIGHT;
 use tokio::sync::mpsc::UnboundedReceiver;
 
 const TICK_RATE: Duration = Duration::from_millis(250);
+const MAX_SCAN_EVENTS_PER_CYCLE: usize = 256;
 
 /// Runs the terminal event loop until the user quits or scanning completes.
 pub fn run_event_loop(
@@ -70,9 +71,14 @@ pub fn run_event_loop(
             }
         }
 
-        while let Ok(scan_event) = scanner_rx.try_recv() {
-            handle_scan_event(state, scan_event);
-            dirty = true;
+        for _ in 0..MAX_SCAN_EVENTS_PER_CYCLE {
+            match scanner_rx.try_recv() {
+                Ok(scan_event) => {
+                    handle_scan_event(state, scan_event);
+                    dirty = true;
+                }
+                Err(_) => break,
+            }
         }
 
         if last_tick.elapsed() >= TICK_RATE || dirty {
