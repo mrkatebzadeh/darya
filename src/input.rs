@@ -30,6 +30,7 @@ pub enum InputAction {
     ToggleSizeMode,
     ExportScan,
     ImportScan,
+    Rescan,
     Quit,
     None,
 }
@@ -60,6 +61,7 @@ impl InputState {
             KeyCode::Char('b') => InputAction::ToggleSizeMode,
             KeyCode::Char('E') => InputAction::ExportScan,
             KeyCode::Char('I') => InputAction::ImportScan,
+            KeyCode::Char('r') => InputAction::Rescan,
             KeyCode::Char('q') if key_event.modifiers.is_empty() => InputAction::Quit,
             KeyCode::Enter | KeyCode::Tab => InputAction::Select,
             KeyCode::Char('g') => {
@@ -168,6 +170,10 @@ mod tests {
         assert_eq!(
             state.process_key(event(KeyCode::Char('I'))),
             InputAction::ImportScan
+        );
+        assert_eq!(
+            state.process_key(event(KeyCode::Char('r'))),
+            InputAction::Rescan
         );
         assert_eq!(
             state.process_key(event(KeyCode::Enter)),

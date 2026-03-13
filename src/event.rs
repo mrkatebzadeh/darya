@@ -17,7 +17,7 @@ use crate::fs_scan::{ScanEvent, ScannerHandle};
 use crate::{
     input::{InputAction, InputState},
     layout,
-    size::normalize_path,
+    size::{normalize_path, total_size},
     snapshot,
     state::AppState,
     theme::Theme,
@@ -112,6 +112,7 @@ fn handle_input_action(action: InputAction, state: &mut AppState) {
         InputAction::ToggleSizeMode => state.toggle_size_mode(),
         InputAction::ExportScan => export_scan(state),
         InputAction::ImportScan => import_scan(state),
+        InputAction::Rescan => rescan_selection(state),
         InputAction::Collapse => collapse_selection(state),
         _ => {}
     }
@@ -285,6 +286,64 @@ fn import_scan(state: &mut AppState) {
     }
 }
 
+fn rescan_selection(state: &mut AppState) {
+    let Some(selected_id) = state.selection else {
+        return;
+    };
+    let Some(node) = state.tree.node(selected_id).cloned() else {
+        return;
+    };
+
+    let previous_size = node.size;
+    let refreshed_size = if node.file_type == NodeType::Directory {
+        match total_size(&node.path, false) {
+            Ok(size) => size,
+            Err(err) => {
+                state.update_status(format!("rescan failed: {err}"));
+                return;
+            }
+        }
+    } else {
+        match std::fs::metadata(&node.path) {
+            Ok(meta) => meta.len(),
+            Err(err) => {
+                state.update_status(format!("rescan failed: {err}"));
+                return;
+            }
+        }
+    };
+
+    if let Some(current) = state.tree.node_mut(selected_id) {
+        current.size = refreshed_size;
+    }
+    adjust_ancestors_after_rescan(state, node.parent, previous_size, refreshed_size);
+    state.update_status(format!("rescanned {}", node.path.display()));
+}
+
+fn adjust_ancestors_after_rescan(
+    state: &mut AppState,
+    mut parent: Option<usize>,
+    previous_size: u64,
+    refreshed_size: u64,
+) {
+    while let Some(parent_id) = parent {
+        if let Some(parent_node) = state.tree.node_mut(parent_id) {
+            if refreshed_size >= previous_size {
+                parent_node.size = parent_node
+                    .size
+                    .saturating_add(refreshed_size.saturating_sub(previous_size));
+            } else {
+                parent_node.size = parent_node
+                    .size
+                    .saturating_sub(previous_size.saturating_sub(refreshed_size));
+            }
+            parent = parent_node.parent;
+        } else {
+            break;
+        }
+    }
+}
+
 fn open_command_for_platform() -> Command {
     if cfg!(target_os = "macos") {
         Command::new("open")
@@ -391,5 +450,20 @@ mod tests {
             "xdg-open"
         };
         assert_eq!(command.get_program().to_string_lossy(), expected);
+    }
+
+    #[test]
+    fn adjust_ancestors_updates_parent_sizes() {
+        let mut state = AppState::new(PathBuf::from("/"), default_sort_mode());
+        let dir_id = state.tree.add_child(
+            0,
+            TreeNode::new(PathBuf::from("/dir"), NodeType::Directory).with_size(10),
+        );
+        if let Some(root) = state.tree.node_mut(0) {
+            root.size = 10;
+        }
+        adjust_ancestors_after_rescan(&mut state, Some(0), 10, 25);
+        assert_eq!(state.tree.node(0).unwrap().size, 25);
+        assert_eq!(dir_id, 1);
     }
 }
