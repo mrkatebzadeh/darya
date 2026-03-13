@@ -29,6 +29,7 @@ use ratatui::{backend::CrosstermBackend, terminal::Terminal};
 use std::fs;
 use std::{
     io::Stdout,
+    process::Command,
     time::{Duration, Instant},
 };
 use throbber_widgets_tui::BRAILLE_EIGHT;
@@ -105,6 +106,7 @@ fn handle_input_action(action: InputAction, state: &mut AppState) {
         InputAction::Expand => expand_selection(state),
         InputAction::Select => toggle_selection(state),
         InputAction::Delete => delete_selection(state),
+        InputAction::Open => open_selection(state),
         InputAction::Collapse => collapse_selection(state),
         _ => {}
     }
@@ -235,6 +237,31 @@ fn delete_selection(state: &mut AppState) {
     state.pending_delete = None;
 }
 
+fn open_selection(state: &mut AppState) {
+    let Some(selected_id) = state.selection else {
+        return;
+    };
+    let Some(path) = state.tree.node(selected_id).map(|n| n.path.clone()) else {
+        return;
+    };
+
+    let mut command = open_command_for_platform();
+    command.arg(&path);
+
+    match command.spawn() {
+        Ok(_) => state.update_status(format!("opened {}", path.display())),
+        Err(err) => state.update_status(format!("open failed for {}: {err}", path.display())),
+    }
+}
+
+fn open_command_for_platform() -> Command {
+    if cfg!(target_os = "macos") {
+        Command::new("open")
+    } else {
+        Command::new("xdg-open")
+    }
+}
+
 fn handle_scan_event(state: &mut AppState, event: ScanEvent) {
     match event {
         ScanEvent::Node(node) => {
@@ -321,5 +348,16 @@ mod tests {
         state.selection = Some(1);
         handle_input_action(InputAction::Delete, &mut state);
         assert_eq!(state.pending_delete, Some(1));
+    }
+
+    #[test]
+    fn open_command_matches_platform() {
+        let command = open_command_for_platform();
+        let expected = if cfg!(target_os = "macos") {
+            "open"
+        } else {
+            "xdg-open"
+        };
+        assert_eq!(command.get_program().to_string_lossy(), expected);
     }
 }
