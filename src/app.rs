@@ -14,6 +14,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
+    cli::CliArgs,
     config::ConfigLoad,
     event,
     fs_scan::{self, ScanProgress},
@@ -28,17 +29,19 @@ use crossterm::terminal::{
 };
 use crossterm::tty::IsTty;
 use ratatui::{Terminal, backend::CrosstermBackend};
-use std::{io, path::PathBuf};
+use std::io;
 use tokio::runtime::Runtime;
 
-pub fn run(root: PathBuf, config_load: ConfigLoad) -> Result<()> {
+pub fn run(cli_args: CliArgs, config_load: ConfigLoad) -> Result<()> {
     let ConfigLoad { config, error, .. } = config_load;
 
     if let Some(err) = error {
         eprintln!("config: {err}");
     }
 
-    let root = normalize_path(root);
+    let root = normalize_path(cli_args.root);
+    let mut exclude_patterns = config.scan.exclude_patterns.clone();
+    exclude_patterns.extend(cli_args.exclude_patterns.clone());
     let guard = TerminalGuard::enter()?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
     terminal.hide_cursor()?;
@@ -46,7 +49,7 @@ pub fn run(root: PathBuf, config_load: ConfigLoad) -> Result<()> {
     let runtime = Runtime::new()?;
     let loop_result = runtime.block_on(async {
         let (scanner_handle, mut scanner_rx) =
-            fs_scan::start_scan(root.clone(), config.scan.follow_symlinks);
+            fs_scan::start_scan(root.clone(), config.scan.follow_symlinks, exclude_patterns);
         let mut state = AppState::new(root.clone(), config.sorting.mode);
         state.mark_scan_progress(ScanProgress {
             scanned: 0,
