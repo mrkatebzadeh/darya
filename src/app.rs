@@ -1,0 +1,66 @@
+use crate::{
+    config::ConfigLoad, event, fs_scan, size::normalize_path, state::AppState, theme::Theme,
+};
+use anyhow::Result;
+use crossterm::execute;
+use crossterm::terminal::{
+    EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
+};
+use ratatui::{Terminal, backend::CrosstermBackend};
+use std::{io, path::PathBuf};
+use tokio::runtime::Runtime;
+
+pub fn run(root: PathBuf, config_load: ConfigLoad) -> Result<()> {
+    let ConfigLoad { config, error, .. } = config_load;
+
+    if let Some(err) = error {
+        eprintln!("config: {err}");
+    }
+
+    let root = normalize_path(root);
+    let guard = TerminalGuard::enter()?;
+    let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
+    terminal.hide_cursor()?;
+
+    let runtime = Runtime::new()?;
+    let (scanner_handle, mut scanner_rx) =
+        fs_scan::start_scan(root.clone(), config.scan.follow_symlinks);
+    let mut state = AppState::new(root.clone(), config.sorting.mode);
+    state.update_status(format!("scanning {}", root.display()));
+
+    let theme = Theme::default();
+    let loop_result = runtime.block_on(async {
+        event::run_event_loop(
+            &mut terminal,
+            &mut state,
+            &mut scanner_rx,
+            &scanner_handle,
+            theme,
+        )?;
+        Ok::<(), anyhow::Error>(())
+    });
+
+    terminal.show_cursor()?;
+    drop(terminal);
+    drop(guard);
+
+    loop_result?;
+    Ok(())
+}
+
+struct TerminalGuard;
+
+impl TerminalGuard {
+    fn enter() -> Result<Self> {
+        enable_raw_mode()?;
+        execute!(io::stdout(), EnterAlternateScreen)?;
+        Ok(Self)
+    }
+}
+
+impl Drop for TerminalGuard {
+    fn drop(&mut self) {
+        let _ = execute!(io::stdout(), LeaveAlternateScreen);
+        let _ = disable_raw_mode();
+    }
+}

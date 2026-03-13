@@ -1,20 +1,11 @@
 use anyhow::Result;
-use dar::{cli::CliCommand, config};
+use dar::{app, cli::CliCommand, config};
 
 fn run() -> Result<()> {
-    let config_load = config::load();
-
     match CliCommand::parse()? {
         CliCommand::Run(cli_args) => {
-            if let Some(err) = config_load.error() {
-                eprintln!("config: {err}");
-            }
-
-            println!(
-                "starting dar for {} using config {}",
-                cli_args.root.display(),
-                config_load.source_description(),
-            );
+            let config_load = config::load();
+            app::run(cli_args.root, config_load)?;
         }
         CliCommand::Help => {
             println!("{}", CliCommand::help_text());
