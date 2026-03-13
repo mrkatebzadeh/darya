@@ -14,6 +14,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::tree::NodeType;
+use globset::{Glob, GlobSet, GlobSetBuilder};
 use std::{
     path::PathBuf,
     sync::{
@@ -81,17 +82,22 @@ impl ScannerHandle {
 pub fn start_scan(
     root: PathBuf,
     follow_symlinks: bool,
+    exclude_patterns: Vec<String>,
 ) -> (ScannerHandle, UnboundedReceiver<ScanEvent>) {
     let (tx, rx) = unbounded_channel();
     let cancel = Arc::new(AtomicBool::new(false));
     let cancel_clone = cancel.clone();
-    tokio::task::spawn_blocking(move || run_scan(root, follow_symlinks, tx, cancel_clone));
+    tokio::task::spawn_blocking(move || {
+        let excludes = build_excludes(&exclude_patterns);
+        run_scan(root, follow_symlinks, excludes, tx, cancel_clone)
+    });
     (ScannerHandle::new(cancel), rx)
 }
 
 fn run_scan(
     root: PathBuf,
     follow_symlinks: bool,
+    excludes: Option<GlobSet>,
     tx: UnboundedSender<ScanEvent>,
     cancel: Arc<AtomicBool>,
 ) {
@@ -109,6 +115,12 @@ fn run_scan(
 
         match entry {
             Ok(entry) => {
+                if excludes
+                    .as_ref()
+                    .is_some_and(|set| set.is_match(entry.path()))
+                {
+                    continue;
+                }
                 scanned += 1;
                 match entry.metadata() {
                     Ok(metadata) => {
@@ -145,6 +157,20 @@ fn run_scan(
     }
 
     let _ = tx.send(ScanEvent::Completed);
+}
+
+fn build_excludes(patterns: &[String]) -> Option<GlobSet> {
+    if patterns.is_empty() {
+        return None;
+    }
+
+    let mut builder = GlobSetBuilder::new();
+    for pattern in patterns {
+        if let Ok(glob) = Glob::new(pattern) {
+            builder.add(glob);
+        }
+    }
+    builder.build().ok()
 }
 
 fn classify(entry: &walkdir::DirEntry) -> NodeType {
@@ -191,7 +217,7 @@ mod tests {
         let file = base.join("file.txt");
         write_file(&file, 4);
 
-        let (_handle, mut rx) = start_scan(base.clone(), false);
+        let (_handle, mut rx) = start_scan(base.clone(), false, Vec::new());
         let mut nodes = 0;
         while let Some(event) = rx.recv().await {
             match event {

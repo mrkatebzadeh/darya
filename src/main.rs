@@ -5,7 +5,7 @@ fn run() -> Result<()> {
     match CliCommand::parse()? {
         CliCommand::Run(cli_args) => {
             let config_load = config::load();
-            app::run(cli_args.root, config_load)?;
+            app::run(cli_args, config_load)?;
         }
         CliCommand::Help => {
             println!("{}", CliCommand::help_text());

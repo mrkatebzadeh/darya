@@ -47,6 +47,7 @@ pub struct SortingConfig {
 pub struct ScanConfig {
     pub follow_symlinks: bool,
     pub max_depth: usize,
+    pub exclude_patterns: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq, Default)]

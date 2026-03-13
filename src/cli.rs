@@ -27,6 +27,7 @@ ARGS:
 
 OPTIONS:
     -h, --help  Print this help screen
+    --exclude PATTERN  Exclude files/directories by glob pattern (repeatable)
 ";
 
 /// Represents the CLI command to run.
@@ -39,29 +40,50 @@ pub enum CliCommand {
 impl CliCommand {
     /// Parse the arguments coming from the environment.
     pub fn parse() -> Result<Self, CliParseError> {
-        let mut args = env::args_os().skip(1);
-        match args.next() {
-            None => Ok(Self::Run(CliArgs::from_current_dir()?)),
-            Some(first) if is_help_flag(&first) => {
-                if args.next().is_some() {
-                    return Err(CliParseError::TooManyArguments);
-                }
-                Ok(Self::Help)
+        let mut args = env::args_os().skip(1).peekable();
+        if let Some(first) = args.peek()
+            && is_help_flag(first)
+            && args.len() == 1
+        {
+            return Ok(Self::Help);
+        }
+
+        let mut root: Option<PathBuf> = None;
+        let mut exclude_patterns = Vec::new();
+
+        while let Some(arg) = args.next() {
+            if arg == "--exclude" {
+                let Some(pattern) = args.next() else {
+                    return Err(CliParseError::MissingOptionValue("--exclude".to_string()));
+                };
+                exclude_patterns.push(pattern.to_string_lossy().into_owned());
+                continue;
             }
-            Some(first) => {
-                if is_unknown_flag(&first) {
-                    return Err(CliParseError::UnknownOption(
-                        first.to_string_lossy().into_owned(),
-                    ));
-                }
-                if args.next().is_some() {
-                    return Err(CliParseError::TooManyArguments);
-                }
-                Ok(Self::Run(CliArgs {
-                    root: PathBuf::from(first),
-                }))
+
+            if is_unknown_flag(&arg) {
+                return Err(CliParseError::UnknownOption(
+                    arg.to_string_lossy().into_owned(),
+                ));
+            }
+
+            if root.is_none() {
+                root = Some(PathBuf::from(arg));
+            } else {
+                return Err(CliParseError::TooManyArguments);
             }
         }
+
+        let cli = if let Some(root) = root {
+            CliArgs {
+                root,
+                exclude_patterns,
+            }
+        } else {
+            let mut cli = CliArgs::from_current_dir()?;
+            cli.exclude_patterns = exclude_patterns;
+            cli
+        };
+        Ok(Self::Run(cli))
     }
 
     /// Return the help text displayed when `--help` is requested.
@@ -74,12 +96,16 @@ impl CliCommand {
 #[derive(Debug)]
 pub struct CliArgs {
     pub root: PathBuf,
+    pub exclude_patterns: Vec<String>,
 }
 
 impl CliArgs {
     fn from_current_dir() -> Result<Self, CliParseError> {
         let root = env::current_dir().map_err(CliParseError::CurrentDir)?;
-        Ok(Self { root })
+        Ok(Self {
+            root,
+            exclude_patterns: Vec::new(),
+        })
     }
 }
 
@@ -100,6 +126,8 @@ pub enum CliParseError {
     TooManyArguments,
     #[error("unknown option: {0}")]
     UnknownOption(String),
+    #[error("missing value for option: {0}")]
+    MissingOptionValue(String),
     #[error("unable to determine current directory: {0}")]
     CurrentDir(#[from] std::io::Error),
 }
