@@ -15,6 +15,7 @@ serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
 toml = "0.7"
+throbber-widgets-tui = "0.8"
 walkdir = "2.3"
 
 [profile.release]

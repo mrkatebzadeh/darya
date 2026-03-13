@@ -30,6 +30,7 @@ use std::{
     io::Stdout,
     time::{Duration, Instant},
 };
+use throbber_widgets_tui::BRAILLE_EIGHT;
 use tokio::sync::mpsc::UnboundedReceiver;
 
 const TICK_RATE: Duration = Duration::from_millis(250);
@@ -75,6 +76,7 @@ pub fn run_event_loop(
         }
 
         if last_tick.elapsed() >= TICK_RATE || dirty {
+            state.advance_spinner(BRAILLE_EIGHT.symbols.len());
             terminal.draw(|frame| {
                 let regions = layout::split_layout(frame.size());
                 ui.draw(frame, regions, state, theme);

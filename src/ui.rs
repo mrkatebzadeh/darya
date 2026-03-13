@@ -26,6 +26,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, Cell, Paragraph, Row, Table},
 };
+use throbber_widgets_tui::BRAILLE_EIGHT;
 
 /// Renderer responsible for drawing the main UI panels.
 pub struct Ui;
@@ -52,7 +53,11 @@ impl Ui {
 
         let progress_label = match &state.scan_state {
             ScanState::Running(progress) => {
-                format!("scanned {} err {}", progress.scanned, progress.errors)
+                let spinner = spinner_symbol(state.spinner_phase);
+                format!(
+                    "{spinner} please wait — scanned {} err {}",
+                    progress.scanned, progress.errors
+                )
             }
             ScanState::Error(message) => format!("error: {message}"),
             ScanState::Completed => "scan complete".into(),
@@ -89,7 +94,11 @@ impl Ui {
         let status_text = state.status_message.as_deref().unwrap_or("ready");
         let progress_label = match &state.scan_state {
             ScanState::Running(progress) => {
-                format!("scanned {} err {}", progress.scanned, progress.errors)
+                let spinner = spinner_symbol(state.spinner_phase);
+                format!(
+                    "{spinner} scanning... {} entries, {} errors",
+                    progress.scanned, progress.errors
+                )
             }
             ScanState::Error(message) => format!("error: {message}"),
             ScanState::Completed => "scan complete".into(),
@@ -198,6 +207,11 @@ fn draw_bar(size: u64, max: u64, width: usize) -> String {
 
     let empty = width.saturating_sub(filled);
     format!("[{}{}]", "#".repeat(filled), " ".repeat(empty))
+}
+
+fn spinner_symbol(phase: usize) -> &'static str {
+    let symbols = BRAILLE_EIGHT.symbols;
+    symbols[phase % symbols.len()]
 }
 
 #[cfg(test)]

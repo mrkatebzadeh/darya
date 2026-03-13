@@ -38,6 +38,7 @@ pub struct AppState {
     pub scroll_offset: usize,
     pub scan_state: ScanState,
     pub status_message: Option<String>,
+    pub spinner_phase: usize,
 }
 
 impl AppState {
@@ -49,6 +50,7 @@ impl AppState {
             scroll_offset: 0,
             scan_state: ScanState::Idle,
             status_message: None,
+            spinner_phase: 0,
         }
     }
 
@@ -79,6 +81,12 @@ impl AppState {
 
     pub fn mark_scan_progress(&mut self, progress: ScanProgress) {
         self.scan_state = ScanState::Running(progress);
+    }
+
+    pub fn advance_spinner(&mut self, modulo: usize) {
+        if modulo > 0 {
+            self.spinner_phase = (self.spinner_phase + 1) % modulo;
+        }
     }
 
     pub fn mark_scan_complete(&mut self) {

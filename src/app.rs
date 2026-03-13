@@ -14,7 +14,12 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    config::ConfigLoad, event, fs_scan, size::normalize_path, state::AppState, theme::Theme,
+    config::ConfigLoad,
+    event,
+    fs_scan::{self, ScanProgress},
+    size::normalize_path,
+    state::AppState,
+    theme::Theme,
 };
 use anyhow::Result;
 use crossterm::execute;
@@ -43,6 +48,10 @@ pub fn run(root: PathBuf, config_load: ConfigLoad) -> Result<()> {
         let (scanner_handle, mut scanner_rx) =
             fs_scan::start_scan(root.clone(), config.scan.follow_symlinks);
         let mut state = AppState::new(root.clone(), config.sorting.mode);
+        state.mark_scan_progress(ScanProgress {
+            scanned: 0,
+            errors: 0,
+        });
         state.update_status(format!("scanning {}", root.display()));
 
         let theme = Theme::default();
