@@ -26,6 +26,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, Cell, Paragraph, Row, Table},
 };
+use std::time::UNIX_EPOCH;
 use throbber_widgets_tui::BRAILLE_EIGHT;
 
 /// Renderer responsible for drawing the main UI panels.
@@ -112,6 +113,7 @@ impl Ui {
                 Span::raw(" | "),
                 Span::styled(progress_label, Style::default().fg(theme.selection)),
             ]),
+            Line::from(Span::raw(selected_info_line(state))),
             Line::from(Span::raw(
                 "hjkl: move │ gg/G: jump │ enter/tab: toggle │ d: delete │ o: open │ q: quit",
             )),
@@ -214,11 +216,55 @@ fn spinner_symbol(phase: usize) -> &'static str {
     symbols[phase % symbols.len()]
 }
 
+fn selected_info_line(state: &AppState) -> String {
+    let Some(selected) = state.selection else {
+        return "info: no selection".to_string();
+    };
+
+    let Some(node) = state.tree.node(selected) else {
+        return "info: no node".to_string();
+    };
+
+    let Ok(metadata) = std::fs::metadata(&node.path) else {
+        return format!("info: metadata unavailable for {}", node.path.display());
+    };
+
+    let modified = metadata
+        .modified()
+        .ok()
+        .and_then(|m| m.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_secs().to_string())
+        .unwrap_or_else(|| "-".to_string());
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        let perm = metadata.permissions().mode() & 0o777;
+        format!(
+            "info: mode={perm:o} uid={} gid={} inode={} nlink={} mtime={} ctime={}",
+            metadata.uid(),
+            metadata.gid(),
+            metadata.ino(),
+            metadata.nlink(),
+            modified,
+            metadata.ctime()
+        )
+    }
+
+    #[cfg(not(unix))]
+    {
+        format!(
+            "info: readonly={} mtime={modified}",
+            metadata.permissions().readonly()
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::tree::{NodeType, TreeNode};
-    use std::path::PathBuf;
+    use std::{fs, path::PathBuf};
 
     #[test]
     fn flatten_tree_respects_depth() {
@@ -256,5 +302,25 @@ mod tests {
 
     fn flatten_ids(tree: &FileTree) -> Vec<usize> {
         flatten_rows(tree).into_iter().map(|row| row.id).collect()
+    }
+
+    #[test]
+    fn selected_info_contains_metadata_fields() {
+        let temp = std::env::temp_dir().join("dar-info-panel-test");
+        fs::write(&temp, b"x").unwrap();
+
+        let mut state =
+            crate::state::AppState::new(PathBuf::from("/"), crate::config::SortMode::SizeDesc);
+        let file_id = state
+            .tree
+            .add_child(0, TreeNode::new(temp.clone(), NodeType::File));
+        state.selection = Some(file_id);
+
+        let info = selected_info_line(&state);
+        assert!(info.contains("mtime="));
+        #[cfg(unix)]
+        assert!(info.contains("uid="));
+
+        let _ = fs::remove_file(temp);
     }
 }
