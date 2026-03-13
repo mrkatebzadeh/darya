@@ -48,8 +48,12 @@ pub fn run(cli_args: CliArgs, config_load: ConfigLoad) -> Result<()> {
 
     let runtime = Runtime::new()?;
     let loop_result = runtime.block_on(async {
-        let (scanner_handle, mut scanner_rx) =
-            fs_scan::start_scan(root.clone(), config.scan.follow_symlinks, exclude_patterns);
+        let (scanner_handle, mut scanner_rx) = fs_scan::start_scan(
+            root.clone(),
+            config.scan.follow_symlinks,
+            exclude_patterns,
+            config.scan.count_hard_links_once,
+        );
         let mut state = AppState::new(root.clone(), config.sorting.mode);
         state.mark_scan_progress(ScanProgress {
             scanned: 0,

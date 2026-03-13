@@ -15,6 +15,7 @@
 
 use crate::tree::NodeType;
 use globset::{Glob, GlobSet, GlobSetBuilder};
+use std::collections::HashSet;
 use std::{
     path::PathBuf,
     sync::{
@@ -83,13 +84,21 @@ pub fn start_scan(
     root: PathBuf,
     follow_symlinks: bool,
     exclude_patterns: Vec<String>,
+    count_hard_links_once: bool,
 ) -> (ScannerHandle, UnboundedReceiver<ScanEvent>) {
     let (tx, rx) = unbounded_channel();
     let cancel = Arc::new(AtomicBool::new(false));
     let cancel_clone = cancel.clone();
     tokio::task::spawn_blocking(move || {
         let excludes = build_excludes(&exclude_patterns);
-        run_scan(root, follow_symlinks, excludes, tx, cancel_clone)
+        run_scan(
+            root,
+            follow_symlinks,
+            excludes,
+            count_hard_links_once,
+            tx,
+            cancel_clone,
+        )
     });
     (ScannerHandle::new(cancel), rx)
 }
@@ -98,11 +107,13 @@ fn run_scan(
     root: PathBuf,
     follow_symlinks: bool,
     excludes: Option<GlobSet>,
+    count_hard_links_once: bool,
     tx: UnboundedSender<ScanEvent>,
     cancel: Arc<AtomicBool>,
 ) {
     let mut scanned = 0;
     let mut errors = 0;
+    let mut seen_links: HashSet<(u64, u64)> = HashSet::new();
 
     for entry in WalkDir::new(&root)
         .follow_links(follow_symlinks)
@@ -124,10 +135,19 @@ fn run_scan(
                 scanned += 1;
                 match entry.metadata() {
                     Ok(metadata) => {
+                        let mut size = metadata.len();
+                        if count_hard_links_once
+                            && entry.file_type().is_file()
+                            && let Some(key) = hard_link_key(&metadata)
+                            && !seen_links.insert(key)
+                        {
+                            size = 0;
+                        }
+
                         let node = ScanNode {
                             path: entry.path().to_path_buf(),
                             kind: classify(&entry),
-                            size: metadata.len(),
+                            size,
                             modified: metadata.modified().ok(),
                         };
                         let _ = tx.send(ScanEvent::Node(node));
@@ -171,6 +191,17 @@ fn build_excludes(patterns: &[String]) -> Option<GlobSet> {
         }
     }
     builder.build().ok()
+}
+
+#[cfg(unix)]
+fn hard_link_key(metadata: &std::fs::Metadata) -> Option<(u64, u64)> {
+    use std::os::unix::fs::MetadataExt;
+    Some((metadata.dev(), metadata.ino()))
+}
+
+#[cfg(not(unix))]
+fn hard_link_key(_metadata: &std::fs::Metadata) -> Option<(u64, u64)> {
+    None
 }
 
 fn classify(entry: &walkdir::DirEntry) -> NodeType {
@@ -217,7 +248,7 @@ mod tests {
         let file = base.join("file.txt");
         write_file(&file, 4);
 
-        let (_handle, mut rx) = start_scan(base.clone(), false, Vec::new());
+        let (_handle, mut rx) = start_scan(base.clone(), false, Vec::new(), true);
         let mut nodes = 0;
         while let Some(event) = rx.recv().await {
             match event {

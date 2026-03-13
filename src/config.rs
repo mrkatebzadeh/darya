@@ -48,6 +48,7 @@ pub struct ScanConfig {
     pub follow_symlinks: bool,
     pub max_depth: usize,
     pub exclude_patterns: Vec<String>,
+    pub count_hard_links_once: bool,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq, Default)]
