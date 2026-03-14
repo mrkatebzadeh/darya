@@ -14,7 +14,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    cli::CliArgs,
+    cli::{CliArgs, InterfaceMode},
     config::{Config, ConfigLoad},
     event,
     fs_scan::{self, ScanEvent, ScanOptions, ScanProgress, ScannerHandle, dummy_scanner},
@@ -104,16 +104,26 @@ pub fn run(cli_args: CliArgs, config_load: ConfigLoad) -> Result<()> {
             )
             .await?;
         } else {
-            run_interactive_mode(
-                root.clone(),
-                exclude_patterns,
-                &config,
-                theme,
-                cli_args.extended,
-                scan_options,
-                export_options,
-            )
-            .await?;
+            match cli_args.interface_mode {
+                InterfaceMode::Tui => {
+                    run_interactive_mode(
+                        root.clone(),
+                        exclude_patterns.clone(),
+                        &config,
+                        theme,
+                        cli_args.extended,
+                        scan_options,
+                        export_options,
+                    )
+                    .await?;
+                }
+                InterfaceMode::Progress => {
+                    run_progress_mode(root.clone(), exclude_patterns.clone(), scan_options).await?;
+                }
+                InterfaceMode::Summary => {
+                    run_summary_mode(root.clone(), exclude_patterns, scan_options).await?;
+                }
+            }
         }
         Ok::<(), anyhow::Error>(())
     })?;
@@ -204,6 +214,60 @@ async fn run_export_mode(
         };
         snapshot::export_to_destination(&state.tree, dest, binary_options)?;
     }
+    scanner_handle.cancel();
+    Ok(())
+}
+
+async fn run_progress_mode(
+    root: PathBuf,
+    exclude_patterns: Vec<String>,
+    scan_options: ScanOptions,
+) -> Result<()> {
+    let (scanner_handle, mut scanner_rx) =
+        fs_scan::start_scan(root.clone(), scan_options, exclude_patterns);
+    while let Some(event) = scanner_rx.recv().await {
+        match event {
+            ScanEvent::Progress(progress) => {
+                println!(
+                    "progress: scanned {} errors {}",
+                    progress.scanned, progress.errors
+                );
+            }
+            ScanEvent::Error(err) => {
+                eprintln!("scan error for {}: {}", err.path.display(), err.source);
+            }
+            ScanEvent::Completed => break,
+            _ => {}
+        }
+    }
+    scanner_handle.cancel();
+    Ok(())
+}
+
+async fn run_summary_mode(
+    root: PathBuf,
+    exclude_patterns: Vec<String>,
+    scan_options: ScanOptions,
+) -> Result<()> {
+    let (scanner_handle, mut scanner_rx) =
+        fs_scan::start_scan(root.clone(), scan_options, exclude_patterns);
+    let mut last = ScanProgress {
+        scanned: 0,
+        errors: 0,
+    };
+    while let Some(event) = scanner_rx.recv().await {
+        match event {
+            ScanEvent::Progress(progress) => {
+                last = progress;
+            }
+            ScanEvent::Error(err) => {
+                eprintln!("scan error for {}: {}", err.path.display(), err.source);
+            }
+            ScanEvent::Completed => break,
+            _ => {}
+        }
+    }
+    println!("summary: scanned {} errors {}", last.scanned, last.errors);
     scanner_handle.cancel();
     Ok(())
 }

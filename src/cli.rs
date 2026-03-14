@@ -51,6 +51,9 @@ const HELP_TEXT: &str = concat!(
     "    -c, --compress  Compress the exported JSON with gzip\n",
     "    --compress-level N  Set gzip compression level (1-9)\n",
     "    --export-block-size BYTES  Set buffered block size for exports\n",
+    "    -0  Force ncurses UI mode (default)\n",
+    "    -1  Print a textual progress report instead of the UI\n",
+    "    -2  Print a simple summary after scanning\n",
     "    --ignore-config  Do not load configuration files\n",
     "    --exclude PATTERN  Exclude files/directories by glob pattern (repeatable)\n"
 );
@@ -61,6 +64,13 @@ pub enum CliCommand {
     Run(CliArgs),
     Help,
     Version,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InterfaceMode {
+    Tui,
+    Progress,
+    Summary,
 }
 
 impl CliCommand {
@@ -97,6 +107,7 @@ impl CliCommand {
         let mut export_compress = false;
         let mut export_compress_level = None;
         let mut export_block_size = None;
+        let mut interface_mode = InterfaceMode::Tui;
 
         while let Some(arg) = args.next() {
             match arg.to_str() {
@@ -170,6 +181,9 @@ impl CliCommand {
                 Some("--ignore-config") => {
                     ignore_config = true;
                 }
+                Some("-0") => interface_mode = InterfaceMode::Tui,
+                Some("-1") => interface_mode = InterfaceMode::Progress,
+                Some("-2") => interface_mode = InterfaceMode::Summary,
                 Some(value) if value.starts_with('-') => {
                     return Err(CliParseError::UnknownOption(value.to_string()));
                 }
@@ -200,6 +214,7 @@ impl CliCommand {
                 export_compress,
                 export_compress_level,
                 export_block_size,
+                interface_mode,
             }
         } else {
             let mut cli = CliArgs::from_current_dir()?;
@@ -217,6 +232,7 @@ impl CliCommand {
             cli.export_compress = export_compress;
             cli.export_compress_level = export_compress_level;
             cli.export_block_size = export_block_size;
+            cli.interface_mode = interface_mode;
             cli
         };
         Ok(Self::Run(cli))
@@ -250,6 +266,7 @@ pub struct CliArgs {
     pub export_compress: bool,
     pub export_compress_level: Option<u32>,
     pub export_block_size: Option<usize>,
+    pub interface_mode: InterfaceMode,
 }
 
 impl CliArgs {
@@ -271,6 +288,7 @@ impl CliArgs {
             export_compress: false,
             export_compress_level: None,
             export_block_size: None,
+            interface_mode: InterfaceMode::Tui,
         })
     }
 }
@@ -517,6 +535,26 @@ mod tests {
             assert!(cli.export_compress);
             assert_eq!(cli.export_compress_level, Some(5));
             assert_eq!(cli.export_block_size, Some(16384));
+        } else {
+            panic!("expected run command");
+        }
+    }
+
+    #[test]
+    fn parse_interface_mode_progress() {
+        let args = vec![OsString::from("-1")];
+        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
+            assert_eq!(cli.interface_mode, InterfaceMode::Progress);
+        } else {
+            panic!("expected run command");
+        }
+    }
+
+    #[test]
+    fn parse_interface_mode_summary() {
+        let args = vec![OsString::from("-2")];
+        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
+            assert_eq!(cli.interface_mode, InterfaceMode::Summary);
         } else {
             panic!("expected run command");
         }
