@@ -38,7 +38,7 @@ pub fn split_layout(area: Rect) -> LayoutRegions {
 
     let body = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
+        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
         .split(vertical[1]);
 
     let right = Layout::default()
@@ -66,9 +66,9 @@ mod tests {
         assert_eq!(regions.header.height, 3);
         assert_eq!(regions.footer.height, 3);
         assert_eq!(regions.tree.height, 18);
-        assert_eq!(regions.tree.width, 32);
-        assert_eq!(regions.treemap.width, 48);
-        assert_eq!(regions.details.width, 48);
+        assert_eq!(regions.tree.width, 56);
+        assert_eq!(regions.treemap.width, 24);
+        assert_eq!(regions.details.width, 24);
         assert_eq!(
             regions.treemap.height + regions.details.height,
             regions.tree.height
