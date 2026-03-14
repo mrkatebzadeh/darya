@@ -13,19 +13,29 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    cli::{CliArgs, InterfaceMode},
-    config::{Config, ConfigLoad},
-    fs_scan::ScanOptions,
-    scan_control::{ScanEventReceiver, ScanEventSender, ScanTriggerReceiver, ScanTriggerSender},
-    size::normalize_path,
-    snapshot::ExportOptions,
-    state::AppState,
-    theme::Theme,
+use self::cli::{CliArgs, InterfaceMode};
+use self::config::{Config, ConfigLoad};
+use self::fs_scan::ScanOptions;
+use self::scan_control::{
+    ScanEventReceiver, ScanEventSender, ScanTriggerReceiver, ScanTriggerSender,
 };
+use self::size::normalize_path;
+use self::snapshot::ExportOptions;
+use self::state::AppState;
+use crate::theme::Theme;
 use anyhow::{Result, anyhow};
 use std::path::PathBuf;
 use tokio::runtime::Builder;
+
+pub mod cli;
+pub mod config;
+pub mod fs_scan;
+pub mod input;
+pub mod scan_control;
+pub mod size;
+pub mod snapshot;
+pub mod state;
+pub mod tree;
 
 mod modes;
 mod scan_manager;

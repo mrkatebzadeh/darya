@@ -14,17 +14,18 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 pub mod app;
-pub mod cli;
-pub mod config;
-pub mod display;
 pub mod events;
-pub mod fs_scan;
-pub mod input;
-pub mod scan_control;
-pub mod size;
-pub mod snapshot;
-pub mod state;
-pub mod theme;
-pub mod tree;
-pub mod treemap;
 pub mod ui;
+
+pub use app::cli;
+pub use app::config;
+pub use app::fs_scan;
+pub use app::input;
+pub use app::scan_control;
+pub use app::size;
+pub use app::snapshot;
+pub use app::state;
+pub use app::tree;
+pub use ui::display;
+pub use ui::theme;
+pub use ui::treemap;
