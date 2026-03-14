@@ -13,240 +13,20 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    config::SortMode,
-    display::DisplayOptions,
-    layout::LayoutRegions,
-    state::{AppState, ScanState, SizeDisplayMode},
-    theme::Theme,
-    tree::{FileTree, NodeType, TreeNode},
-    treemap::{TreemapNode, TreemapTile, squarified_treemap},
-};
-use ratatui::{
-    layout::{Alignment, Constraint, Rect},
-    style::{Color, Style},
-    terminal::Frame,
-    text::{Line, Span},
-    widgets::{Block, Borders, Cell, Clear, Paragraph, Row, Table},
-};
+use crate::config::SortMode;
+use crate::display::DisplayOptions;
+use crate::state::{AppState, SizeDisplayMode};
+use crate::theme::Theme;
+use crate::tree::{FileTree, NodeType, TreeNode};
+use crate::treemap::{TreemapNode, TreemapTile, squarified_treemap};
+use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::style::Color;
+use ratatui::terminal::Frame;
+use ratatui::widgets::{Cell, Row};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use throbber_widgets_tui::BRAILLE_EIGHT;
 
-/// Renderer responsible for drawing the main UI panels.
-pub struct Ui;
-
-impl Ui {
-    pub fn draw(
-        &self,
-        frame: &mut Frame<'_>,
-        layout: LayoutRegions,
-        state: &AppState,
-        theme: Theme,
-    ) {
-        self.draw_header(frame, layout.header, state, theme);
-        self.draw_tree(frame, layout.tree, state, theme);
-        self.draw_treemap(frame, layout.treemap, state, theme);
-        self.draw_details(frame, layout.details, theme);
-        self.draw_footer(frame, layout.footer, state, theme);
-        if state.show_help {
-            self.draw_help_modal(frame, state, theme);
-        }
-    }
-
-    fn draw_header(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
-        let root_label = state
-            .tree
-            .node(state.tree.root())
-            .map(|node| node.path.display().to_string())
-            .unwrap_or_else(|| "<unknown>".into());
-
-        let progress_label = match &state.scan_state {
-            ScanState::Running(progress) => {
-                let spinner = spinner_symbol(state.spinner_phase);
-                format!(
-                    "{spinner} please wait — scanned {} err {}",
-                    progress.scanned, progress.errors
-                )
-            }
-            ScanState::Error(message) => format!("error: {message}"),
-            ScanState::Completed => "scan complete".into(),
-            _ => "scan idle".into(),
-        };
-
-        let header = Paragraph::new(Line::from(vec![
-            Span::styled("root: ", Style::default().fg(theme.directory)),
-            Span::styled(root_label, Style::default().fg(theme.foreground)),
-            Span::raw(format!(" | sort:{} ", sort_mode_label(state.sort_mode))),
-            Span::styled(progress_label, Style::default().fg(theme.selection)),
-        ]))
-        .block(Block::default().borders(Borders::ALL).title("dar"))
-        .style(Style::default().bg(theme.background));
-
-        frame.render_widget(header, area);
-    }
-
-    fn draw_tree(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
-        let rows = build_rows(
-            &state.tree,
-            state.selection,
-            theme,
-            state.size_mode,
-            &state.filter_query,
-            state.filter_active,
-            state.display_options,
-        );
-        let table = Table::new(rows)
-            .block(Block::default().borders(Borders::ALL).title("filesystem"))
-            .widths(&[
-                Constraint::Percentage(55),
-                Constraint::Length(12),
-                Constraint::Percentage(33),
-            ])
-            .column_spacing(1);
-
-        frame.render_widget(table, area);
-    }
-
-    fn draw_footer(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
-        let status_text = state.status_message.as_deref().unwrap_or("ready");
-        let progress_label = match &state.scan_state {
-            ScanState::Running(progress) => {
-                let spinner = spinner_symbol(state.spinner_phase);
-                format!(
-                    "{spinner} scanning... {} entries, {} errors",
-                    progress.scanned, progress.errors
-                )
-            }
-            ScanState::Error(message) => format!("error: {message}"),
-            ScanState::Completed => "scan complete".into(),
-            _ => "scan idle".into(),
-        };
-
-        let footer = Paragraph::new(vec![
-            Line::from(vec![
-                Span::styled("status: ", Style::default().fg(theme.foreground)),
-                Span::raw(status_text.to_string()),
-                Span::raw(" | "),
-                Span::styled(progress_label, Style::default().fg(theme.selection)),
-            ]),
-            Line::from(Span::raw(selected_info_line(state))),
-                Line::from(Span::raw(
-                "hjkl: move │ gg/G: jump │ enter/tab: toggle │ d: delete │ o: open │ /: filter │ c: clear filter │ r: rescan │ R: start scan │ b: size mode │ s: cycle sort │ E/I: export/import │ ?: help │ q: quit",
-            )),
-        ])
-        .block(Block::default().borders(Borders::ALL))
-        .style(Style::default().bg(theme.background));
-
-        frame.render_widget(footer, area);
-    }
-
-    fn draw_treemap(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
-        let title = format!("treemap ({})", treemap_scope_name(state));
-        let panel = Block::default().borders(Borders::ALL).title(title);
-        let inner = panel.inner(area);
-        frame.render_widget(panel, area);
-
-        if inner.width < 2 || inner.height < 2 {
-            return;
-        }
-
-        let max_tiles_for_panel = usize::from(inner.width) * usize::from(inner.height) / 2;
-        let max_tiles = 200_usize.min(max_tiles_for_panel.max(1));
-        let tiles = squarified_treemap(&state.treemap_nodes, inner, max_tiles);
-        if tiles.is_empty() {
-            frame.render_widget(
-                Paragraph::new("No sized children")
-                    .alignment(Alignment::Center)
-                    .style(Style::default().fg(theme.foreground).bg(theme.background)),
-                inner,
-            );
-            return;
-        }
-
-        let path = selection_path(state);
-        let highlighted_id = path.first().copied();
-        let overlays = selection_highlight_overlays(&tiles, &path, state);
-
-        for tile in tiles {
-            let is_highlighted = Some(tile.node.node_id) == highlighted_id;
-            self.draw_treemap_tile(frame, tile, theme, is_highlighted);
-        }
-
-        for overlay in overlays {
-            fill_rect(frame, overlay, theme.selection, theme.background);
-        }
-    }
-
-    fn draw_treemap_tile(
-        &self,
-        frame: &mut Frame<'_>,
-        tile: TreemapTile,
-        theme: Theme,
-        is_highlighted: bool,
-    ) {
-        if tile.rect.width == 0 || tile.rect.height == 0 {
-            return;
-        }
-
-        let color = if is_highlighted {
-            theme.selection
-        } else {
-            theme.bar
-        };
-        fill_rect(frame, tile.rect, color, theme.background);
-    }
-
-    fn draw_details(&self, frame: &mut Frame<'_>, area: Rect, theme: Theme) {
-        let panel = Paragraph::new("Details")
-            .alignment(Alignment::Center)
-            .block(Block::default().borders(Borders::ALL).title("Details"))
-            .style(Style::default().fg(theme.foreground).bg(theme.background));
-
-        frame.render_widget(panel, area);
-    }
-
-    fn draw_help_modal(&self, frame: &mut Frame<'_>, _state: &AppState, theme: Theme) {
-        let area = centered_rect(80, 70, frame.size());
-        let lines = vec![
-            Line::from("██████╗  █████╗ ██████╗"),
-            Line::from("██╔══██╗██╔══██╗██╔══██╗"),
-            Line::from("██║  ██║███████║██████╔╝"),
-            Line::from("██║  ██║██╔══██║██╔══██╗"),
-            Line::from("██████╔╝██║  ██║██║  ██║"),
-            Line::from("╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝"),
-            Line::from(""),
-            Line::from("Keybindings:"),
-            Line::from("  j/k or up/down: move"),
-            Line::from("  enter/tab: toggle folder"),
-            Line::from("  d: delete (with confirmation)"),
-            Line::from("  o: open selected path"),
-            Line::from("  /: start filter, c: clear filter"),
-            Line::from("  b: size mode, s: sort mode, r: rescan, R: start scan"),
-            Line::from("  E/I: export/import snapshot"),
-            Line::from("  ?: toggle this help, q: quit"),
-        ];
-
-        let popup = Paragraph::new(lines)
-            .block(Block::default().title("DAR Help").borders(Borders::ALL))
-            .style(Style::default().fg(theme.foreground).bg(theme.background));
-
-        frame.render_widget(Clear, area);
-        frame.render_widget(popup, area);
-    }
-}
-
-struct TreeRow {
-    id: usize,
-    depth: usize,
-    name: String,
-    size: u64,
-    disk_size: u64,
-    kind: NodeType,
-    child_count: usize,
-    modified: Option<SystemTime>,
-}
-
-fn build_rows(
+pub(crate) fn build_rows(
     tree: &FileTree,
     selection: Option<usize>,
     theme: Theme,
@@ -303,18 +83,6 @@ fn traverse(
     }
 }
 
-fn draw_bar(size: u64, max: u64, width: usize) -> String {
-    let filled = if max == 0 {
-        0
-    } else {
-        let ratio = size as f64 / max as f64;
-        ((ratio * width as f64).round() as usize).min(width)
-    };
-
-    let empty = width.saturating_sub(filled);
-    format!("[{}{}]", "#".repeat(filled), " ".repeat(empty))
-}
-
 fn build_row(
     row: TreeRow,
     selection: Option<usize>,
@@ -332,9 +100,13 @@ fn build_row(
     };
 
     let style = if Some(row.id) == selection {
-        Style::default().bg(theme.selection).fg(theme.background)
+        ratatui::style::Style::default()
+            .bg(theme.selection)
+            .fg(theme.background)
     } else {
-        Style::default().bg(theme.background).fg(theme.foreground)
+        ratatui::style::Style::default()
+            .bg(theme.background)
+            .fg(theme.foreground)
     };
 
     let size_value = chosen_size(&row, size_mode, options);
@@ -378,6 +150,18 @@ fn chosen_size(row: &TreeRow, mode: SizeDisplayMode, options: DisplayOptions) ->
     }
 }
 
+fn draw_bar(size: u64, max: u64, width: usize) -> String {
+    let filled = if max == 0 {
+        0
+    } else {
+        let ratio = size as f64 / max as f64;
+        ((ratio * width as f64).round() as usize).min(width)
+    };
+
+    let empty = width.saturating_sub(filled);
+    format!("[{}{}]", "#".repeat(filled), " ".repeat(empty))
+}
+
 fn format_size_custom(bytes: u64, use_si: bool) -> String {
     let (unit, div) = if use_si {
         ("kB", 1000.0)
@@ -407,41 +191,12 @@ fn format_mtime(modified: Option<SystemTime>) -> String {
         .unwrap_or_else(|| "mtime:-".to_string())
 }
 
-fn spinner_symbol(phase: usize) -> &'static str {
+pub(crate) fn spinner_symbol(phase: usize) -> &'static str {
     let symbols = BRAILLE_EIGHT.symbols;
     symbols[phase % symbols.len()]
 }
 
-fn sort_mode_label(mode: SortMode) -> &'static str {
-    match mode {
-        SortMode::SizeDesc => "size_desc",
-        SortMode::SizeAsc => "size_asc",
-        SortMode::Name => "name",
-        SortMode::ModifiedTime => "modified_time",
-    }
-}
-
-fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = ratatui::layout::Layout::default()
-        .direction(ratatui::layout::Direction::Vertical)
-        .constraints([
-            Constraint::Percentage((100 - percent_y) / 2),
-            Constraint::Percentage(percent_y),
-            Constraint::Percentage((100 - percent_y) / 2),
-        ])
-        .split(r);
-
-    ratatui::layout::Layout::default()
-        .direction(ratatui::layout::Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage((100 - percent_x) / 2),
-            Constraint::Percentage(percent_x),
-            Constraint::Percentage((100 - percent_x) / 2),
-        ])
-        .split(popup_layout[1])[1]
-}
-
-fn selected_info_line(state: &AppState) -> String {
+pub(crate) fn selected_info_line(state: &AppState) -> String {
     let Some(selected) = state.selection else {
         return "info: no selection".to_string();
     };
@@ -471,7 +226,7 @@ fn selected_info_line(state: &AppState) -> String {
     {
         use std::os::unix::fs::{MetadataExt, PermissionsExt};
         let perm = metadata.permissions().mode() & 0o777;
-        format!(
+        return format!(
             "info: mode={perm:o} uid={} gid={} inode={} nlink={} mtime={} ctime={}",
             metadata.uid(),
             metadata.gid(),
@@ -479,19 +234,19 @@ fn selected_info_line(state: &AppState) -> String {
             metadata.nlink(),
             modified,
             metadata.ctime()
-        )
+        );
     }
 
     #[cfg(not(unix))]
     {
-        format!(
+        return format!(
             "info: readonly={} mtime={modified}",
             metadata.permissions().readonly()
-        )
+        );
     }
 }
 
-fn format_node_metadata(node: &crate::tree::TreeNode) -> Option<String> {
+fn format_node_metadata(node: &TreeNode) -> Option<String> {
     let modified = node
         .modified
         .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
@@ -517,7 +272,16 @@ fn format_node_metadata(node: &crate::tree::TreeNode) -> Option<String> {
     None
 }
 
-fn treemap_scope_name(state: &AppState) -> String {
+pub(crate) fn sort_mode_label(mode: SortMode) -> &'static str {
+    match mode {
+        SortMode::SizeDesc => "size_desc",
+        SortMode::SizeAsc => "size_asc",
+        SortMode::Name => "name",
+        SortMode::ModifiedTime => "modified_time",
+    }
+}
+
+pub(crate) fn treemap_scope_name(state: &AppState) -> String {
     let Some(root) = state.tree.node(state.tree.root()) else {
         return "root".to_string();
     };
@@ -525,7 +289,7 @@ fn treemap_scope_name(state: &AppState) -> String {
     root.name.clone()
 }
 
-fn fill_rect(frame: &mut Frame<'_>, rect: Rect, fg: Color, bg: Color) {
+pub(crate) fn fill_rect(frame: &mut Frame<'_>, rect: Rect, fg: Color, bg: Color) {
     let buf = frame.buffer_mut();
     let x_end = rect.x.saturating_add(rect.width);
     let y_end = rect.y.saturating_add(rect.height);
@@ -540,7 +304,7 @@ fn fill_rect(frame: &mut Frame<'_>, rect: Rect, fg: Color, bg: Color) {
     }
 }
 
-fn selection_path(state: &AppState) -> Vec<usize> {
+pub(crate) fn selection_path(state: &AppState) -> Vec<usize> {
     let Some(mut current) = state.selection else {
         return Vec::new();
     };
@@ -561,7 +325,7 @@ fn selection_path(state: &AppState) -> Vec<usize> {
     stack
 }
 
-fn selection_highlight_overlays(
+pub(crate) fn selection_highlight_overlays(
     tiles: &[TreemapTile],
     path: &[usize],
     state: &AppState,
@@ -634,6 +398,37 @@ fn node_size(node: &TreeNode, mode: SizeDisplayMode) -> u64 {
         SizeDisplayMode::Apparent => node.size,
         SizeDisplayMode::Disk => node.disk_size,
     }
+}
+
+pub(crate) fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+    let popup_layout = Layout::default()
+        .direction(ratatui::layout::Direction::Vertical)
+        .constraints([
+            Constraint::Percentage((100 - percent_y) / 2),
+            Constraint::Percentage(percent_y),
+            Constraint::Percentage((100 - percent_y) / 2),
+        ])
+        .split(r);
+
+    Layout::default()
+        .direction(ratatui::layout::Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage((100 - percent_x) / 2),
+            Constraint::Percentage(percent_x),
+            Constraint::Percentage((100 - percent_x) / 2),
+        ])
+        .split(popup_layout[1])[1]
+}
+
+struct TreeRow {
+    id: usize,
+    depth: usize,
+    name: String,
+    size: u64,
+    disk_size: u64,
+    kind: NodeType,
+    child_count: usize,
+    modified: Option<SystemTime>,
 }
 
 #[cfg(test)]

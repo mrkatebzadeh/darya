@@ -13,96 +13,18 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    config::SortMode,
-    fs_scan::{ScanEvent, ScanProgress},
-    input::{InputAction, InputState},
-    layout,
-    scan_control::ScanTriggerSender,
-    size::{normalize_path, total_size},
-    snapshot::{self, SnapshotEndpoint, SnapshotFormat},
-    state::{AppState, ScanState},
-    theme::Theme,
-    tree::{NodeMetadata, NodeType},
-    ui::Ui,
-};
-use anyhow::Result;
-use crossterm::event::{self, Event};
-use ratatui::{backend::CrosstermBackend, terminal::Terminal};
+use crate::config::SortMode;
+use crate::fs_scan::{ScanEvent, ScanProgress};
+use crate::input::InputAction;
+use crate::scan_control::{ScanTrigger, ScanTriggerSender};
+use crate::size::{normalize_path, total_size};
+use crate::snapshot::{self, SnapshotEndpoint, SnapshotFormat};
+use crate::state::{AppState, ScanState};
+use crate::tree::{NodeMetadata, NodeType};
 use std::fs;
-use std::{
-    io::Stdout,
-    process::Command,
-    time::{Duration, Instant},
-};
-use throbber_widgets_tui::BRAILLE_EIGHT;
-use tokio::sync::mpsc::UnboundedReceiver;
+use std::process::Command;
 
-const TICK_RATE: Duration = Duration::from_millis(250);
-const MAX_SCAN_EVENTS_PER_CYCLE: usize = 256;
-const SNAPSHOT_PATH: &str = "/tmp/dar-scan.json";
-
-/// Runs the terminal event loop until the user quits.
-pub fn run_event_loop(
-    terminal: &mut Terminal<CrosstermBackend<Stdout>>,
-    state: &mut AppState,
-    scanner_rx: &mut UnboundedReceiver<ScanEvent>,
-    scan_trigger: &ScanTriggerSender,
-    theme: Theme,
-) -> Result<()> {
-    let mut input_state = InputState::new();
-    let ui = Ui;
-    let mut last_tick = Instant::now();
-    let mut dirty = true;
-    let mut should_quit = false;
-
-    if state.selection.is_none() {
-        state.selection = Some(state.tree.root());
-    }
-    state.refresh_treemap_nodes();
-
-    while !should_quit {
-        if event::poll(Duration::from_millis(50))? {
-            match event::read()? {
-                Event::Key(key_event) => {
-                    let action = input_state.process_key(key_event);
-                    if matches!(action, InputAction::Quit) {
-                        should_quit = true;
-                        let _ = scan_trigger.send(crate::scan_control::ScanTrigger::Cancel);
-                    }
-                    handle_input_action(action, state, scan_trigger);
-                    dirty = true;
-                }
-                Event::Resize(_, _) => dirty = true,
-                _ => {}
-            }
-        }
-
-        for _ in 0..MAX_SCAN_EVENTS_PER_CYCLE {
-            match scanner_rx.try_recv() {
-                Ok(scan_event) => {
-                    process_scan_event(state, scan_event);
-                    dirty = true;
-                }
-                Err(_) => break,
-            }
-        }
-
-        if last_tick.elapsed() >= TICK_RATE || dirty {
-            state.advance_spinner(BRAILLE_EIGHT.symbols.len());
-            terminal.draw(|frame| {
-                let regions = layout::split_layout(frame.size());
-                ui.draw(frame, regions, state, theme);
-            })?;
-            last_tick = Instant::now();
-            dirty = false;
-        }
-    }
-
-    Ok(())
-}
-
-fn handle_input_action(
+pub(crate) fn handle_input_action(
     action: InputAction,
     state: &mut AppState,
     scan_trigger: &ScanTriggerSender,
@@ -160,7 +82,7 @@ fn handle_input_action(
         InputAction::Collapse => collapse_selection(state),
         InputAction::StartScan => {
             if !matches!(state.scan_state, ScanState::Running(_)) {
-                let _ = scan_trigger.send(crate::scan_control::ScanTrigger::Start);
+                let _ = scan_trigger.send(ScanTrigger::Start);
                 state.mark_scan_progress(ScanProgress {
                     scanned: 0,
                     errors: 0,
@@ -347,7 +269,7 @@ fn open_selection(state: &mut AppState) {
 }
 
 fn export_scan(state: &mut AppState) {
-    let snapshot_path = std::path::Path::new(SNAPSHOT_PATH);
+    let snapshot_path = std::path::Path::new("/tmp/dar-scan.json");
     match snapshot::export_tree(&state.tree, snapshot_path, state.export_options) {
         Ok(()) => state.update_status(format!("scan exported to {}", snapshot_path.display())),
         Err(err) => state.update_status(format!("export failed: {err}")),
@@ -355,7 +277,7 @@ fn export_scan(state: &mut AppState) {
 }
 
 fn import_scan(state: &mut AppState) {
-    let snapshot_path = std::path::Path::new(SNAPSHOT_PATH);
+    let snapshot_path = std::path::Path::new("/tmp/dar-scan.json");
     let default_root = state
         .tree
         .node(state.tree.root())
@@ -446,7 +368,7 @@ fn open_command_for_platform() -> Command {
     }
 }
 
-pub(crate) fn process_scan_event(state: &mut AppState, event: ScanEvent) {
+pub fn process_scan_event(state: &mut AppState, event: ScanEvent) {
     match event {
         ScanEvent::Node(node) => {
             let normalized = normalize_path(&node.path);

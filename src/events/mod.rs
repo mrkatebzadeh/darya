@@ -13,18 +13,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod app;
-pub mod cli;
-pub mod config;
-pub mod display;
-pub mod events;
-pub mod fs_scan;
-pub mod input;
-pub mod scan_control;
-pub mod size;
-pub mod snapshot;
-pub mod state;
-pub mod theme;
-pub mod tree;
-pub mod treemap;
-pub mod ui;
+pub mod event_loop;
+pub mod handlers;
+
+pub use event_loop::run_event_loop;
+pub use handlers::process_scan_event;
