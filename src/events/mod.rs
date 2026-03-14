@@ -13,19 +13,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod app;
-pub mod events;
-pub mod ui;
+pub mod event_loop;
+pub mod handlers;
 
-pub use app::cli;
-pub use app::config;
-pub use app::fs_scan;
-pub use app::input;
-pub use app::scan_control;
-pub use app::size;
-pub use app::snapshot;
-pub use app::state;
-pub use app::tree;
-pub use ui::display;
-pub use ui::theme;
-pub use ui::treemap;
+pub use event_loop::run_event_loop;
+pub use handlers::process_scan_event;
