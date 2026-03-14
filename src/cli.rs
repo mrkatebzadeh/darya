@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::snapshot::SnapshotEndpoint;
+use crate::{display::DisplayOptions, snapshot::SnapshotEndpoint};
 use std::env;
 use std::ffi::{OsStr, OsString};
 use std::fs;
@@ -107,6 +107,7 @@ impl CliCommand {
         let mut export_compress = false;
         let mut export_compress_level = None;
         let mut export_block_size = None;
+        let mut display_options = DisplayOptions::default();
         let mut interface_mode = InterfaceMode::Tui;
 
         while let Some(arg) = args.next() {
@@ -132,6 +133,24 @@ impl CliCommand {
                     let value = take_option_value(&mut args, "--export-block-size")?;
                     export_block_size = Some(parse_block_size(&value)?);
                 }
+                Some("--si") => {
+                    display_options.use_si = true;
+                }
+                Some("--disk-usage") => {
+                    display_options.prefer_disk = true;
+                }
+                Some("--apparent-size") => {
+                    display_options.prefer_disk = false;
+                }
+                Some("--show-hidden") => display_options.show_hidden = true,
+                Some("--hide-hidden") => display_options.show_hidden = false,
+                Some("--show-itemcount") => display_options.show_item_count = true,
+                Some("--hide-itemcount") => display_options.show_item_count = false,
+                Some("--show-mtime") => display_options.show_mtime = true,
+                Some("--hide-mtime") => display_options.show_mtime = false,
+                Some("--show-percent") => display_options.show_percent = true,
+                Some("--hide-percent") => display_options.show_percent = false,
+                Some("--no-graph") => display_options.show_graph = false,
                 Some("-f") => {
                     let value = take_option_value(&mut args, "-f")?;
                     import_snapshot = Some(parse_endpoint(&value));
@@ -214,6 +233,7 @@ impl CliCommand {
                 export_compress,
                 export_compress_level,
                 export_block_size,
+                display_options,
                 interface_mode,
             }
         } else {
@@ -233,6 +253,7 @@ impl CliCommand {
             cli.export_compress_level = export_compress_level;
             cli.export_block_size = export_block_size;
             cli.interface_mode = interface_mode;
+            cli.display_options = display_options;
             cli
         };
         Ok(Self::Run(cli))
@@ -267,6 +288,7 @@ pub struct CliArgs {
     pub export_compress_level: Option<u32>,
     pub export_block_size: Option<usize>,
     pub interface_mode: InterfaceMode,
+    pub display_options: DisplayOptions,
 }
 
 impl CliArgs {
@@ -289,6 +311,7 @@ impl CliArgs {
             export_compress_level: None,
             export_block_size: None,
             interface_mode: InterfaceMode::Tui,
+            display_options: DisplayOptions::default(),
         })
     }
 }
@@ -465,6 +488,30 @@ mod tests {
         let args = vec![OsString::from("-t"), OsString::from("3")];
         if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
             assert_eq!(cli.thread_count, Some(3));
+        } else {
+            panic!("expected run command");
+        }
+    }
+
+    #[test]
+    fn parse_display_options_flags() {
+        let args = vec![
+            OsString::from("--si"),
+            OsString::from("--disk-usage"),
+            OsString::from("--show-hidden"),
+            OsString::from("--show-itemcount"),
+            OsString::from("--show-mtime"),
+            OsString::from("--show-percent"),
+            OsString::from("--no-graph"),
+        ];
+        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
+            assert!(cli.display_options.use_si);
+            assert!(cli.display_options.prefer_disk);
+            assert!(cli.display_options.show_hidden);
+            assert!(cli.display_options.show_item_count);
+            assert!(cli.display_options.show_mtime);
+            assert!(cli.display_options.show_percent);
+            assert!(!cli.display_options.show_graph);
         } else {
             panic!("expected run command");
         }

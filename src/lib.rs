@@ -1,6 +1,7 @@
 pub mod app;
 pub mod cli;
 pub mod config;
+pub mod display;
 pub mod event;
 pub mod fs_scan;
 pub mod input;

@@ -15,6 +15,7 @@
 
 use crate::{
     config::SortMode,
+    display::DisplayOptions,
     layout::LayoutRegions,
     state::{AppState, ScanState, SizeDisplayMode},
     theme::Theme,
@@ -28,7 +29,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, Cell, Clear, Paragraph, Row, Table},
 };
-use std::time::UNIX_EPOCH;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use throbber_widgets_tui::BRAILLE_EIGHT;
 
 /// Renderer responsible for drawing the main UI panels.
@@ -92,6 +93,7 @@ impl Ui {
             state.size_mode,
             &state.filter_query,
             state.filter_active,
+            state.display_options,
         );
         let table = Table::new(rows)
             .block(Block::default().borders(Borders::ALL).title("filesystem"))
@@ -240,6 +242,8 @@ struct TreeRow {
     size: u64,
     disk_size: u64,
     kind: NodeType,
+    child_count: usize,
+    modified: Option<SystemTime>,
 }
 
 fn build_rows(
@@ -249,51 +253,37 @@ fn build_rows(
     size_mode: SizeDisplayMode,
     filter_query: &str,
     filter_active: bool,
+    options: DisplayOptions,
 ) -> Vec<Row<'static>> {
     let mut rows = Vec::new();
-    traverse(tree, tree.root(), 0, &mut rows);
+    traverse(tree, tree.root(), 0, &mut rows, options);
     if filter_active && !filter_query.is_empty() {
         let filter = filter_query.to_lowercase();
         rows.retain(|row| row.name.to_lowercase().contains(&filter));
     }
     let max_size = rows
         .iter()
-        .map(|row| chosen_size(row, size_mode))
+        .map(|row| chosen_size(row, size_mode, options))
         .max()
         .unwrap_or(1);
 
     rows.into_iter()
-        .map(|row| {
-            let indent = "  ".repeat(row.depth);
-            let icon = match row.kind {
-                NodeType::Directory => "📁",
-                NodeType::File => "📄",
-                NodeType::Symlink => "🔗",
-                NodeType::Other => "❓",
-            };
-
-            let style = if Some(row.id) == selection {
-                Style::default().bg(theme.selection).fg(theme.background)
-            } else {
-                Style::default().bg(theme.background).fg(theme.foreground)
-            };
-
-            Row::new(vec![
-                Cell::from(format!("{}{} {}", indent, icon, row.name)),
-                Cell::from(format!(
-                    "{} | d:{}",
-                    format_size(row.size),
-                    format_size(row.disk_size)
-                )),
-                Cell::from(draw_bar(chosen_size(&row, size_mode), max_size, 12)),
-            ])
-            .style(style)
-        })
+        .map(|row| build_row(row, selection, theme, size_mode, max_size, options))
         .collect()
 }
 
-fn traverse(tree: &FileTree, id: usize, depth: usize, rows: &mut Vec<TreeRow>) {
+fn traverse(
+    tree: &FileTree,
+    id: usize,
+    depth: usize,
+    rows: &mut Vec<TreeRow>,
+    options: DisplayOptions,
+) {
     if let Some(node) = tree.node(id) {
+        if depth > 0 && !options.show_hidden && node.name.starts_with('.') {
+            return;
+        }
+
         rows.push(TreeRow {
             id: node.id,
             depth,
@@ -301,30 +291,15 @@ fn traverse(tree: &FileTree, id: usize, depth: usize, rows: &mut Vec<TreeRow>) {
             size: node.size,
             disk_size: node.disk_size,
             kind: node.file_type,
+            child_count: node.children.len(),
+            modified: node.modified,
         });
 
         if node.expanded {
             for &child in &node.children {
-                traverse(tree, child, depth + 1, rows);
+                traverse(tree, child, depth + 1, rows, options);
             }
         }
-    }
-}
-
-fn format_size(bytes: u64) -> String {
-    const KB: f64 = 1024.0;
-    const MB: f64 = KB * 1024.0;
-    const GB: f64 = MB * 1024.0;
-    let value = bytes as f64;
-
-    if value >= GB {
-        format!("{:.1} GiB", value / GB)
-    } else if value >= MB {
-        format!("{:.1} MiB", value / MB)
-    } else if value >= KB {
-        format!("{:.1} KiB", value / KB)
-    } else {
-        format!("{bytes} B")
     }
 }
 
@@ -340,16 +315,101 @@ fn draw_bar(size: u64, max: u64, width: usize) -> String {
     format!("[{}{}]", "#".repeat(filled), " ".repeat(empty))
 }
 
+fn build_row(
+    row: TreeRow,
+    selection: Option<usize>,
+    theme: Theme,
+    size_mode: SizeDisplayMode,
+    max_size: u64,
+    options: DisplayOptions,
+) -> Row<'static> {
+    let indent = "  ".repeat(row.depth);
+    let icon = match row.kind {
+        NodeType::Directory => "📁",
+        NodeType::File => "📄",
+        NodeType::Symlink => "🔗",
+        NodeType::Other => "❓",
+    };
+
+    let style = if Some(row.id) == selection {
+        Style::default().bg(theme.selection).fg(theme.background)
+    } else {
+        Style::default().bg(theme.background).fg(theme.foreground)
+    };
+
+    let size_value = chosen_size(&row, size_mode, options);
+    let size_label = format_size_custom(size_value, options.use_si);
+
+    let mut cells = vec![Cell::from(format!("{}{} {}", indent, icon, row.name))];
+    cells.push(Cell::from(size_label));
+
+    if options.show_percent {
+        let percent = if max_size == 0 {
+            0.0
+        } else {
+            size_value as f64 / max_size as f64 * 100.0
+        };
+        cells.push(Cell::from(format!("{percent:.1}%")));
+    }
+
+    if options.show_item_count {
+        cells.push(Cell::from(format!("items:{}", row.child_count)));
+    }
+
+    if options.show_mtime {
+        cells.push(Cell::from(format_mtime(row.modified)));
+    }
+
+    if options.show_graph {
+        cells.push(Cell::from(draw_bar(size_value, max_size, 12)));
+    }
+
+    Row::new(cells).style(style)
+}
+
+fn chosen_size(row: &TreeRow, mode: SizeDisplayMode, options: DisplayOptions) -> u64 {
+    if options.prefer_disk {
+        row.disk_size
+    } else {
+        match mode {
+            SizeDisplayMode::Apparent => row.size,
+            SizeDisplayMode::Disk => row.disk_size,
+        }
+    }
+}
+
+fn format_size_custom(bytes: u64, use_si: bool) -> String {
+    let (unit, div) = if use_si {
+        ("kB", 1000.0)
+    } else {
+        ("KiB", 1024.0)
+    };
+    let value = bytes as f64;
+    if value >= div * div * div {
+        format!(
+            "{:.1} {}",
+            value / (div * div * div),
+            unit.replace('k', "G")
+        )
+    } else if value >= div * div {
+        format!("{:.1} {}", value / (div * div), unit.replace('k', "M"))
+    } else if value >= div {
+        format!("{:.1} {}", value / div, unit)
+    } else {
+        format!("{bytes} B")
+    }
+}
+
+fn format_mtime(modified: Option<SystemTime>) -> String {
+    modified
+        .and_then(|time: SystemTime| time.duration_since(UNIX_EPOCH).ok())
+        .map(|duration: Duration| format!("mtime:{}s", duration.as_secs()))
+        .unwrap_or_else(|| "mtime:-".to_string())
+}
+
 fn spinner_symbol(phase: usize) -> &'static str {
     let symbols = BRAILLE_EIGHT.symbols;
     symbols[phase % symbols.len()]
-}
-
-fn chosen_size(row: &TreeRow, mode: SizeDisplayMode) -> u64 {
-    match mode {
-        SizeDisplayMode::Apparent => row.size,
-        SizeDisplayMode::Disk => row.disk_size,
-    }
 }
 
 fn sort_mode_label(mode: SortMode) -> &'static str {
@@ -612,7 +672,7 @@ mod tests {
 
     fn flatten_rows(tree: &FileTree) -> Vec<TreeRow> {
         let mut rows = Vec::new();
-        traverse(tree, tree.root(), 0, &mut rows);
+        traverse(tree, tree.root(), 0, &mut rows, DisplayOptions::default());
         rows
     }
 
