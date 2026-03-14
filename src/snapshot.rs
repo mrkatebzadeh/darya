@@ -16,9 +16,11 @@
 use crate::tree::{FileTree, NodeType, TreeNode};
 use bincode::config::standard;
 use bincode::serde::{decode_from_std_read, encode_into_std_write};
+use flate2::Compression;
+use flate2::write::GzEncoder;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::io::{self, Read, Write};
+use std::io::{self, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, UNIX_EPOCH};
 
@@ -35,7 +37,26 @@ struct SnapshotEntry {
     modified_secs: Option<u64>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ExportOptions {
+    pub compress: bool,
+    pub compress_level: u32,
+    pub block_size: usize,
+    pub format: SnapshotFormat,
+}
+
+impl Default for ExportOptions {
+    fn default() -> Self {
+        Self {
+            compress: false,
+            compress_level: 6,
+            block_size: 8192,
+            format: SnapshotFormat::Json,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SnapshotFormat {
     Json,
     Binary,
@@ -132,20 +153,33 @@ fn build_tree(entries: Vec<SnapshotEntry>, default_root: &Path) -> FileTree {
     tree
 }
 
-pub fn export_tree(tree: &FileTree, path: &Path) -> anyhow::Result<()> {
-    let entries: Vec<SnapshotEntry> = tree.nodes().iter().map(entry_from_node).collect();
+pub fn export_tree(tree: &FileTree, path: &Path, options: ExportOptions) -> anyhow::Result<()> {
     let writer = fs::File::create(path)?;
-    write_entries(writer, &entries, SnapshotFormat::Json)
+    export_with_options(tree, writer, options)
 }
 
 pub fn export_to_destination(
     tree: &FileTree,
     destination: SnapshotEndpoint,
-    format: SnapshotFormat,
+    options: ExportOptions,
+) -> anyhow::Result<()> {
+    let writer = destination.to_writer()?;
+    export_with_options(tree, writer, options)
+}
+
+fn export_with_options<W: Write>(
+    tree: &FileTree,
+    writer: W,
+    options: ExportOptions,
 ) -> anyhow::Result<()> {
     let entries: Vec<SnapshotEntry> = tree.nodes().iter().map(entry_from_node).collect();
-    let writer = destination.to_writer()?;
-    write_entries(writer, &entries, format)
+    let writer = BufWriter::with_capacity(options.block_size.max(512), writer);
+    if options.compress {
+        let encoder = GzEncoder::new(writer, Compression::new(options.compress_level.min(9)));
+        write_entries(encoder, &entries, options.format)
+    } else {
+        write_entries(writer, &entries, options.format)
+    }
 }
 
 pub fn import_from_destination(
@@ -174,7 +208,7 @@ mod tests {
         }
 
         let path = std::env::temp_dir().join("dar-snapshot-test.json");
-        export_tree(&tree, &path).unwrap();
+        export_tree(&tree, &path, ExportOptions::default()).unwrap();
         let imported = import_from_destination(
             SnapshotEndpoint::File(path.clone()),
             &root,
@@ -197,12 +231,12 @@ mod tests {
         }
 
         let path = std::env::temp_dir().join("dar-snapshot-test.bin");
-        export_to_destination(
-            &tree,
-            SnapshotEndpoint::File(path.clone()),
-            SnapshotFormat::Binary,
-        )
-        .unwrap();
+        let binary_options = ExportOptions {
+            format: SnapshotFormat::Binary,
+            compress: false,
+            ..ExportOptions::default()
+        };
+        export_to_destination(&tree, SnapshotEndpoint::File(path.clone()), binary_options).unwrap();
         let imported = import_from_destination(
             SnapshotEndpoint::File(path.clone()),
             &root,

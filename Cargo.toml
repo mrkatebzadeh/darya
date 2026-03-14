@@ -20,6 +20,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
 toml = "0.7"
 throbber-widgets-tui = "0.8"
 walkdir = "2.3"
+flate2 = "1.0"
 
 [profile.release]
 opt-level = 3

@@ -48,6 +48,9 @@ const HELP_TEXT: &str = concat!(
     "    --include-kernfs  Include kernfs-mounted directories\n",
     "    --exclude-kernfs  Skip kernfs namespaces\n",
     "    -t N  Limit the runtime worker threads to N\n",
+    "    -c, --compress  Compress the exported JSON with gzip\n",
+    "    --compress-level N  Set gzip compression level (1-9)\n",
+    "    --export-block-size BYTES  Set buffered block size for exports\n",
     "    --ignore-config  Do not load configuration files\n",
     "    --exclude PATTERN  Exclude files/directories by glob pattern (repeatable)\n"
 );
@@ -91,6 +94,9 @@ impl CliCommand {
         let mut kernfs_policy: Option<bool> = None;
         let mut thread_count: Option<usize> = None;
         let mut follow_override: Option<bool> = None;
+        let mut export_compress = false;
+        let mut export_compress_level = None;
+        let mut export_block_size = None;
 
         while let Some(arg) = args.next() {
             match arg.to_str() {
@@ -103,6 +109,17 @@ impl CliCommand {
                     let path = PathBuf::from(value);
                     let patterns = read_patterns_from_file(&path)?;
                     exclude_patterns.extend(patterns);
+                }
+                Some("-c") | Some("--compress") => {
+                    export_compress = true;
+                }
+                Some("--compress-level") => {
+                    let value = take_option_value(&mut args, "--compress-level")?;
+                    export_compress_level = Some(parse_compression_level(&value)?);
+                }
+                Some("--export-block-size") => {
+                    let value = take_option_value(&mut args, "--export-block-size")?;
+                    export_block_size = Some(parse_block_size(&value)?);
                 }
                 Some("-f") => {
                     let value = take_option_value(&mut args, "-f")?;
@@ -180,6 +197,9 @@ impl CliCommand {
                 kernfs_policy,
                 thread_count,
                 follow_symlinks_override: follow_override,
+                export_compress,
+                export_compress_level,
+                export_block_size,
             }
         } else {
             let mut cli = CliArgs::from_current_dir()?;
@@ -194,6 +214,9 @@ impl CliCommand {
             cli.kernfs_policy = kernfs_policy;
             cli.thread_count = thread_count;
             cli.follow_symlinks_override = follow_override;
+            cli.export_compress = export_compress;
+            cli.export_compress_level = export_compress_level;
+            cli.export_block_size = export_block_size;
             cli
         };
         Ok(Self::Run(cli))
@@ -224,6 +247,9 @@ pub struct CliArgs {
     pub kernfs_policy: Option<bool>,
     pub thread_count: Option<usize>,
     pub follow_symlinks_override: Option<bool>,
+    pub export_compress: bool,
+    pub export_compress_level: Option<u32>,
+    pub export_block_size: Option<usize>,
 }
 
 impl CliArgs {
@@ -242,6 +268,9 @@ impl CliArgs {
             kernfs_policy: None,
             thread_count: None,
             follow_symlinks_override: None,
+            export_compress: false,
+            export_compress_level: None,
+            export_block_size: None,
         })
     }
 }
@@ -260,6 +289,28 @@ fn parse_endpoint(value: &OsStr) -> SnapshotEndpoint {
     } else {
         SnapshotEndpoint::File(PathBuf::from(value))
     }
+}
+
+fn parse_compression_level(value: &OsStr) -> Result<u32, CliParseError> {
+    let text = value.to_string_lossy();
+    let level = text
+        .parse::<u32>()
+        .map_err(|_| CliParseError::InvalidCompressionLevel(text.to_string()))?;
+    if level > 9 {
+        return Err(CliParseError::InvalidCompressionLevel(text.to_string()));
+    }
+    Ok(level)
+}
+
+fn parse_block_size(value: &OsStr) -> Result<usize, CliParseError> {
+    let text = value.to_string_lossy();
+    let size = text
+        .parse::<usize>()
+        .map_err(|_| CliParseError::InvalidExportBlockSize(text.to_string()))?;
+    if size == 0 {
+        return Err(CliParseError::InvalidExportBlockSize(text.to_string()));
+    }
+    Ok(size)
 }
 
 fn read_patterns_from_file(path: &Path) -> Result<Vec<String>, CliParseError> {
@@ -303,6 +354,10 @@ pub enum CliParseError {
     MissingOptionValue(String),
     #[error("invalid thread count: {0}")]
     InvalidThreadCount(String),
+    #[error("invalid compression level: {0}")]
+    InvalidCompressionLevel(String),
+    #[error("invalid export block size: {0}")]
+    InvalidExportBlockSize(String),
     #[error("failed to read exclude-from file {0}: {1}")]
     ExcludeFile(PathBuf, #[source] std::io::Error),
     #[error("unable to determine current directory: {0}")]
@@ -444,6 +499,24 @@ mod tests {
         let args = vec![OsString::from("--ignore-config")];
         if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
             assert!(cli.ignore_config);
+        } else {
+            panic!("expected run command");
+        }
+    }
+
+    #[test]
+    fn parse_export_tuning_flags() {
+        let args = vec![
+            OsString::from("-c"),
+            OsString::from("--compress-level"),
+            OsString::from("5"),
+            OsString::from("--export-block-size"),
+            OsString::from("16384"),
+        ];
+        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
+            assert!(cli.export_compress);
+            assert_eq!(cli.export_compress_level, Some(5));
+            assert_eq!(cli.export_block_size, Some(16384));
         } else {
             panic!("expected run command");
         }

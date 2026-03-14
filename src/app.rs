@@ -19,7 +19,7 @@ use crate::{
     event,
     fs_scan::{self, ScanEvent, ScanOptions, ScanProgress, ScannerHandle, dummy_scanner},
     size::normalize_path,
-    snapshot::{self, SnapshotEndpoint, SnapshotFormat},
+    snapshot::{self, ExportOptions, SnapshotEndpoint, SnapshotFormat},
     state::{AppState, ScanState},
     theme::Theme,
 };
@@ -79,6 +79,7 @@ pub fn run(cli_args: CliArgs, config_load: ConfigLoad) -> Result<()> {
     {
         builder.worker_threads(threads);
     }
+    let export_options = export_options_from_cli(&cli_args);
     let runtime = builder.enable_all().build()?;
     runtime.block_on(async move {
         if let Some(import_endpoint) = cli_args.import_snapshot.clone() {
@@ -99,6 +100,7 @@ pub fn run(cli_args: CliArgs, config_load: ConfigLoad) -> Result<()> {
                 cli_args.export_binary.clone(),
                 cli_args.extended,
                 scan_options,
+                export_options,
             )
             .await?;
         } else {
@@ -109,6 +111,7 @@ pub fn run(cli_args: CliArgs, config_load: ConfigLoad) -> Result<()> {
                 theme,
                 cli_args.extended,
                 scan_options,
+                export_options,
             )
             .await?;
         }
@@ -124,11 +127,13 @@ async fn run_interactive_mode(
     theme: Theme,
     extended: bool,
     scan_options: ScanOptions,
+    export_options: ExportOptions,
 ) -> Result<()> {
     let (scanner_handle, scanner_rx) =
         fs_scan::start_scan(root.clone(), scan_options, exclude_patterns);
     let mut state = AppState::new(root.clone(), config.sorting.mode);
     state.set_extended_mode(extended);
+    state.set_export_options(export_options);
     state.mark_scan_progress(ScanProgress {
         scanned: 0,
         errors: 0,
@@ -158,6 +163,7 @@ async fn run_import_mode(
     run_ui_thread(state, scanner_rx, scanner_handle, theme).await
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn run_export_mode(
     root: PathBuf,
     exclude_patterns: Vec<String>,
@@ -166,11 +172,13 @@ async fn run_export_mode(
     export_binary: Option<SnapshotEndpoint>,
     extended: bool,
     scan_options: ScanOptions,
+    export_options: ExportOptions,
 ) -> Result<()> {
     let (scanner_handle, mut scanner_rx) =
         fs_scan::start_scan(root.clone(), scan_options, exclude_patterns);
     let mut state = AppState::new(root, config.sorting.mode);
     state.set_extended_mode(extended);
+    state.set_export_options(export_options);
     state.mark_scan_progress(ScanProgress {
         scanned: 0,
         errors: 0,
@@ -181,11 +189,20 @@ async fn run_export_mode(
             break;
         }
     }
+    let json_options = ExportOptions {
+        format: SnapshotFormat::Json,
+        ..export_options
+    };
     if let Some(dest) = export_json {
-        snapshot::export_to_destination(&state.tree, dest, SnapshotFormat::Json)?;
+        snapshot::export_to_destination(&state.tree, dest, json_options)?;
     }
     if let Some(dest) = export_binary {
-        snapshot::export_to_destination(&state.tree, dest, SnapshotFormat::Binary)?;
+        let binary_options = ExportOptions {
+            format: SnapshotFormat::Binary,
+            compress: false,
+            ..export_options
+        };
+        snapshot::export_to_destination(&state.tree, dest, binary_options)?;
     }
     scanner_handle.cancel();
     Ok(())
@@ -228,6 +245,19 @@ fn run_ui_loop(
     drop(terminal);
     drop(guard);
     result
+}
+
+fn export_options_from_cli(cli: &CliArgs) -> ExportOptions {
+    let base = ExportOptions::default();
+    ExportOptions {
+        compress: cli.export_compress,
+        compress_level: cli
+            .export_compress_level
+            .unwrap_or(base.compress_level)
+            .min(9),
+        block_size: cli.export_block_size.unwrap_or(base.block_size),
+        ..base
+    }
 }
 
 struct TerminalGuard;

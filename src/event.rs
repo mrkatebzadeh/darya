@@ -329,7 +329,7 @@ fn open_selection(state: &mut AppState) {
 
 fn export_scan(state: &mut AppState) {
     let snapshot_path = std::path::Path::new(SNAPSHOT_PATH);
-    match snapshot::export_tree(&state.tree, snapshot_path) {
+    match snapshot::export_tree(&state.tree, snapshot_path, state.export_options) {
         Ok(()) => state.update_status(format!("scan exported to {}", snapshot_path.display())),
         Err(err) => state.update_status(format!("export failed: {err}")),
     }

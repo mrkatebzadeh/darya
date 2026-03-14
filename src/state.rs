@@ -16,6 +16,7 @@
 use crate::{
     config::SortMode,
     fs_scan::ScanProgress,
+    snapshot::ExportOptions,
     tree::{FileTree, NodeId, NodeType},
     treemap::TreemapNode,
 };
@@ -54,6 +55,7 @@ pub struct AppState {
     pub treemap_nodes: Vec<TreemapNode>,
     pub allow_modifications: bool,
     pub extended_mode: bool,
+    pub export_options: ExportOptions,
 }
 
 impl AppState {
@@ -74,11 +76,16 @@ impl AppState {
             treemap_nodes: Vec::new(),
             allow_modifications: true,
             extended_mode: false,
+            export_options: ExportOptions::default(),
         }
     }
 
     pub fn set_extended_mode(&mut self, enabled: bool) {
         self.extended_mode = enabled;
+    }
+
+    pub fn set_export_options(&mut self, options: ExportOptions) {
+        self.export_options = options;
     }
 
     pub fn select_node(&mut self, node: NodeId) {
@@ -186,6 +193,7 @@ mod tests {
         assert!(state.treemap_nodes.is_empty());
         assert!(state.allow_modifications);
         assert!(!state.extended_mode);
+        assert_eq!(state.export_options, ExportOptions::default());
     }
 
     #[test]
