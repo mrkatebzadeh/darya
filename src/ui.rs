@@ -130,8 +130,8 @@ impl Ui {
                 Span::styled(progress_label, Style::default().fg(theme.selection)),
             ]),
             Line::from(Span::raw(selected_info_line(state))),
-            Line::from(Span::raw(
-                "hjkl: move │ gg/G: jump │ enter/tab: toggle │ d: delete │ o: open │ /: filter │ c: clear filter │ r: rescan │ b: size mode │ s: cycle sort │ E/I: export/import │ ?: help │ q: quit",
+                Line::from(Span::raw(
+                "hjkl: move │ gg/G: jump │ enter/tab: toggle │ d: delete │ o: open │ /: filter │ c: clear filter │ r: rescan │ R: start scan │ b: size mode │ s: cycle sort │ E/I: export/import │ ?: help │ q: quit",
             )),
         ])
         .block(Block::default().borders(Borders::ALL))
@@ -221,7 +221,7 @@ impl Ui {
             Line::from("  d: delete (with confirmation)"),
             Line::from("  o: open selected path"),
             Line::from("  /: start filter, c: clear filter"),
-            Line::from("  b: size mode, s: sort mode, r: rescan"),
+            Line::from("  b: size mode, s: sort mode, r: rescan, R: start scan"),
             Line::from("  E/I: export/import snapshot"),
             Line::from("  ?: toggle this help, q: quit"),
         ];

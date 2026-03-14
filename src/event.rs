@@ -1,4 +1,3 @@
-use crate::fs_scan::{ScanEvent, ScannerHandle};
 // Copyright (C) 2026 M.R. Siavash Katebzadeh <mr@katebzadeh.xyz>
 //
 // This program is free software: you can redistribute it and/or modify
@@ -16,11 +15,13 @@ use crate::fs_scan::{ScanEvent, ScannerHandle};
 
 use crate::{
     config::SortMode,
+    fs_scan::{ScanEvent, ScanProgress},
     input::{InputAction, InputState},
     layout,
+    scan_control::ScanTriggerSender,
     size::{normalize_path, total_size},
     snapshot::{self, SnapshotEndpoint, SnapshotFormat},
-    state::AppState,
+    state::{AppState, ScanState},
     theme::Theme,
     tree::{NodeMetadata, NodeType},
     ui::Ui,
@@ -41,12 +42,12 @@ const TICK_RATE: Duration = Duration::from_millis(250);
 const MAX_SCAN_EVENTS_PER_CYCLE: usize = 256;
 const SNAPSHOT_PATH: &str = "/tmp/dar-scan.json";
 
-/// Runs the terminal event loop until the user quits or scanning completes.
+/// Runs the terminal event loop until the user quits.
 pub fn run_event_loop(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     state: &mut AppState,
     scanner_rx: &mut UnboundedReceiver<ScanEvent>,
-    scanner_handle: &ScannerHandle,
+    scan_trigger: &ScanTriggerSender,
     theme: Theme,
 ) -> Result<()> {
     let mut input_state = InputState::new();
@@ -67,9 +68,9 @@ pub fn run_event_loop(
                     let action = input_state.process_key(key_event);
                     if matches!(action, InputAction::Quit) {
                         should_quit = true;
-                        scanner_handle.cancel();
+                        let _ = scan_trigger.send(crate::scan_control::ScanTrigger::Cancel);
                     }
-                    handle_input_action(action, state);
+                    handle_input_action(action, state, scan_trigger);
                     dirty = true;
                 }
                 Event::Resize(_, _) => dirty = true,
@@ -101,7 +102,11 @@ pub fn run_event_loop(
     Ok(())
 }
 
-fn handle_input_action(action: InputAction, state: &mut AppState) {
+fn handle_input_action(
+    action: InputAction,
+    state: &mut AppState,
+    scan_trigger: &ScanTriggerSender,
+) {
     match action {
         InputAction::MoveUp => select_previous(state),
         InputAction::MoveDown => select_next(state),
@@ -153,6 +158,20 @@ fn handle_input_action(action: InputAction, state: &mut AppState) {
             }
         }
         InputAction::Collapse => collapse_selection(state),
+        InputAction::StartScan => {
+            if !matches!(state.scan_state, ScanState::Running(_)) {
+                let _ = scan_trigger.send(crate::scan_control::ScanTrigger::Start);
+                state.mark_scan_progress(ScanProgress {
+                    scanned: 0,
+                    errors: 0,
+                });
+                if let Some(root_node) = state.tree.node(state.tree.root()) {
+                    state.update_status(format!("scanning {}", root_node.path.display()));
+                } else {
+                    state.update_status("scanning");
+                }
+            }
+        }
         _ => {}
     }
 
@@ -474,9 +493,11 @@ pub(crate) fn process_scan_event(state: &mut AppState, event: ScanEvent) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::scan_control::ScanTriggerSender;
     use crate::state::AppState;
     use crate::tree::{NodeType, TreeNode};
     use std::path::PathBuf;
+    use tokio::sync::mpsc;
 
     fn sample_state() -> AppState {
         let mut state = AppState::new(PathBuf::from("/"), default_sort_mode());
@@ -490,10 +511,16 @@ mod tests {
         crate::config::SortMode::SizeDesc
     }
 
+    fn dummy_trigger() -> ScanTriggerSender {
+        let (tx, _rx) = mpsc::unbounded_channel();
+        tx
+    }
+
     #[test]
     fn move_down_moves_selection() {
         let mut state = sample_state();
-        handle_input_action(InputAction::MoveDown, &mut state);
+        let trigger = dummy_trigger();
+        handle_input_action(InputAction::MoveDown, &mut state, &trigger);
         assert_eq!(state.selection, Some(1));
     }
 
@@ -501,7 +528,8 @@ mod tests {
     fn move_up_wraps_to_root() {
         let mut state = sample_state();
         state.selection = Some(1);
-        handle_input_action(InputAction::MoveUp, &mut state);
+        let trigger = dummy_trigger();
+        handle_input_action(InputAction::MoveUp, &mut state, &trigger);
         assert_eq!(state.selection, Some(0));
     }
 
@@ -513,11 +541,12 @@ mod tests {
             TreeNode::new(PathBuf::from("/dir"), NodeType::Directory).collapsed(),
         );
         state.selection = Some(dir_id);
+        let trigger = dummy_trigger();
 
-        handle_input_action(InputAction::Select, &mut state);
+        handle_input_action(InputAction::Select, &mut state, &trigger);
         assert!(state.tree.node(dir_id).unwrap().expanded);
 
-        handle_input_action(InputAction::Select, &mut state);
+        handle_input_action(InputAction::Select, &mut state, &trigger);
         assert!(!state.tree.node(dir_id).unwrap().expanded);
     }
 
@@ -525,7 +554,8 @@ mod tests {
     fn delete_action_first_press_requests_confirmation() {
         let mut state = sample_state();
         state.selection = Some(1);
-        handle_input_action(InputAction::Delete, &mut state);
+        let trigger = dummy_trigger();
+        handle_input_action(InputAction::Delete, &mut state, &trigger);
         assert_eq!(state.pending_delete, Some(1));
     }
 

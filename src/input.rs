@@ -31,6 +31,7 @@ pub enum InputAction {
     ExportScan,
     ImportScan,
     Rescan,
+    StartScan,
     StartFilter,
     FilterChar(char),
     FilterBackspace,
@@ -82,6 +83,7 @@ impl InputState {
             KeyCode::Char('E') => InputAction::ExportScan,
             KeyCode::Char('I') => InputAction::ImportScan,
             KeyCode::Char('r') => InputAction::Rescan,
+            KeyCode::Char('R') => InputAction::StartScan,
             KeyCode::Char('/') => {
                 self.filter_mode = true;
                 InputAction::StartFilter
@@ -201,6 +203,10 @@ mod tests {
         assert_eq!(
             state.process_key(event(KeyCode::Char('r'))),
             InputAction::Rescan
+        );
+        assert_eq!(
+            state.process_key(event(KeyCode::Char('R'))),
+            InputAction::StartScan
         );
         assert_eq!(
             state.process_key(event(KeyCode::Char('c'))),

@@ -6,6 +6,7 @@ pub mod event;
 pub mod fs_scan;
 pub mod input;
 pub mod layout;
+pub mod scan_control;
 pub mod size;
 pub mod snapshot;
 pub mod state;

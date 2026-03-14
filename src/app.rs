@@ -17,7 +17,10 @@ use crate::{
     cli::{CliArgs, InterfaceMode},
     config::{Config, ConfigLoad},
     event,
-    fs_scan::{self, ScanEvent, ScanOptions, ScanProgress, ScannerHandle, dummy_scanner},
+    fs_scan::{self, ScanEvent, ScanOptions, ScanProgress, dummy_scanner},
+    scan_control::{
+        ScanEventReceiver, ScanEventSender, ScanTrigger, ScanTriggerReceiver, ScanTriggerSender,
+    },
     size::normalize_path,
     snapshot::{self, ExportOptions, SnapshotEndpoint, SnapshotFormat},
     state::{AppState, ScanState},
@@ -34,7 +37,7 @@ use std::io;
 use std::path::PathBuf;
 use std::thread;
 use tokio::runtime::Builder;
-use tokio::sync::{mpsc::UnboundedReceiver, oneshot};
+use tokio::sync::oneshot;
 
 pub fn run(cli_args: CliArgs, config_load: ConfigLoad) -> Result<()> {
     let ConfigLoad { config, error, .. } = config_load;
@@ -139,17 +142,71 @@ async fn run_interactive_mode(
     scan_options: ScanOptions,
     export_options: ExportOptions,
 ) -> Result<()> {
-    let (scanner_handle, scanner_rx) =
-        fs_scan::start_scan(root.clone(), scan_options, exclude_patterns);
+    let (scan_event_tx, scan_event_rx): (ScanEventSender, ScanEventReceiver) =
+        tokio::sync::mpsc::unbounded_channel();
+    let (scan_trigger_tx, scan_trigger_rx): (ScanTriggerSender, ScanTriggerReceiver) =
+        tokio::sync::mpsc::unbounded_channel();
+    let manager = tokio::spawn(scan_manager(
+        scan_trigger_rx,
+        scan_event_tx.clone(),
+        root.clone(),
+        exclude_patterns.clone(),
+        scan_options,
+    ));
     let mut state = AppState::new(root.clone(), config.sorting.mode);
     state.set_extended_mode(extended);
     state.set_export_options(export_options);
-    state.mark_scan_progress(ScanProgress {
-        scanned: 0,
-        errors: 0,
-    });
-    state.update_status(format!("scanning {}", root.display()));
-    run_ui_thread(state, scanner_rx, scanner_handle, theme).await
+    state.update_status(format!("press R to scan {}", root.display()));
+    run_ui_thread(state, scan_event_rx, scan_trigger_tx.clone(), theme).await?;
+    drop(scan_trigger_tx);
+    manager
+        .await
+        .map_err(|err| anyhow!("scan manager aborted: {err}"))?;
+    Ok(())
+}
+
+async fn scan_manager(
+    mut commands: ScanTriggerReceiver,
+    event_tx: ScanEventSender,
+    root: PathBuf,
+    exclude_patterns: Vec<String>,
+    scan_options: ScanOptions,
+) {
+    let mut running_handle: Option<fs_scan::ScannerHandle> = None;
+    while let Some(command) = commands.recv().await {
+        match command {
+            ScanTrigger::Start => {
+                if let Some(handle) = running_handle.take() {
+                    handle.cancel();
+                }
+                let root_clone = root.clone();
+                let patterns = exclude_patterns.clone();
+                let (handle, mut scanner_rx) =
+                    fs_scan::start_scan(root_clone, scan_options, patterns);
+                let sender = event_tx.clone();
+                running_handle = Some(handle);
+                tokio::spawn(async move {
+                    while let Some(event) = scanner_rx.recv().await {
+                        let _ = sender.send(event);
+                    }
+                });
+            }
+            ScanTrigger::Stop | ScanTrigger::Cancel => {
+                if let Some(handle) = running_handle.take() {
+                    handle.cancel();
+                }
+                if let ScanTrigger::Cancel = command {
+                    break;
+                }
+            }
+            ScanTrigger::Pause | ScanTrigger::Resume => {
+                // Not supported in current scanner; ignore.
+            }
+        }
+    }
+    if let Some(handle) = running_handle {
+        handle.cancel();
+    }
 }
 
 async fn run_import_mode(
@@ -169,8 +226,9 @@ async fn run_import_mode(
     state.tree = snapshot::import_from_destination(endpoint, &default_root, SnapshotFormat::Json)?;
     state.selection = Some(state.tree.root());
     state.allow_modifications = false;
-    let (scanner_handle, scanner_rx) = dummy_scanner();
-    run_ui_thread(state, scanner_rx, scanner_handle, theme).await
+    let (_scanner_handle, scanner_rx) = dummy_scanner();
+    let (scan_trigger_tx, _scan_trigger_rx) = tokio::sync::mpsc::unbounded_channel::<ScanTrigger>();
+    run_ui_thread(state, scanner_rx, scan_trigger_tx, theme).await
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -274,13 +332,13 @@ async fn run_summary_mode(
 
 async fn run_ui_thread(
     state: AppState,
-    scanner_rx: UnboundedReceiver<ScanEvent>,
-    scanner_handle: ScannerHandle,
+    scanner_rx: ScanEventReceiver,
+    scan_trigger: ScanTriggerSender,
     theme: Theme,
 ) -> Result<()> {
     let (done_tx, done_rx) = oneshot::channel();
     thread::spawn(move || {
-        let result = run_ui_loop(state, scanner_rx, scanner_handle, theme);
+        let result = run_ui_loop(state, scanner_rx, scan_trigger, theme);
         let _ = done_tx.send(result);
     });
     done_rx
@@ -291,8 +349,8 @@ async fn run_ui_thread(
 
 fn run_ui_loop(
     mut state: AppState,
-    mut scanner_rx: UnboundedReceiver<ScanEvent>,
-    scanner_handle: ScannerHandle,
+    mut scanner_rx: ScanEventReceiver,
+    scan_trigger: ScanTriggerSender,
     theme: Theme,
 ) -> Result<()> {
     let guard = TerminalGuard::enter()?;
@@ -302,7 +360,7 @@ fn run_ui_loop(
         &mut terminal,
         &mut state,
         &mut scanner_rx,
-        &scanner_handle,
+        &scan_trigger,
         theme,
     );
     terminal.show_cursor()?;
