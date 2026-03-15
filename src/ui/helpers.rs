@@ -22,9 +22,9 @@ use crate::treemap::TreemapNode;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::terminal::Frame;
-use ratatui::text::{Line, Span};
+use ratatui::text::Span;
 use ratatui::widgets::{Cell, Row};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::UNIX_EPOCH;
 use throbber_widgets_tui::BRAILLE_EIGHT;
 pub const PERCENT_VALUE_WIDTH: usize = 7;
 pub const PERCENT_COLUMN_WIDTH: usize = 20;
@@ -64,8 +64,6 @@ fn traverse(
             size: node.size,
             disk_size: node.disk_size,
             kind: node.file_type,
-            child_count: node.children.len(),
-            modified: node.modified,
         });
 
         if node.expanded {
@@ -82,7 +80,7 @@ pub(crate) fn build_row(
     theme: Theme,
     size_mode: SizeDisplayMode,
     max_size: u64,
-    options: DisplayOptions,
+    _options: DisplayOptions,
 ) -> Row<'static> {
     let indent = "  ".repeat(row.depth);
     let icon = match row.kind {
@@ -102,36 +100,19 @@ pub(crate) fn build_row(
             .fg(theme.foreground)
     };
 
-    let size_value = chosen_size(&row, size_mode, options);
-    let size_label = format_size_custom(size_value, options.use_si);
+    let size_value = chosen_size(row, size_mode, _options);
+    let percent = if max_size == 0 {
+        0.0
+    } else {
+        size_value as f64 / max_size as f64 * 100.0
+    };
+    let bar = percent_bar(percent, PERCENT_BAR_WIDTH);
 
     let mut cells = vec![Cell::from(format!("{}{} {}", indent, icon, row.name))];
-    cells.push(Cell::from(size_label));
-
-    if options.show_percent {
-        let percent = if max_size == 0 {
-            0.0
-        } else {
-            size_value as f64 / max_size as f64 * 100.0
-        };
-        let bar = percent_bar(percent, PERCENT_BAR_WIDTH);
-        let percent_label = format!("{percent:>6.1}%");
-        let bar_style = Style::default().fg(Color::LightGreen);
-        let line = Line::from(vec![Span::styled(bar, bar_style), Span::raw(percent_label)]);
-        cells.push(Cell::from(line));
-    }
-
-    if options.show_item_count {
-        cells.push(Cell::from(format!("items:{}", row.child_count)));
-    }
-
-    if options.show_mtime {
-        cells.push(Cell::from(format_mtime(row.modified)));
-    }
-
-    if options.show_graph {
-        cells.push(Cell::from(draw_bar(size_value, max_size, 12)));
-    }
+    let percent_label = format!("{percent:>6.1}%");
+    let bar_style = Style::default().fg(Color::LightGreen);
+    let percent_cell = Cell::from(Span::styled(format!("{bar}{percent_label}"), bar_style));
+    cells.push(percent_cell);
 
     Row::new(cells).style(style)
 }
@@ -147,25 +128,12 @@ pub(crate) fn chosen_size(row: &TreeRow, mode: SizeDisplayMode, options: Display
     }
 }
 
-fn draw_bar(size: u64, max: u64, width: usize) -> String {
-    let filled = if max == 0 {
-        0
-    } else {
-        let ratio = size as f64 / max as f64;
-        ((ratio * width as f64).round() as usize).min(width)
-    };
-
-    let empty = width.saturating_sub(filled);
-    format!("[{}{}]", "#".repeat(filled), " ".repeat(empty))
-}
-
 fn percent_bar(percent: f64, width: usize) -> String {
     let ratio = (percent.clamp(0.0, 100.0) / 100.0).min(1.0);
     let filled = ((ratio * width as f64).round() as usize).min(width);
     let empty = width.saturating_sub(filled);
     format!("{}{}", "█".repeat(filled), " ".repeat(empty))
 }
-
 fn format_size_custom(bytes: u64, use_si: bool) -> String {
     let (unit, div) = if use_si {
         ("kB", 1000.0)
@@ -186,13 +154,6 @@ fn format_size_custom(bytes: u64, use_si: bool) -> String {
     } else {
         format!("{bytes} B")
     }
-}
-
-fn format_mtime(modified: Option<SystemTime>) -> String {
-    modified
-        .and_then(|time: SystemTime| time.duration_since(UNIX_EPOCH).ok())
-        .map(|duration: Duration| format!("mtime:{}s", duration.as_secs()))
-        .unwrap_or_else(|| "mtime:-".to_string())
 }
 
 pub(crate) fn spinner_symbol(phase: usize) -> &'static str {
@@ -447,8 +408,6 @@ pub(crate) struct TreeRow {
     size: u64,
     disk_size: u64,
     kind: NodeType,
-    child_count: usize,
-    modified: Option<SystemTime>,
 }
 
 impl TreeRow {

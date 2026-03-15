@@ -146,11 +146,7 @@ impl Ui {
 
         let table = Table::new(table_rows)
             .block(Block::default().borders(Borders::ALL).title("filesystem"))
-            .widths(&[
-                Constraint::Percentage(55),
-                Constraint::Length(PERCENT_COLUMN_WIDTH as u16),
-                Constraint::Percentage(33),
-            ])
+            .widths(&[Constraint::Percentage(55), Constraint::Percentage(45)])
             .column_spacing(1);
 
         frame.render_widget(table, area);
