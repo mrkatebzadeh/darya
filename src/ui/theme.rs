@@ -26,6 +26,7 @@ pub struct Theme {
     pub directory: Color,
     pub file: Color,
     pub bar: Color,
+    pub bar_bg: Color,
     pub tile_palette: [Color; TILE_PALETTE_SIZE],
 }
 
@@ -52,6 +53,7 @@ impl Default for Theme {
             directory: Color::Cyan,
             file: Color::Gray,
             bar: Color::LightGreen,
+            bar_bg: Color::Reset,
             tile_palette: [
                 Color::LightGreen,
                 Color::LightYellow,
@@ -91,6 +93,7 @@ mod tests {
         assert_eq!(theme.directory, Color::Cyan);
         assert_eq!(theme.file, Color::Gray);
         assert_eq!(theme.bar, Color::LightGreen);
+        assert_eq!(theme.bar_bg, Color::Reset);
         assert_eq!(theme.tile_palette.len(), TILE_PALETTE_SIZE);
         assert_eq!(theme.tile_color(0), Color::LightGreen);
         assert_eq!(theme.tile_color(5), Color::Yellow);

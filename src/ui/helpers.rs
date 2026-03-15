@@ -24,7 +24,7 @@ use ratatui::layout::Rect;
 use ratatui::layout::{Constraint, Layout};
 use ratatui::style::{Color, Style};
 use ratatui::terminal::Frame;
-use ratatui::text::Span;
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Cell, Row};
 #[cfg(test)]
 use std::time::UNIX_EPOCH;
@@ -120,16 +120,33 @@ pub(crate) fn build_row(
     let trimmed_percent_label = trim_to_width(&percent_label, percent_column_width);
     let bar_width = percent_column_width.saturating_sub(trimmed_percent_label.len());
     let bar = percent_bar(percent, bar_width);
-    let percent_column_content = if percent_column_width == 0 {
-        String::new()
+    let percent_bar_style = if Some(row.id) == selection {
+        // Let the row highlight background show through.
+        Style::default().fg(theme.bar)
     } else {
-        let combined = if bar_width == 0 {
-            trimmed_percent_label.clone()
-        } else {
-            format!("{bar}{trimmed_percent_label}")
-        };
-        let trimmed_combined = trim_to_width(&combined, percent_column_width);
-        format!("{trimmed_combined:>width$}", width = percent_column_width)
+        Style::default().fg(theme.bar).bg(theme.bar_bg)
+    };
+    let percent_value_style = Style::default().fg(theme.foreground);
+    let size_value_style = Style::default().fg(theme.bar);
+    let percent_cell = if percent_column_width == 0 {
+        Cell::from(Span::raw(String::new()))
+    } else {
+        let combined_len = bar_width + trimmed_percent_label.len();
+        let padding = percent_column_width.saturating_sub(combined_len);
+        let mut spans = Vec::new();
+        if padding > 0 {
+            spans.push(Span::raw(" ".repeat(padding)));
+        }
+        if !bar.is_empty() {
+            spans.push(Span::styled(bar.clone(), percent_bar_style));
+        }
+        if !trimmed_percent_label.is_empty() {
+            spans.push(Span::styled(
+                trimmed_percent_label.clone(),
+                percent_value_style,
+            ));
+        }
+        Cell::from(Line::from(spans))
     };
     let trimmed_size_label = trim_to_width(&size_label, size_column_width);
     let size_column_content = if size_column_width == 0 {
@@ -139,9 +156,7 @@ pub(crate) fn build_row(
     };
 
     let mut cells = vec![Cell::from(format!("{}{} {}", indent, icon, row.name))];
-    let bar_style = Style::default().fg(Color::LightGreen);
-    let percent_cell = Cell::from(Span::styled(percent_column_content, bar_style));
-    let size_cell = Cell::from(Span::styled(size_column_content, bar_style));
+    let size_cell = Cell::from(Span::styled(size_column_content, size_value_style));
     cells.push(percent_cell);
     cells.push(size_cell);
 
@@ -163,7 +178,7 @@ fn percent_bar(percent: f64, width: usize) -> String {
     let ratio = (percent.clamp(0.0, 100.0) / 100.0).min(1.0);
     let filled = ((ratio * width as f64).round() as usize).min(width);
     let empty = width.saturating_sub(filled);
-    format!("{}{}", "█".repeat(filled), " ".repeat(empty))
+    format!("{}{}", "█".repeat(filled), "-".repeat(empty))
 }
 
 fn trim_to_width(value: &str, width: usize) -> String {
@@ -176,6 +191,7 @@ fn trim_to_width(value: &str, width: usize) -> String {
         value.chars().take(width).collect()
     }
 }
+
 fn format_size_custom(bytes: u64, use_si: bool) -> String {
     let (unit, div) = if use_si {
         ("kB", 1000.0)
