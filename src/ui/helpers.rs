@@ -314,7 +314,7 @@ pub(crate) fn detail_panel_lines(state: &AppState, theme: Theme) -> Vec<Line<'_>
 
     let mut lines = vec![
         Line::from(vec![
-            Span::styled("📂 path: ", Style::default().fg(theme.directory)),
+            Span::styled("📂\tpath: ", Style::default().fg(theme.directory)),
             Span::styled(
                 node.path.display().to_string(),
                 Style::default()
@@ -323,18 +323,18 @@ pub(crate) fn detail_panel_lines(state: &AppState, theme: Theme) -> Vec<Line<'_>
             ),
         ]),
         Line::from(vec![
-            Span::styled("⬤ type: ", Style::default().fg(theme.selection)),
+            Span::styled("⬤\ttype: ", Style::default().fg(theme.selection)),
             Span::styled(
                 kind_label,
                 Style::default().fg(kind_color).add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(vec![
-            Span::styled("⚖️ apparent: ", Style::default().fg(theme.bar)),
+            Span::styled("⚖️\tapparent: ", Style::default().fg(theme.bar)),
             Span::styled(apparent, Style::default().fg(theme.foreground)),
         ]),
         Line::from(vec![
-            Span::styled("💾 disk: ", Style::default().fg(theme.directory)),
+            Span::styled("💾\tdisk: ", Style::default().fg(theme.directory)),
             Span::styled(
                 disk,
                 Style::default()
@@ -350,7 +350,7 @@ pub(crate) fn detail_panel_lines(state: &AppState, theme: Theme) -> Vec<Line<'_>
 
     if node.file_type == NodeType::Directory {
         lines.push(Line::from(vec![
-            Span::styled("📦 items: ", Style::default().fg(theme.selection)),
+            Span::styled("📦\titems: ", Style::default().fg(theme.selection)),
             Span::styled(
                 node.children.len().to_string(),
                 Style::default().fg(theme.bar).add_modifier(Modifier::BOLD),
