@@ -20,7 +20,7 @@ use crate::ui::{
     components,
     helpers::*,
     layout::LayoutRegions,
-    view_model::{ActivityViewModel, DetailViewModel},
+    view_model::{ActivityViewModel, DetailViewModel, FilesystemViewModel},
 };
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::Style;
@@ -43,7 +43,8 @@ impl Ui {
         theme: Theme,
     ) {
         self.draw_header(frame, layout.header, state, theme);
-        components::draw_filesystem_panel(frame, layout.tree, state, theme);
+        let filesystem_vm = FilesystemViewModel::build(state, layout.tree, theme);
+        components::draw_filesystem_panel(frame, layout.tree, filesystem_vm, theme);
         self.draw_treemap(frame, layout.treemap, state, theme);
         let detail_vm = DetailViewModel::build(state);
         components::draw_detail_panel(frame, layout.details, &detail_vm, theme);

@@ -14,7 +14,12 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::state::AppState;
-use crate::ui::helpers::detail_panel_lines;
+use crate::theme::Theme;
+use crate::ui::helpers::{
+    ColumnWidths, build_row, chosen_size, collect_tree_rows, detail_panel_lines,
+};
+use ratatui::layout::Rect;
+use ratatui::widgets::Row;
 
 #[derive(Debug)]
 pub struct DetailEntry {
@@ -98,5 +103,95 @@ impl ActivityViewModel {
         ];
 
         Self { metrics }
+    }
+}
+
+#[derive(Debug)]
+pub struct FilesystemViewModel {
+    pub table_rows: Vec<Row<'static>>,
+    pub filter_prompt: Option<String>,
+}
+
+impl FilesystemViewModel {
+    pub fn build(state: &mut AppState, area: Rect, theme: Theme) -> Self {
+        const OVERLAY_HEIGHT: u16 = 3;
+        let tree_rows = collect_tree_rows(
+            &state.tree,
+            &state.filter_query,
+            state.filter_active,
+            state.display_options,
+        );
+        let max_size = tree_rows
+            .iter()
+            .map(|row| chosen_size(row, state.size_mode, state.display_options))
+            .max()
+            .unwrap_or(1);
+
+        let visible_height = area.height.saturating_sub(2) as usize;
+        if tree_rows.is_empty() {
+            state.set_scroll_offset(0);
+        }
+
+        let mut offset = state.scroll_offset;
+        if !tree_rows.is_empty() && visible_height > 0 {
+            let selected_index = tree_rows
+                .iter()
+                .position(|row| Some(row.id()) == state.selection)
+                .unwrap_or(0);
+            if selected_index < offset {
+                offset = selected_index;
+            } else if selected_index >= offset + visible_height {
+                offset = selected_index + 1 - visible_height;
+            }
+            let max_offset = tree_rows.len().saturating_sub(visible_height);
+            if offset > max_offset {
+                offset = max_offset;
+            }
+        } else {
+            offset = 0;
+        }
+        state.set_scroll_offset(offset);
+
+        let percent_column_width = (((area.width as usize) * 30) / 100).max(1);
+        let size_column_width = (((area.width as usize) * 15) / 100).max(1);
+        let table_rows = if visible_height == 0 {
+            Vec::new()
+        } else {
+            tree_rows
+                .iter()
+                .skip(offset)
+                .take(visible_height)
+                .map(|row| {
+                    build_row(
+                        row,
+                        state.selection,
+                        theme,
+                        state.size_mode,
+                        max_size,
+                        state.display_options,
+                        ColumnWidths {
+                            percent: percent_column_width,
+                            size: size_column_width,
+                        },
+                    )
+                })
+                .collect()
+        };
+
+        let filter_prompt =
+            if state.filter_prompt_active && area.height > OVERLAY_HEIGHT && area.width >= 4 {
+                Some(if state.filter_query.is_empty() {
+                    " ".into()
+                } else {
+                    state.filter_query.clone()
+                })
+            } else {
+                None
+            };
+
+        Self {
+            table_rows,
+            filter_prompt,
+        }
     }
 }
