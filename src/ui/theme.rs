@@ -31,7 +31,15 @@ pub struct Theme {
 
 impl Theme {
     pub fn tile_color(&self, index: usize) -> Color {
-        self.tile_palette[index % TILE_PALETTE_SIZE]
+        let mut current = index % TILE_PALETTE_SIZE;
+        for _ in 0..TILE_PALETTE_SIZE {
+            let color = self.tile_palette[current];
+            if color != self.selection {
+                return color;
+            }
+            current = (current + 1) % TILE_PALETTE_SIZE;
+        }
+        self.bar
     }
 }
 
