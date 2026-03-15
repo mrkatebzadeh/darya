@@ -15,7 +15,7 @@
 
 use crate::state::{AppState, ScanState};
 use crate::theme::Theme;
-use crate::treemap::{contextual_treemap_layout, TreemapLayout, TreemapNode, TreemapTile};
+use crate::treemap::{TreemapLayout, TreemapNode, TreemapTile, contextual_treemap_layout};
 use crate::ui::{helpers::*, layout::LayoutRegions};
 use ratatui::layout::{Alignment, Constraint, Rect};
 use ratatui::style::Style;
@@ -58,7 +58,6 @@ impl Ui {
             Span::styled("root: ", Style::default().fg(theme.directory)),
             Span::styled(root_label, Style::default().fg(theme.foreground)),
             Span::raw(format!(" | sort:{} ", sort_mode_label(state.sort_mode))),
-            Span::raw(" | press R to start scan"),
         ]))
         .block(Block::default().borders(Borders::ALL))
         .style(Style::default().bg(theme.background));
@@ -157,23 +156,41 @@ impl Ui {
             _ => "scan idle".into(),
         };
 
-        let footer = Paragraph::new(vec![
-            Line::from(vec![
-                Span::raw(status_text.to_string()),
-                Span::raw(" | "),
-                Span::styled(progress_label, Style::default().fg(theme.selection)),
-                Span::raw(" | "),
-                Span::styled("press ? for keybindings", Style::default().fg(theme.directory)),
-            ]),
-            Line::from(Span::raw(selected_info_line(state))),
-            Line::from(Span::raw(
-                "hjkl: move │ gg/G: jump │ enter/tab: toggle │ d: delete │ o: open │ /: filter │ c: clear filter │ r: rescan │ b: size mode │ s: cycle sort │ E/I: export/import │ ?: help │ q: quit",
-            )),
-        ])
-        .block(Block::default().borders(Borders::ALL))
-        .style(Style::default().bg(theme.background));
+        frame.render_widget(
+            Paragraph::new(" ").style(Style::default().bg(theme.background)),
+            area,
+        );
+        if area.height == 0 {
+            return;
+        }
 
-        frame.render_widget(footer, area);
+        let status = format!("{status_text} | {progress_label}");
+        let hint = "Press ? for keybindings";
+        let hint_width = hint.len() as u16;
+        let status_width = area.width.saturating_sub(hint_width + 1);
+        let status_trimmed = trim_to_width(&status, status_width as usize);
+
+        let buf = frame.buffer_mut();
+        if status_width > 0 {
+            buf.set_stringn(
+                area.x,
+                area.y,
+                &status_trimmed,
+                status_width as usize,
+                Style::default().fg(theme.foreground).bg(theme.background),
+            );
+        }
+
+        if area.width > hint_width {
+            let hint_x = area.x + area.width.saturating_sub(hint_width);
+            buf.set_stringn(
+                hint_x,
+                area.y,
+                hint,
+                hint_width as usize,
+                Style::default().fg(theme.directory).bg(theme.background),
+            );
+        }
     }
 
     fn draw_treemap(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
