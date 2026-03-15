@@ -188,8 +188,9 @@ impl Ui {
     }
 
     fn draw_details(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
+        frame.render_widget(Clear, area);
         let detail_lines = detail_panel_lines(state, theme);
-        let content: Vec<Line> = detail_lines.into_iter().map(Line::from).collect();
+        let content: Vec<Line> = detail_lines;
         let panel = Paragraph::new(content)
             .block(Block::default().borders(Borders::ALL).title("Details"))
             .style(Style::default().fg(theme.foreground).bg(theme.background));
