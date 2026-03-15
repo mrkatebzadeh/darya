@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::events::handlers::{handle_input_action, process_scan_event};
+use crate::events::controller::{handle_input_action, process_scan_event};
 use crate::fs_scan::ScanEvent;
 use crate::input::{InputAction, InputState};
 use crate::scan_control::ScanTriggerSender;

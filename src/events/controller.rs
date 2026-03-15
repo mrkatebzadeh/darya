@@ -24,7 +24,7 @@ use crate::tree::{NodeMetadata, NodeType};
 use std::fs;
 use std::process::Command;
 
-pub(crate) fn handle_input_action(
+pub fn handle_input_action(
     action: InputAction,
     state: &mut AppState,
     scan_trigger: &ScanTriggerSender,

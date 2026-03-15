@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod controller;
-pub mod event_loop;
+pub mod activity_panel;
+pub mod detail_panel;
 
-pub use controller::{handle_input_action, process_scan_event};
-pub use event_loop::run_event_loop;
+pub use activity_panel::draw_activity_panel;
+pub use detail_panel::draw_detail_panel;
