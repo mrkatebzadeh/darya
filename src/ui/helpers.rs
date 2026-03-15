@@ -20,12 +20,15 @@ use crate::theme::Theme;
 use crate::tree::{FileTree, NodeType, TreeNode};
 use crate::treemap::TreemapNode;
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::Color;
+use ratatui::style::{Color, Style};
 use ratatui::terminal::Frame;
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Cell, Row};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use throbber_widgets_tui::BRAILLE_EIGHT;
-const PERCENT_BAR_WIDTH: usize = 10;
+pub const PERCENT_VALUE_WIDTH: usize = 7;
+pub const PERCENT_COLUMN_WIDTH: usize = 20;
+pub const PERCENT_BAR_WIDTH: usize = PERCENT_COLUMN_WIDTH - PERCENT_VALUE_WIDTH;
 
 pub(crate) fn collect_tree_rows(
     tree: &FileTree,
@@ -112,7 +115,10 @@ pub(crate) fn build_row(
             size_value as f64 / max_size as f64 * 100.0
         };
         let bar = percent_bar(percent, PERCENT_BAR_WIDTH);
-        cells.push(Cell::from(format!("{bar} {percent:.1}%")));
+        let percent_label = format!("{percent:>6.1}%");
+        let bar_style = Style::default().fg(Color::LightGreen).bg(Color::DarkGray);
+        let line = Line::from(vec![Span::styled(bar, bar_style), Span::raw(percent_label)]);
+        cells.push(Cell::from(line));
     }
 
     if options.show_item_count {

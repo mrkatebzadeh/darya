@@ -148,7 +148,7 @@ impl Ui {
             .block(Block::default().borders(Borders::ALL).title("filesystem"))
             .widths(&[
                 Constraint::Percentage(55),
-                Constraint::Length(12),
+                Constraint::Length(PERCENT_COLUMN_WIDTH as u16),
                 Constraint::Percentage(33),
             ])
             .column_spacing(1);
