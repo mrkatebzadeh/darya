@@ -44,9 +44,9 @@ pub fn split_layout(area: Rect) -> LayoutRegions {
 
     let mut top = center[0];
     let mut bottom = center[1];
-    if bottom.height > 6 {
-        let diff = bottom.height - 6;
-        bottom.height = 6;
+    if bottom.height > 8 {
+        let diff = bottom.height - 8;
+        bottom.height = 8;
         top.height += diff;
         bottom.y = top.y + top.height;
     }
