@@ -15,7 +15,7 @@
 
 use ratatui::style::Color;
 
-pub const TILE_PALETTE_SIZE: usize = 10;
+pub const TILE_PALETTE_SIZE: usize = 20;
 
 /// Color palette for the application.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,6 +63,16 @@ impl Default for Theme {
                 Color::Green,
                 Color::Magenta,
                 Color::Cyan,
+                Color::Red,
+                Color::White,
+                Color::Gray,
+                Color::DarkGray,
+                Color::Black,
+                Color::Rgb(255, 165, 0),
+                Color::Rgb(128, 0, 128),
+                Color::Rgb(0, 128, 128),
+                Color::Rgb(128, 128, 0),
+                Color::Rgb(255, 192, 203),
             ],
         }
     }
@@ -84,5 +94,6 @@ mod tests {
         assert_eq!(theme.tile_palette.len(), TILE_PALETTE_SIZE);
         assert_eq!(theme.tile_color(0), Color::LightGreen);
         assert_eq!(theme.tile_color(5), Color::Yellow);
+        assert_eq!(theme.tile_color(19), Color::Rgb(255, 192, 203));
     }
 }
