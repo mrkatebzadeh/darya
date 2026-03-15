@@ -313,54 +313,72 @@ pub(crate) fn detail_panel_lines(state: &AppState, theme: Theme) -> Vec<Line<'_>
     };
 
     let mut lines = vec![
-        Line::from(vec![
-            Span::styled("📂\tpath: ", Style::default().fg(theme.directory)),
-            Span::styled(
-                node.path.display().to_string(),
-                Style::default()
-                    .fg(theme.foreground)
-                    .add_modifier(Modifier::BOLD),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("⬤\ttype: ", Style::default().fg(theme.selection)),
-            Span::styled(
-                kind_label,
-                Style::default().fg(kind_color).add_modifier(Modifier::BOLD),
-            ),
-        ]),
-        Line::from(vec![
-            Span::styled("⚖️\tapparent: ", Style::default().fg(theme.bar)),
-            Span::styled(apparent, Style::default().fg(theme.foreground)),
-        ]),
-        Line::from(vec![
-            Span::styled("💾\tdisk: ", Style::default().fg(theme.directory)),
-            Span::styled(
-                disk,
-                Style::default()
-                    .fg(theme.selection)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                format!(" ({ratio:.1}%)"),
-                Style::default().fg(theme.file).add_modifier(Modifier::DIM),
-            ),
-        ]),
+        format_line(
+            "📂",
+            "path",
+            node.path.display().to_string(),
+            Style::default().fg(theme.directory),
+            Style::default()
+                .fg(theme.foreground)
+                .add_modifier(Modifier::BOLD),
+        ),
+        format_line(
+            "⬤",
+            "type",
+            kind_label.to_string(),
+            Style::default().fg(theme.selection),
+            Style::default().fg(kind_color).add_modifier(Modifier::BOLD),
+        ),
+        format_line(
+            "⚖️",
+            "apparent",
+            apparent,
+            Style::default().fg(theme.bar),
+            Style::default().fg(theme.foreground),
+        ),
+        format_line(
+            "💾",
+            "disk",
+            format!("{disk} ({ratio:.1}%)"),
+            Style::default().fg(theme.directory),
+            Style::default()
+                .fg(theme.selection)
+                .add_modifier(Modifier::BOLD),
+        ),
     ];
 
     if node.file_type == NodeType::Directory {
-        lines.push(Line::from(vec![
-            Span::styled("📦\titems: ", Style::default().fg(theme.selection)),
-            Span::styled(
-                node.children.len().to_string(),
-                Style::default().fg(theme.bar).add_modifier(Modifier::BOLD),
-            ),
-        ]));
+        lines.push(format_line(
+            "📦",
+            "items",
+            node.children.len().to_string(),
+            Style::default().fg(theme.selection),
+            Style::default().fg(theme.bar).add_modifier(Modifier::BOLD),
+        ));
     } else {
-        lines.push(Line::from(Span::raw("")));
+        lines.push(format_line(
+            "📦",
+            "items",
+            String::new(),
+            Style::default().fg(theme.selection),
+            Style::default().fg(theme.bar),
+        ));
     }
 
     lines
+}
+
+fn format_line<'a>(
+    prefix: &'a str,
+    key: &'a str,
+    value: String,
+    label_style: Style,
+    value_style: Style,
+) -> Line<'a> {
+    Line::from(vec![
+        Span::styled(format!("{prefix}\t{key}:	"), label_style),
+        Span::styled(value, value_style),
+    ])
 }
 
 pub(crate) fn sort_mode_label(mode: SortMode) -> &'static str {
