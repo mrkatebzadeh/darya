@@ -149,7 +149,7 @@ impl Ui {
         };
 
         let table = Table::new(table_rows)
-            .block(Block::default().borders(Borders::ALL).title("filesystem"))
+            .block(Block::default().borders(Borders::ALL).title("Filesystem"))
             .widths(&[
                 Constraint::Percentage(53),
                 Constraint::Percentage(30),
