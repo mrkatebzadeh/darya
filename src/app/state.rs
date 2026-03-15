@@ -179,6 +179,21 @@ impl AppState {
 
         nodes.sort_unstable_by(|a, b| b.size.cmp(&a.size).then_with(|| a.name.cmp(&b.name)));
         self.treemap_nodes = nodes;
+        self.ensure_selection_visible();
+    }
+
+    pub fn ensure_selection_visible(&mut self) {
+        let ids = self.tree.visible_ids();
+        if ids.is_empty() {
+            self.selection = Some(self.tree.root());
+            return;
+        }
+        if let Some(selection) = self.selection {
+            if ids.contains(&selection) {
+                return;
+            }
+        }
+        self.selection = Some(ids[0]);
     }
 }
 

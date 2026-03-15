@@ -356,6 +356,8 @@ pub(crate) fn detail_panel_lines(state: &AppState, theme: Theme) -> Vec<Line<'_>
                 Style::default().fg(theme.bar).add_modifier(Modifier::BOLD),
             ),
         ]));
+    } else {
+        lines.push(Line::from(Span::raw("")));
     }
 
     lines
