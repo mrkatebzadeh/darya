@@ -15,7 +15,7 @@
 
 use crate::state::{AppState, ScanState};
 use crate::theme::Theme;
-use crate::treemap::{TreemapLayout, TreemapNode, TreemapTile, contextual_treemap_layout};
+use crate::treemap::{contextual_treemap_layout, TreemapLayout, TreemapNode, TreemapTile};
 use crate::ui::{helpers::*, layout::LayoutRegions};
 use ratatui::layout::{Alignment, Constraint, Rect};
 use ratatui::style::Style;
@@ -54,24 +54,10 @@ impl Ui {
             .map(|node| node.path.display().to_string())
             .unwrap_or_else(|| "<unknown>".into());
 
-        let progress_label = match &state.scan_state {
-            ScanState::Running(progress) => {
-                let spinner = spinner_symbol(state.spinner_phase);
-                format!(
-                    "{spinner} please wait — scanned {} err {}",
-                    progress.scanned, progress.errors
-                )
-            }
-            ScanState::Error(message) => format!("error: {message}"),
-            ScanState::Completed => "scan complete".into(),
-            _ => "scan idle".into(),
-        };
-
         let header = Paragraph::new(Line::from(vec![
             Span::styled("root: ", Style::default().fg(theme.directory)),
             Span::styled(root_label, Style::default().fg(theme.foreground)),
             Span::raw(format!(" | sort:{} ", sort_mode_label(state.sort_mode))),
-            Span::styled(progress_label, Style::default().fg(theme.selection)),
         ]))
         .block(Block::default().borders(Borders::ALL))
         .style(Style::default().bg(theme.background));
