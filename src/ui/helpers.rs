@@ -42,6 +42,12 @@ pub(crate) fn collect_tree_rows(
     rows
 }
 
+#[derive(Clone, Copy)]
+pub(crate) struct ColumnWidths {
+    pub percent: usize,
+    pub size: usize,
+}
+
 fn traverse(
     tree: &FileTree,
     id: usize,
@@ -78,8 +84,7 @@ pub(crate) fn build_row(
     size_mode: SizeDisplayMode,
     max_size: u64,
     _options: DisplayOptions,
-    percent_column_width: usize,
-    size_column_width: usize,
+    column_widths: ColumnWidths,
 ) -> Row<'static> {
     let indent = "  ".repeat(row.depth);
     let icon = match row.kind {
@@ -106,6 +111,8 @@ pub(crate) fn build_row(
     } else {
         size_value as f64 / max_size as f64 * 100.0
     };
+    let percent_column_width = column_widths.percent;
+    let size_column_width = column_widths.size;
     let percent_label = format!("{percent:>6.1}%");
     let trimmed_percent_label = trim_to_width(&percent_label, percent_column_width);
     let bar_width = percent_column_width.saturating_sub(trimmed_percent_label.len());
@@ -113,8 +120,13 @@ pub(crate) fn build_row(
     let percent_column_content = if percent_column_width == 0 {
         String::new()
     } else {
-        let combined = format!("{bar}{trimmed_percent_label}");
-        format!("{combined:>width$}", width = percent_column_width)
+        let combined = if bar_width == 0 {
+            trimmed_percent_label.clone()
+        } else {
+            format!("{bar}{trimmed_percent_label}")
+        };
+        let trimmed_combined = trim_to_width(&combined, percent_column_width);
+        format!("{trimmed_combined:>width$}", width = percent_column_width)
     };
     let trimmed_size_label = trim_to_width(&size_label, size_column_width);
     let size_column_content = if size_column_width == 0 {
@@ -218,7 +230,7 @@ pub(crate) fn selected_info_line(state: &AppState) -> String {
     {
         use std::os::unix::fs::{MetadataExt, PermissionsExt};
         let perm = metadata.permissions().mode() & 0o777;
-        return format!(
+        format!(
             "info: mode={perm:o} uid={} gid={} inode={} nlink={} mtime={} ctime={}",
             metadata.uid(),
             metadata.gid(),
@@ -226,15 +238,15 @@ pub(crate) fn selected_info_line(state: &AppState) -> String {
             metadata.nlink(),
             modified,
             metadata.ctime()
-        );
+        )
     }
 
     #[cfg(not(unix))]
     {
-        return format!(
+        format!(
             "info: readonly={} mtime={modified}",
             metadata.permissions().readonly()
-        );
+        )
     }
 }
 
@@ -321,14 +333,6 @@ pub(crate) fn sort_mode_label(mode: SortMode) -> &'static str {
         SortMode::Name => "name",
         SortMode::ModifiedTime => "modified_time",
     }
-}
-
-pub(crate) fn treemap_scope_name(state: &AppState) -> String {
-    let Some(root) = state.tree.node(state.tree.root()) else {
-        return "root".to_string();
-    };
-
-    root.name.clone()
 }
 
 pub(crate) fn fill_rect(frame: &mut Frame<'_>, rect: Rect, fg: Color, bg: Color) {

@@ -42,7 +42,8 @@ mod scan_manager;
 mod ui_thread;
 
 use modes::{
-    export_options_from_cli, run_export_mode, run_import_mode, run_progress_mode, run_summary_mode,
+    ExportDestinations, export_options_from_cli, run_export_mode, run_import_mode,
+    run_progress_mode, run_summary_mode,
 };
 use scan_manager::scan_manager;
 use ui_thread::run_ui_thread;
@@ -107,8 +108,10 @@ pub fn run(cli_args: CliArgs, config_load: ConfigLoad) -> Result<()> {
                 root.clone(),
                 exclude_patterns.clone(),
                 &config,
-                cli_args.export_json.clone(),
-                cli_args.export_binary.clone(),
+                ExportDestinations {
+                    json: cli_args.export_json.clone(),
+                    binary: cli_args.export_binary.clone(),
+                },
                 cli_args.extended,
                 scan_options,
                 export_options,

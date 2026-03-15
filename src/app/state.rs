@@ -193,10 +193,11 @@ impl AppState {
             self.selection = Some(self.tree.root());
             return;
         }
-        if let Some(selection) = self.selection {
-            if ids.contains(&selection) {
-                return;
-            }
+        if self
+            .selection
+            .is_some_and(|selection| ids.contains(&selection))
+        {
+            return;
         }
         self.selection = Some(ids[0]);
     }
