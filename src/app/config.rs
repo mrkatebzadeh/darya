@@ -14,14 +14,14 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use directories::ProjectDirs;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{
     fs,
     path::{Path, PathBuf},
 };
 
 /// Represents the parsed configuration file and the default values used when no file is present.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(default)]
 pub struct Config {
     pub ui: UiConfig,
@@ -29,20 +29,20 @@ pub struct Config {
     pub scan: ScanConfig,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(default)]
 pub struct UiConfig {
     pub show_bars: bool,
     pub show_hidden: bool,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(default)]
 pub struct SortingConfig {
     pub mode: SortMode,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(default)]
 pub struct ScanConfig {
     pub follow_symlinks: bool,
@@ -55,7 +55,7 @@ pub struct ScanConfig {
     pub thread_count: Option<usize>,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum SortMode {
     #[default]
@@ -101,6 +101,18 @@ pub enum ConfigError {
         #[source]
         source: toml::de::Error,
     },
+    #[error("failed to serialize default config into {path}: {source}")]
+    Serialize {
+        path: PathBuf,
+        #[source]
+        source: toml::ser::Error,
+    },
+    #[error("failed to write config file {path}: {source}")]
+    Write {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
 }
 
 fn config_file_paths() -> Vec<PathBuf> {
@@ -139,6 +151,15 @@ pub fn load(ignore_config: bool) -> ConfigLoad {
         return load;
     }
 
+    if let Some(path) = config_file_path()
+        && !path.exists()
+        && let Err(err) = create_default_config(&path)
+    {
+        load.error = Some(err);
+        load.config_path = Some(path);
+        return load;
+    }
+
     for path in config_file_paths() {
         match parse_config_file(&path) {
             Ok(config) => {
@@ -168,6 +189,24 @@ fn parse_config_file(path: &Path) -> Result<Config, ConfigError> {
         source,
     })?;
     toml::from_str(&contents).map_err(|source| ConfigError::Decode {
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
+fn create_default_config(path: &Path) -> Result<(), ConfigError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|source| ConfigError::Io {
+            path: parent.to_path_buf(),
+            source,
+        })?;
+    }
+    let default = Config::default();
+    let contents = toml::to_string_pretty(&default).map_err(|source| ConfigError::Serialize {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    fs::write(path, contents).map_err(|source| ConfigError::Write {
         path: path.to_path_buf(),
         source,
     })
