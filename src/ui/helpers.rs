@@ -101,6 +101,7 @@ pub(crate) fn build_row(
     };
 
     let size_value = chosen_size(row, size_mode, _options);
+    let size_label = format_size_custom(size_value, _options.use_si);
     let percent = if max_size == 0 {
         0.0
     } else {
@@ -113,6 +114,7 @@ pub(crate) fn build_row(
     let bar_style = Style::default().fg(Color::LightGreen);
     let percent_cell = Cell::from(Span::styled(format!("{bar}{percent_label}"), bar_style));
     cells.push(percent_cell);
+    cells.push(Cell::from(size_label));
 
     Row::new(cells).style(style)
 }
