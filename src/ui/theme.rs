@@ -24,6 +24,7 @@ pub struct Theme {
     pub directory: Color,
     pub file: Color,
     pub bar: Color,
+    pub bar_alt: Color,
 }
 
 impl Default for Theme {
@@ -35,6 +36,7 @@ impl Default for Theme {
             directory: Color::Cyan,
             file: Color::Gray,
             bar: Color::LightGreen,
+            bar_alt: Color::Green,
         }
     }
 }
@@ -52,5 +54,6 @@ mod tests {
         assert_eq!(theme.directory, Color::Cyan);
         assert_eq!(theme.file, Color::Gray);
         assert_eq!(theme.bar, Color::LightGreen);
+        assert_eq!(theme.bar_alt, Color::Green);
     }
 }
