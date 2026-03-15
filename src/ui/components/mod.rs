@@ -15,6 +15,8 @@
 
 pub mod activity_panel;
 pub mod detail_panel;
+pub mod filesystem_panel;
 
 pub use activity_panel::draw_activity_panel;
 pub use detail_panel::draw_detail_panel;
+pub use filesystem_panel::draw_filesystem_panel;
