@@ -15,7 +15,7 @@
 
 use crate::state::{AppState, ScanState};
 use crate::theme::Theme;
-use crate::treemap::{contextual_treemap_layout, TreemapLayout, TreemapNode, TreemapTile};
+use crate::treemap::{TreemapLayout, TreemapNode, TreemapTile, contextual_treemap_layout};
 use crate::ui::{helpers::*, layout::LayoutRegions};
 use ratatui::layout::{Alignment, Constraint, Rect};
 use ratatui::style::Style;
@@ -169,7 +169,7 @@ impl Ui {
             return;
         }
 
-        let status = if status_text.is_empty() {
+        let status = if status_text.is_empty() || status_text == progress_label {
             progress_label.clone()
         } else {
             format!("{status_text} | {progress_label}")
