@@ -116,7 +116,7 @@ pub(crate) fn build_row(
         };
         let bar = percent_bar(percent, PERCENT_BAR_WIDTH);
         let percent_label = format!("{percent:>6.1}%");
-        let bar_style = Style::default().fg(Color::LightGreen).bg(Color::DarkGray);
+        let bar_style = Style::default().fg(Color::LightGreen);
         let line = Line::from(vec![Span::styled(bar, bar_style), Span::raw(percent_label)]);
         cells.push(Cell::from(line));
     }
