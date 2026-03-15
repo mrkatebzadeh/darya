@@ -52,6 +52,7 @@ pub struct AppState {
     pub size_mode: SizeDisplayMode,
     pub filter_query: String,
     pub filter_active: bool,
+    pub filter_prompt_active: bool,
     pub show_help: bool,
     pub treemap_nodes: Vec<TreemapNode>,
     pub treemap_revision: u64,
@@ -76,6 +77,7 @@ impl AppState {
             filter_query: String::new(),
             filter_active: false,
             show_help: false,
+            filter_prompt_active: false,
             treemap_nodes: Vec::new(),
             treemap_revision: 0,
             allow_modifications: true,
@@ -148,6 +150,7 @@ impl AppState {
     }
 
     pub fn clear_filter(&mut self) {
+        self.filter_prompt_active = false;
         self.filter_query.clear();
         self.filter_active = false;
     }

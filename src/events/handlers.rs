@@ -44,6 +44,7 @@ pub(crate) fn handle_input_action(
         InputAction::Rescan => rescan_selection(state),
         InputAction::StartFilter => {
             state.filter_active = true;
+            state.filter_prompt_active = true;
             state.update_status("filter: type name substring and press Enter");
         }
         InputAction::FilterChar(ch) => {
@@ -54,6 +55,7 @@ pub(crate) fn handle_input_action(
             state.filter_query.pop();
         }
         InputAction::ApplyFilter => {
+            state.filter_prompt_active = false;
             if state.filter_query.is_empty() {
                 state.filter_active = false;
                 state.update_status("filter cleared");
@@ -63,6 +65,7 @@ pub(crate) fn handle_input_action(
             }
         }
         InputAction::ClearFilter => {
+            state.filter_prompt_active = false;
             state.clear_filter();
             state.update_status("filter cleared");
         }
