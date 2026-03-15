@@ -13,16 +13,15 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::state::{AppState, ScanState};
+use crate::state::AppState;
 use crate::theme::Theme;
-use crate::treemap::{TreemapLayout, TreemapNode, TreemapTile, contextual_treemap_layout};
 use crate::ui::{
     components,
     helpers::*,
     layout::LayoutRegions,
     view_model::{ActivityViewModel, DetailViewModel, FilesystemViewModel},
 };
-use ratatui::layout::{Alignment, Rect};
+use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::terminal::Frame;
 use ratatui::text::{Line, Span};
@@ -31,7 +30,7 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 /// Renderer responsible for drawing the main UI panels.
 #[derive(Default)]
 pub struct Ui {
-    treemap_cache: TreemapLayoutCache,
+    treemap_cache: components::TreemapLayoutCache,
 }
 
 impl Ui {
@@ -45,12 +44,18 @@ impl Ui {
         self.draw_header(frame, layout.header, state, theme);
         let filesystem_vm = FilesystemViewModel::build(state, layout.tree, theme);
         components::draw_filesystem_panel(frame, layout.tree, filesystem_vm, theme);
-        self.draw_treemap(frame, layout.treemap, state, theme);
+        components::draw_treemap_panel(
+            frame,
+            layout.treemap,
+            state,
+            theme,
+            &mut self.treemap_cache,
+        );
         let detail_vm = DetailViewModel::build(state);
         components::draw_detail_panel(frame, layout.details, &detail_vm, theme);
         let activity_vm = ActivityViewModel::build(state);
         components::draw_activity_panel(frame, layout.activity, &activity_vm, theme);
-        self.draw_footer(frame, layout.footer, state, theme);
+        components::draw_footer_panel(frame, layout.footer, state, theme);
         if state.show_help {
             self.draw_help_modal(frame, state, theme);
         }
@@ -72,109 +77,6 @@ impl Ui {
         .style(Style::default().bg(theme.background));
 
         frame.render_widget(header, area);
-    }
-
-    fn draw_footer(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
-        let base_status = state.status_message.as_deref().unwrap_or("ready");
-        let status_text = if matches!(state.scan_state, ScanState::Running(_)) {
-            ""
-        } else {
-            base_status
-        };
-        let progress_label = match &state.scan_state {
-            ScanState::Running(progress) => {
-                let spinner = spinner_symbol(state.spinner_phase);
-                format!(
-                    "{spinner} scanning... {} entries, {} errors",
-                    progress.scanned, progress.errors
-                )
-            }
-            ScanState::Error(message) => format!("error: {message}"),
-            ScanState::Completed => "scan complete".into(),
-            _ => "scan idle".into(),
-        };
-
-        frame.render_widget(
-            Paragraph::new(" ").style(Style::default().bg(theme.background)),
-            area,
-        );
-        if area.height == 0 {
-            return;
-        }
-
-        let status = if status_text.is_empty() || status_text == progress_label {
-            progress_label.clone()
-        } else {
-            format!("{status_text} | {progress_label}")
-        };
-        let hint = "Press ? for keybindings";
-        let hint_width = hint.len() as u16;
-        let status_width = area.width.saturating_sub(hint_width + 1);
-        let status_trimmed = trim_to_width(&status, status_width as usize);
-
-        let buf = frame.buffer_mut();
-        if status_width > 0 {
-            buf.set_stringn(
-                area.x,
-                area.y,
-                &status_trimmed,
-                status_width as usize,
-                Style::default().fg(theme.foreground).bg(theme.background),
-            );
-        }
-
-        if area.width > hint_width {
-            let hint_x = area.x + area.width.saturating_sub(hint_width);
-            buf.set_stringn(
-                hint_x,
-                area.y,
-                hint,
-                hint_width as usize,
-                Style::default().fg(theme.directory).bg(theme.background),
-            );
-        }
-    }
-
-    fn draw_treemap(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
-        let panel = Block::default().borders(Borders::ALL).title("Treemap");
-        let inner = panel.inner(area);
-        frame.render_widget(panel, area);
-
-        if inner.width < 2 || inner.height < 2 {
-            return;
-        }
-
-        let max_tiles_for_panel = usize::from(inner.width) * usize::from(inner.height) / 2;
-        let max_tiles = 200_usize.min(max_tiles_for_panel.max(1));
-        let path = selection_path(state);
-        let layout = self.treemap_cache.layout_for(
-            inner,
-            &path,
-            state.treemap_revision,
-            &state.treemap_nodes,
-            max_tiles,
-            |parent, limit| gather_child_nodes(parent, state, limit),
-        );
-        if layout.tiles.is_empty() {
-            frame.render_widget(
-                Paragraph::new("No sized children")
-                    .alignment(Alignment::Center)
-                    .style(Style::default().fg(theme.foreground).bg(theme.background)),
-                inner,
-            );
-            return;
-        }
-
-        for tile in &layout.tiles {
-            draw_treemap_tile(frame, tile, theme);
-        }
-
-        if let Some(selection_rect) = state
-            .selection
-            .and_then(|selection| layout.node_rects.get(&selection).copied())
-        {
-            fill_rect(frame, selection_rect, theme.selection, theme.background);
-        }
     }
 
     fn draw_help_modal(&self, frame: &mut Frame<'_>, _state: &AppState, theme: Theme) {
@@ -222,60 +124,5 @@ impl Ui {
 
         frame.render_widget(Clear, area);
         frame.render_widget(popup, area);
-    }
-}
-
-fn draw_treemap_tile(frame: &mut Frame<'_>, tile: &TreemapTile, theme: Theme) {
-    if tile.rect.width == 0 || tile.rect.height == 0 {
-        return;
-    }
-
-    let color = theme.tile_color(tile.color_index);
-    fill_rect(frame, tile.rect, color, theme.background);
-}
-
-#[derive(Default)]
-struct TreemapLayoutCache {
-    key: Option<TreemapLayoutKey>,
-    layout: Option<TreemapLayout>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct TreemapLayoutKey {
-    bounds: Rect,
-    revision: u64,
-    selection_path: Vec<usize>,
-}
-
-impl TreemapLayoutCache {
-    fn layout_for<F>(
-        &mut self,
-        bounds: Rect,
-        selection_path: &[usize],
-        revision: u64,
-        root_nodes: &[TreemapNode],
-        max_nodes: usize,
-        child_provider: F,
-    ) -> &TreemapLayout
-    where
-        F: FnMut(usize, usize) -> Vec<TreemapNode>,
-    {
-        let provider = child_provider;
-        let key = TreemapLayoutKey {
-            bounds,
-            revision,
-            selection_path: selection_path.to_vec(),
-        };
-
-        if self.key.as_ref() == Some(&key) {
-            return self.layout.as_ref().unwrap();
-        }
-
-        let layout =
-            contextual_treemap_layout(root_nodes, bounds, selection_path, max_nodes, provider);
-
-        self.key = Some(key);
-        self.layout = Some(layout);
-        self.layout.as_ref().unwrap()
     }
 }

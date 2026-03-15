@@ -18,7 +18,7 @@ use crate::display::DisplayOptions;
 use crate::state::{AppState, SizeDisplayMode};
 use crate::theme::Theme;
 use crate::tree::{FileTree, NodeType, TreeNode};
-use crate::treemap::TreemapNode;
+use crate::treemap::{TreemapNode, TreemapTile};
 use ratatui::layout::Rect;
 #[cfg(test)]
 use ratatui::layout::{Constraint, Layout};
@@ -369,6 +369,15 @@ pub(crate) fn fill_rect(frame: &mut Frame<'_>, rect: Rect, fg: Color, bg: Color)
             cell.set_bg(bg);
         }
     }
+}
+
+pub(crate) fn draw_treemap_tile(frame: &mut Frame<'_>, tile: &TreemapTile, theme: Theme) {
+    if tile.rect.width == 0 || tile.rect.height == 0 {
+        return;
+    }
+
+    let color = theme.tile_color(tile.color_index);
+    fill_rect(frame, tile.rect, color, theme.background);
 }
 
 pub(crate) fn selection_path(state: &AppState) -> Vec<usize> {

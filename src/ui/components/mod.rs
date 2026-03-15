@@ -16,7 +16,11 @@
 pub mod activity_panel;
 pub mod detail_panel;
 pub mod filesystem_panel;
+pub mod footer;
+pub mod treemap_panel;
 
 pub use activity_panel::draw_activity_panel;
 pub use detail_panel::draw_detail_panel;
 pub use filesystem_panel::draw_filesystem_panel;
+pub use footer::draw_footer_panel;
+pub use treemap_panel::{TreemapLayoutCache, draw_treemap_panel};
