@@ -324,6 +324,17 @@ fn split_detail_line(line: &str) -> (&str, &str, &str) {
     (glyph, key, value)
 }
 
+fn trim_to_width(value: &str, width: usize) -> String {
+    if width == 0 {
+        return String::new();
+    }
+    if value.len() <= width {
+        value.to_string()
+    } else {
+        value.chars().take(width).collect()
+    }
+}
+
 fn draw_treemap_tile(frame: &mut Frame<'_>, tile: &TreemapTile, theme: Theme) {
     if tile.rect.width == 0 || tile.rect.height == 0 {
         return;

@@ -24,6 +24,7 @@ use ratatui::style::{Color, Style};
 use ratatui::terminal::Frame;
 use ratatui::text::Span;
 use ratatui::widgets::{Cell, Row};
+#[cfg(test)]
 use std::time::UNIX_EPOCH;
 use throbber_widgets_tui::BRAILLE_EIGHT;
 
@@ -200,6 +201,7 @@ pub(crate) fn spinner_symbol(phase: usize) -> &'static str {
     symbols[phase % symbols.len()]
 }
 
+#[cfg(test)]
 pub(crate) fn selected_info_line(state: &AppState) -> String {
     let Some(selected) = state.selection else {
         return "info: no selection".to_string();
@@ -250,6 +252,7 @@ pub(crate) fn selected_info_line(state: &AppState) -> String {
     }
 }
 
+#[cfg(test)]
 fn format_node_metadata(node: &TreeNode) -> Option<String> {
     let modified = node
         .modified
