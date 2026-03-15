@@ -15,7 +15,7 @@
 
 use crate::state::{AppState, ScanState};
 use crate::theme::Theme;
-use crate::treemap::{TreemapLayout, TreemapNode, TreemapTile, contextual_treemap_layout};
+use crate::treemap::{contextual_treemap_layout, TreemapLayout, TreemapNode, TreemapTile};
 use crate::ui::{helpers::*, layout::LayoutRegions};
 use ratatui::layout::{Alignment, Constraint, Rect};
 use ratatui::style::Style;
@@ -159,10 +159,11 @@ impl Ui {
 
         let footer = Paragraph::new(vec![
             Line::from(vec![
-                Span::styled("status: ", Style::default().fg(theme.foreground)),
                 Span::raw(status_text.to_string()),
                 Span::raw(" | "),
                 Span::styled(progress_label, Style::default().fg(theme.selection)),
+                Span::raw(" | "),
+                Span::styled("press ? for keybindings", Style::default().fg(theme.directory)),
             ]),
             Line::from(Span::raw(selected_info_line(state))),
             Line::from(Span::raw(
