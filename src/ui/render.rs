@@ -189,13 +189,52 @@ impl Ui {
 
     fn draw_details(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
         frame.render_widget(Clear, area);
-        let detail_lines = detail_panel_lines(state, theme);
-        let content: Vec<Line> = detail_lines;
-        let panel = Paragraph::new(content)
-            .block(Block::default().borders(Borders::ALL).title("Details"))
-            .style(Style::default().fg(theme.foreground).bg(theme.background));
+        let block = Block::default().borders(Borders::ALL).title("Details");
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
 
-        frame.render_widget(panel, area);
+        if inner.width == 0 || inner.height == 0 {
+            return;
+        }
+
+        frame.render_widget(Clear, inner);
+        let lines = detail_panel_lines(state);
+
+        let glyph_col_width: u16 = 3;
+        let key_col_width: u16 = 13;
+        let value_start = glyph_col_width.saturating_add(key_col_width);
+        if inner.width <= value_start {
+            return;
+        }
+        let value_col_width = inner.width - value_start;
+
+        let buf = frame.buffer_mut();
+        for (idx, raw_line) in lines.iter().take(inner.height as usize).enumerate() {
+            let y = inner.y + idx as u16;
+            let (glyph, key, value) = split_detail_line(raw_line);
+
+            buf.set_stringn(
+                inner.x,
+                y,
+                glyph,
+                glyph_col_width as usize,
+                Style::default().fg(theme.selection),
+            );
+            buf.set_stringn(
+                inner.x + glyph_col_width,
+                y,
+                key,
+                key_col_width as usize,
+                Style::default().fg(theme.directory),
+            );
+            buf.set_stringn(
+                inner.x + value_start,
+                y,
+                value,
+                value_col_width as usize,
+                Style::default().fg(theme.foreground),
+            );
+        }
     }
 
     fn draw_help_modal(&self, frame: &mut Frame<'_>, _state: &AppState, theme: Theme) {
@@ -227,4 +266,12 @@ impl Ui {
         frame.render_widget(Clear, area);
         frame.render_widget(popup, area);
     }
+}
+
+fn split_detail_line(line: &str) -> (&str, &str, &str) {
+    let mut parts = line.splitn(3, '\t');
+    let glyph = parts.next().unwrap_or("");
+    let key = parts.next().unwrap_or("");
+    let value = parts.next().unwrap_or("");
+    (glyph, key, value)
 }

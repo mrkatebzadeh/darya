@@ -20,9 +20,8 @@ use crate::theme::Theme;
 use crate::tree::{FileTree, NodeType, TreeNode};
 use crate::treemap::{TreemapNode, TreemapTile, squarified_treemap};
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::Color;
 use ratatui::terminal::Frame;
-use ratatui::text::{Line, Span};
 use ratatui::widgets::{Cell, Row};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use throbber_widgets_tui::BRAILLE_EIGHT;
@@ -273,23 +272,23 @@ fn format_node_metadata(node: &TreeNode) -> Option<String> {
     None
 }
 
-pub(crate) fn detail_panel_lines(state: &AppState, theme: Theme) -> Vec<Line<'_>> {
+pub(crate) fn detail_panel_lines(state: &AppState) -> Vec<String> {
+    let empty = || {
+        vec![
+            detail_line("•", "path", ""),
+            detail_line("•", "type", ""),
+            detail_line("•", "apparent", ""),
+            detail_line("•", "disk", ""),
+            detail_line("•", "items", ""),
+        ]
+    };
+
     let Some(selected) = state.selection else {
-        return vec![Line::from(Span::styled(
-            "details: no selection",
-            Style::default()
-                .fg(theme.file)
-                .add_modifier(Modifier::ITALIC),
-        ))];
+        return empty();
     };
 
     let Some(node) = state.tree.node(selected) else {
-        return vec![Line::from(Span::styled(
-            "details: no node",
-            Style::default()
-                .fg(theme.file)
-                .add_modifier(Modifier::ITALIC),
-        ))];
+        return empty();
     };
 
     let apparent = format_size_custom(node.size, state.display_options.use_si);
@@ -299,12 +298,6 @@ pub(crate) fn detail_panel_lines(state: &AppState, theme: Theme) -> Vec<Line<'_>
     } else {
         (node.disk_size as f64 / node.size as f64) * 100.0
     };
-    let kind_color = match node.file_type {
-        NodeType::Directory => theme.directory,
-        NodeType::File => theme.file,
-        NodeType::Symlink => theme.selection,
-        NodeType::Other => theme.bar,
-    };
     let kind_label = match node.file_type {
         NodeType::Directory => "directory",
         NodeType::File => "file",
@@ -312,73 +305,21 @@ pub(crate) fn detail_panel_lines(state: &AppState, theme: Theme) -> Vec<Line<'_>
         NodeType::Other => "other",
     };
 
-    let mut lines = vec![
-        format_line(
-            "📂",
-            "path",
-            node.path.display().to_string(),
-            Style::default().fg(theme.directory),
-            Style::default()
-                .fg(theme.foreground)
-                .add_modifier(Modifier::BOLD),
-        ),
-        format_line(
-            "⬤",
-            "type",
-            kind_label.to_string(),
-            Style::default().fg(theme.selection),
-            Style::default().fg(kind_color).add_modifier(Modifier::BOLD),
-        ),
-        format_line(
-            "⚖️",
-            "apparent",
-            apparent,
-            Style::default().fg(theme.bar),
-            Style::default().fg(theme.foreground),
-        ),
-        format_line(
-            "💾",
-            "disk",
-            format!("{disk} ({ratio:.1}%)"),
-            Style::default().fg(theme.directory),
-            Style::default()
-                .fg(theme.selection)
-                .add_modifier(Modifier::BOLD),
-        ),
-    ];
-
-    if node.file_type == NodeType::Directory {
-        lines.push(format_line(
-            "📦",
-            "items",
-            node.children.len().to_string(),
-            Style::default().fg(theme.selection),
-            Style::default().fg(theme.bar).add_modifier(Modifier::BOLD),
-        ));
-    } else {
-        lines.push(format_line(
-            "📦",
-            "items",
-            String::new(),
-            Style::default().fg(theme.selection),
-            Style::default().fg(theme.bar),
-        ));
-    }
-
-    lines
+    vec![
+        detail_line("📂", "path", &node.path.display().to_string()),
+        detail_line("⬤", "type", kind_label),
+        detail_line("⚖", "apparent", &apparent),
+        detail_line("💾", "disk", &format!("{disk} ({ratio:.1}%)")),
+        if node.file_type == NodeType::Directory {
+            detail_line("📦", "items", &node.children.len().to_string())
+        } else {
+            detail_line("📦", "items", "")
+        },
+    ]
 }
 
-fn format_line<'a>(
-    prefix: &'a str,
-    key: &'a str,
-    value: String,
-    label_style: Style,
-    value_style: Style,
-) -> Line<'a> {
-    Line::from(vec![
-        Span::styled(format!("{prefix}\t{key}:	"), label_style),
-        Span::styled(value, value_style),
-    ])
+fn detail_line(glyph: &str, key: &str, value: &str) -> String {
+    format!("{glyph}\t{key}:\t{value}")
 }
 
 pub(crate) fn sort_mode_label(mode: SortMode) -> &'static str {
