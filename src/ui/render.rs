@@ -129,8 +129,24 @@ impl Ui {
                 .collect()
         };
 
+        let block = Block::default().borders(Borders::ALL).title("Filesystem");
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        let overlay_height = 3u16;
+        let mut table_area = inner;
+        let mut filter_area = None;
+        if state.filter_prompt_active && inner.height > overlay_height && inner.width >= 4 {
+            filter_area = Some(Rect::new(inner.x, inner.y, inner.width, overlay_height));
+            table_area = Rect::new(
+                inner.x,
+                inner.y + overlay_height,
+                inner.width,
+                inner.height - overlay_height,
+            );
+        }
+
         let table = Table::new(table_rows)
-            .block(Block::default().borders(Borders::ALL).title("Filesystem"))
             .widths(&[
                 Constraint::Percentage(53),
                 Constraint::Percentage(30),
@@ -138,26 +154,19 @@ impl Ui {
             ])
             .column_spacing(1);
 
-        frame.render_widget(table, area);
+        frame.render_widget(table, table_area);
 
-        if state.filter_prompt_active && area.height >= 3 {
-            let overlay_height = 3u16;
-            let overlay_width = area.width.saturating_sub(4).max(10).min(area.width);
-            if overlay_width > 0 {
-                let overlay_x = area.x + area.width.saturating_sub(overlay_width) / 2;
-                let overlay_y = area.y + area.height.saturating_sub(overlay_height) / 2;
-                let overlay_area = Rect::new(overlay_x, overlay_y, overlay_width, overlay_height);
-                let display_line = if state.filter_query.is_empty() {
-                    Line::from(" ")
-                } else {
-                    Line::from(state.filter_query.clone())
-                };
-                let filter_box = Paragraph::new(display_line)
-                    .block(Block::default().title("Filter").borders(Borders::ALL))
-                    .style(Style::default().fg(theme.foreground).bg(theme.background));
-                frame.render_widget(Clear, overlay_area);
-                frame.render_widget(filter_box, overlay_area);
-            }
+        if let Some(filter_area) = filter_area {
+            frame.render_widget(Clear, filter_area);
+            let display_line = if state.filter_query.is_empty() {
+                Line::from(" ")
+            } else {
+                Line::from(state.filter_query.clone())
+            };
+            let filter_box = Paragraph::new(display_line)
+                .block(Block::default().title("Filter").borders(Borders::ALL))
+                .style(Style::default().fg(theme.foreground).bg(theme.background));
+            frame.render_widget(filter_box, filter_area);
         }
     }
 
