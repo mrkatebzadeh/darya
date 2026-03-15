@@ -15,7 +15,7 @@
 
 use crate::state::{AppState, ScanState};
 use crate::theme::Theme;
-use crate::treemap::{TreemapLayout, TreemapNode, TreemapTile, contextual_treemap_layout};
+use crate::treemap::{contextual_treemap_layout, TreemapLayout, TreemapNode, TreemapTile};
 use crate::ui::{helpers::*, layout::LayoutRegions};
 use ratatui::layout::{Alignment, Constraint, Rect};
 use ratatui::style::Style;
@@ -142,7 +142,12 @@ impl Ui {
     }
 
     fn draw_footer(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
-        let status_text = state.status_message.as_deref().unwrap_or("ready");
+        let base_status = state.status_message.as_deref().unwrap_or("ready");
+        let status_text = if matches!(state.scan_state, ScanState::Running(_)) {
+            ""
+        } else {
+            base_status
+        };
         let progress_label = match &state.scan_state {
             ScanState::Running(progress) => {
                 let spinner = spinner_symbol(state.spinner_phase);
@@ -164,7 +169,11 @@ impl Ui {
             return;
         }
 
-        let status = format!("{status_text} | {progress_label}");
+        let status = if status_text.is_empty() {
+            progress_label.clone()
+        } else {
+            format!("{status_text} | {progress_label}")
+        };
         let hint = "Press ? for keybindings";
         let hint_width = hint.len() as u16;
         let status_width = area.width.saturating_sub(hint_width + 1);
