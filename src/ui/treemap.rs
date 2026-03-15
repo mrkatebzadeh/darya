@@ -490,9 +490,7 @@ fn synthetic_other_id(parent_id: usize) -> usize {
 }
 
 fn insert_node_rect(map: Option<&mut HashMap<usize, Rect>>, tile: &TreemapTile) {
-    if !tile.node.is_aggregated {
-        if let Some(rect_map) = map {
-            rect_map.insert(tile.node.node_id, tile.rect);
-        }
+    if let Some(rect_map) = map.filter(|_| !tile.node.is_aggregated) {
+        rect_map.insert(tile.node.node_id, tile.rect);
     }
 }

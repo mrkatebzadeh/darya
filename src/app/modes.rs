@@ -23,6 +23,11 @@ use crate::theme::Theme;
 use anyhow::Result;
 use std::path::PathBuf;
 
+pub(crate) struct ExportDestinations {
+    pub json: Option<SnapshotEndpoint>,
+    pub binary: Option<SnapshotEndpoint>,
+}
+
 pub(crate) async fn run_import_mode(
     root: PathBuf,
     sort_mode: crate::config::SortMode,
@@ -50,8 +55,7 @@ pub(crate) async fn run_export_mode(
     root: PathBuf,
     exclude_patterns: Vec<String>,
     config: &Config,
-    export_json: Option<SnapshotEndpoint>,
-    export_binary: Option<SnapshotEndpoint>,
+    export_destinations: ExportDestinations,
     extended: bool,
     scan_options: ScanOptions,
     export_options: ExportOptions,
@@ -75,10 +79,10 @@ pub(crate) async fn run_export_mode(
         format: SnapshotFormat::Json,
         ..export_options
     };
-    if let Some(dest) = export_json {
+    if let Some(dest) = export_destinations.json {
         snapshot::export_to_destination(&state.tree, dest, json_options)?;
     }
-    if let Some(dest) = export_binary {
+    if let Some(dest) = export_destinations.binary {
         let binary_options = ExportOptions {
             format: SnapshotFormat::Binary,
             compress: false,

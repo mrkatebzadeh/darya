@@ -24,16 +24,9 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Table};
 
 /// Renderer responsible for drawing the main UI panels.
+#[derive(Default)]
 pub struct Ui {
     treemap_cache: TreemapLayoutCache,
-}
-
-impl Default for Ui {
-    fn default() -> Self {
-        Self {
-            treemap_cache: TreemapLayoutCache::default(),
-        }
-    }
 }
 
 impl Ui {
@@ -141,8 +134,10 @@ impl Ui {
                         state.size_mode,
                         max_size,
                         state.display_options,
-                        percent_column_width,
-                        size_column_width,
+                        ColumnWidths {
+                            percent: percent_column_width,
+                            size: size_column_width,
+                        },
                     )
                 })
                 .collect()
@@ -227,10 +222,11 @@ impl Ui {
             draw_treemap_tile(frame, tile, theme);
         }
 
-        if let Some(selection) = state.selection {
-            if let Some(&selection_rect) = layout.node_rects.get(&selection) {
-                fill_rect(frame, selection_rect, theme.selection, theme.background);
-            }
+        if let Some(selection_rect) = state
+            .selection
+            .and_then(|selection| layout.node_rects.get(&selection).copied())
+        {
+            fill_rect(frame, selection_rect, theme.selection, theme.background);
         }
     }
 
@@ -358,7 +354,7 @@ impl TreemapLayoutCache {
     where
         F: FnMut(usize, usize) -> Vec<TreemapNode>,
     {
-        let mut provider = child_provider;
+        let provider = child_provider;
         let key = TreemapLayoutKey {
             bounds,
             revision,
@@ -369,13 +365,8 @@ impl TreemapLayoutCache {
             return self.layout.as_ref().unwrap();
         }
 
-        let layout = contextual_treemap_layout(
-            root_nodes,
-            bounds,
-            selection_path,
-            max_nodes,
-            move |parent, limit| provider(parent, limit),
-        );
+        let layout =
+            contextual_treemap_layout(root_nodes, bounds, selection_path, max_nodes, provider);
 
         self.key = Some(key);
         self.layout = Some(layout);
