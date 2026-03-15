@@ -139,6 +139,26 @@ impl Ui {
             .column_spacing(1);
 
         frame.render_widget(table, area);
+
+        if state.filter_prompt_active && area.height >= 3 {
+            let overlay_height = 3u16;
+            let overlay_width = area.width.saturating_sub(4).max(10).min(area.width);
+            if overlay_width > 0 {
+                let overlay_x = area.x + area.width.saturating_sub(overlay_width) / 2;
+                let overlay_y = area.y + area.height.saturating_sub(overlay_height) / 2;
+                let overlay_area = Rect::new(overlay_x, overlay_y, overlay_width, overlay_height);
+                let display_line = if state.filter_query.is_empty() {
+                    Line::from(" ")
+                } else {
+                    Line::from(state.filter_query.clone())
+                };
+                let filter_box = Paragraph::new(display_line)
+                    .block(Block::default().title("Filter").borders(Borders::ALL))
+                    .style(Style::default().fg(theme.foreground).bg(theme.background));
+                frame.render_widget(Clear, overlay_area);
+                frame.render_widget(filter_box, overlay_area);
+            }
+        }
     }
 
     fn draw_footer(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
