@@ -93,6 +93,7 @@ impl InputState {
             KeyCode::Char('s') => InputAction::CycleSort,
             KeyCode::Char('H') => InputAction::ToggleHidden,
             KeyCode::Char('?') => InputAction::ToggleHelp,
+            KeyCode::Esc => InputAction::ToggleHelp,
             KeyCode::Char('q') if key_event.modifiers.is_empty() => InputAction::Quit,
             KeyCode::Enter | KeyCode::Tab => InputAction::Select,
             KeyCode::Char('g') => {
@@ -220,6 +221,10 @@ mod tests {
         );
         assert_eq!(
             state.process_key(event(KeyCode::Char('?'))),
+            InputAction::ToggleHelp
+        );
+        assert_eq!(
+            state.process_key(event(KeyCode::Esc)),
             InputAction::ToggleHelp
         );
         assert_eq!(
