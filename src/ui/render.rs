@@ -18,7 +18,7 @@ use crate::theme::Theme;
 use crate::treemap::{TreemapLayout, TreemapNode, TreemapTile, contextual_treemap_layout};
 use crate::ui::{helpers::*, layout::LayoutRegions};
 use ratatui::layout::{Alignment, Constraint, Rect};
-use ratatui::style::{Color, Style};
+use ratatui::style::Style;
 use ratatui::terminal::Frame;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Table};
@@ -277,17 +277,12 @@ fn draw_treemap_tile(frame: &mut Frame<'_>, tile: &TreemapTile, theme: Theme) {
         return;
     }
 
-    let color = tile_shade(tile, theme);
+    let color = if tile.shade_variant {
+        theme.bar_alt
+    } else {
+        theme.bar
+    };
     fill_rect(frame, tile.rect, color, theme.background);
-}
-
-fn tile_shade(tile: &TreemapTile, theme: Theme) -> Color {
-    let x_group = tile.rect.x / 2;
-    let y_group = tile.rect.y / 2;
-    let depth_mod = tile.depth as u16;
-    let parity = (x_group + y_group + depth_mod) % 2 == 0;
-
-    if parity { theme.bar } else { theme.bar_alt }
 }
 
 #[derive(Default)]

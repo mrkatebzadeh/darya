@@ -30,6 +30,7 @@ pub struct TreemapTile {
     pub node: TreemapNode,
     pub rect: Rect,
     pub depth: usize,
+    pub shade_variant: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -226,6 +227,7 @@ fn layout_row(
                 node: item.node.clone(),
                 rect: Rect::new(x, area.y, width, row_height),
                 depth,
+                shade_variant: (idx % 2) == 1,
             };
             insert_node_rect(node_rects.as_deref_mut(), &tile);
             output.push(tile);
@@ -276,6 +278,7 @@ fn layout_row(
                 node: item.node.clone(),
                 rect: Rect::new(area.x, y, row_width, height),
                 depth,
+                shade_variant: (idx % 2) == 1,
             };
             insert_node_rect(node_rects.as_deref_mut(), &tile);
             output.push(tile);
