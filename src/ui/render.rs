@@ -80,7 +80,7 @@ impl Ui {
             Span::raw(format!(" | sort:{} ", sort_mode_label(state.sort_mode))),
             Span::styled(progress_label, Style::default().fg(theme.selection)),
         ]))
-        .block(Block::default().borders(Borders::ALL).title("dar"))
+        .block(Block::default().borders(Borders::ALL))
         .style(Style::default().bg(theme.background));
 
         frame.render_widget(header, area);
@@ -194,8 +194,7 @@ impl Ui {
     }
 
     fn draw_treemap(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
-        let title = format!("treemap ({})", treemap_scope_name(state));
-        let panel = Block::default().borders(Borders::ALL).title(title);
+        let panel = Block::default().borders(Borders::ALL).title("Treemap");
         let inner = panel.inner(area);
         frame.render_widget(panel, area);
 
