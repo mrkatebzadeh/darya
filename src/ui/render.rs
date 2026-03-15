@@ -15,7 +15,7 @@
 
 use crate::state::{AppState, ScanState};
 use crate::theme::Theme;
-use crate::treemap::{contextual_treemap_layout, TreemapLayout, TreemapNode, TreemapTile};
+use crate::treemap::{TreemapLayout, TreemapNode, TreemapTile, contextual_treemap_layout};
 use crate::ui::{helpers::*, layout::LayoutRegions};
 use ratatui::layout::{Alignment, Constraint, Rect};
 use ratatui::style::Style;
@@ -58,6 +58,7 @@ impl Ui {
             Span::styled("root: ", Style::default().fg(theme.directory)),
             Span::styled(root_label, Style::default().fg(theme.foreground)),
             Span::raw(format!(" | sort:{} ", sort_mode_label(state.sort_mode))),
+            Span::raw(" | press R to start scan"),
         ]))
         .block(Block::default().borders(Borders::ALL))
         .style(Style::default().bg(theme.background));
@@ -165,7 +166,7 @@ impl Ui {
             ]),
             Line::from(Span::raw(selected_info_line(state))),
             Line::from(Span::raw(
-                "hjkl: move │ gg/G: jump │ enter/tab: toggle │ d: delete │ o: open │ /: filter │ c: clear filter │ r: rescan │ R: start scan │ b: size mode │ s: cycle sort │ E/I: export/import │ ?: help │ q: quit",
+                "hjkl: move │ gg/G: jump │ enter/tab: toggle │ d: delete │ o: open │ /: filter │ c: clear filter │ r: rescan │ b: size mode │ s: cycle sort │ E/I: export/import │ ?: help │ q: quit",
             )),
         ])
         .block(Block::default().borders(Borders::ALL))
