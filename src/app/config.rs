@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::ui::theme::ThemeConfig;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -25,6 +26,7 @@ use std::{
 #[serde(default)]
 pub struct Config {
     pub ui: UiConfig,
+    pub theme: ThemeConfig,
     pub sorting: SortingConfig,
     pub scan: ScanConfig,
 }

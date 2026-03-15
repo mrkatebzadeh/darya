@@ -83,7 +83,7 @@ pub fn run(cli_args: CliArgs, config_load: ConfigLoad) -> Result<()> {
         skip_kernfs,
     };
 
-    let theme = Theme::default();
+    let theme = config.theme.to_theme();
     let thread_count = cli_args.thread_count.or(config.scan.thread_count);
     let mut builder = Builder::new_multi_thread();
     if let Some(threads) = thread_count
