@@ -26,7 +26,6 @@ use ratatui::text::Span;
 use ratatui::widgets::{Cell, Row};
 use std::time::UNIX_EPOCH;
 use throbber_widgets_tui::BRAILLE_EIGHT;
-pub const PERCENT_VALUE_WIDTH: usize = 7;
 
 pub(crate) fn collect_tree_rows(
     tree: &FileTree,
@@ -80,6 +79,7 @@ pub(crate) fn build_row(
     max_size: u64,
     _options: DisplayOptions,
     percent_column_width: usize,
+    size_column_width: usize,
 ) -> Row<'static> {
     let indent = "  ".repeat(row.depth);
     let icon = match row.kind {
@@ -107,22 +107,28 @@ pub(crate) fn build_row(
         size_value as f64 / max_size as f64 * 100.0
     };
     let percent_label = format!("{percent:>6.1}%");
-    let reserved = PERCENT_VALUE_WIDTH + 1 + size_label.len();
-    let bar_width = if percent_column_width > reserved {
-        percent_column_width - reserved
-    } else {
-        0
-    };
+    let trimmed_percent_label = trim_to_width(&percent_label, percent_column_width);
+    let bar_width = percent_column_width.saturating_sub(trimmed_percent_label.len());
     let bar = percent_bar(percent, bar_width);
+    let percent_column_content = if percent_column_width == 0 {
+        String::new()
+    } else {
+        let combined = format!("{bar}{trimmed_percent_label}");
+        format!("{combined:>width$}", width = percent_column_width)
+    };
+    let trimmed_size_label = trim_to_width(&size_label, size_column_width);
+    let size_column_content = if size_column_width == 0 {
+        String::new()
+    } else {
+        format!("{trimmed_size_label:>width$}", width = size_column_width)
+    };
 
     let mut cells = vec![Cell::from(format!("{}{} {}", indent, icon, row.name))];
     let bar_style = Style::default().fg(Color::LightGreen);
-    let percent_cell = if bar_width == 0 {
-        Cell::from(Span::styled(format!("{percent_label} {size_label}"), bar_style))
-    } else {
-        Cell::from(Span::styled(format!("{bar}{percent_label} {size_label}"), bar_style))
-    };
+    let percent_cell = Cell::from(Span::styled(percent_column_content, bar_style));
+    let size_cell = Cell::from(Span::styled(size_column_content, bar_style));
     cells.push(percent_cell);
+    cells.push(size_cell);
 
     Row::new(cells).style(style)
 }
@@ -143,6 +149,17 @@ fn percent_bar(percent: f64, width: usize) -> String {
     let filled = ((ratio * width as f64).round() as usize).min(width);
     let empty = width.saturating_sub(filled);
     format!("{}{}", "█".repeat(filled), " ".repeat(empty))
+}
+
+fn trim_to_width(value: &str, width: usize) -> String {
+    if width == 0 {
+        return String::new();
+    }
+    if value.len() <= width {
+        value.to_string()
+    } else {
+        value.chars().take(width).collect()
+    }
 }
 fn format_size_custom(bytes: u64, use_si: bool) -> String {
     let (unit, div) = if use_si {
