@@ -15,7 +15,7 @@
 
 use crate::state::{AppState, ScanState};
 use crate::theme::Theme;
-use crate::treemap::{TreemapLayout, TreemapNode, TreemapTile, contextual_treemap_layout};
+use crate::treemap::{contextual_treemap_layout, TreemapLayout, TreemapNode, TreemapTile};
 use crate::ui::{helpers::*, layout::LayoutRegions};
 use ratatui::layout::{Alignment, Constraint, Rect};
 use ratatui::style::Style;
@@ -124,6 +124,7 @@ impl Ui {
         }
         state.set_scroll_offset(offset);
 
+        let percent_column_width = ((area.width as usize) * 45) / 100;
         let table_rows = if visible_height == 0 {
             Vec::new()
         } else {
@@ -139,6 +140,7 @@ impl Ui {
                         state.size_mode,
                         max_size,
                         state.display_options,
+                        percent_column_width,
                     )
                 })
                 .collect()
@@ -146,11 +148,7 @@ impl Ui {
 
         let table = Table::new(table_rows)
             .block(Block::default().borders(Borders::ALL).title("filesystem"))
-            .widths(&[
-                Constraint::Percentage(55),
-                Constraint::Length(PERCENT_COLUMN_WIDTH as u16),
-                Constraint::Percentage(45),
-            ])
+            .widths(&[Constraint::Percentage(55), Constraint::Percentage(45)])
             .column_spacing(1);
 
         frame.render_widget(table, area);

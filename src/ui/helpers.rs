@@ -27,8 +27,6 @@ use ratatui::widgets::{Cell, Row};
 use std::time::UNIX_EPOCH;
 use throbber_widgets_tui::BRAILLE_EIGHT;
 pub const PERCENT_VALUE_WIDTH: usize = 7;
-pub const PERCENT_COLUMN_WIDTH: usize = 20;
-pub const PERCENT_BAR_WIDTH: usize = PERCENT_COLUMN_WIDTH - PERCENT_VALUE_WIDTH;
 
 pub(crate) fn collect_tree_rows(
     tree: &FileTree,
@@ -81,6 +79,7 @@ pub(crate) fn build_row(
     size_mode: SizeDisplayMode,
     max_size: u64,
     _options: DisplayOptions,
+    percent_column_width: usize,
 ) -> Row<'static> {
     let indent = "  ".repeat(row.depth);
     let icon = match row.kind {
@@ -107,14 +106,23 @@ pub(crate) fn build_row(
     } else {
         size_value as f64 / max_size as f64 * 100.0
     };
-    let bar = percent_bar(percent, PERCENT_BAR_WIDTH);
+    let percent_label = format!("{percent:>6.1}%");
+    let reserved = PERCENT_VALUE_WIDTH + 1 + size_label.len();
+    let bar_width = if percent_column_width > reserved {
+        percent_column_width - reserved
+    } else {
+        0
+    };
+    let bar = percent_bar(percent, bar_width);
 
     let mut cells = vec![Cell::from(format!("{}{} {}", indent, icon, row.name))];
-    let percent_label = format!("{percent:>6.1}%");
     let bar_style = Style::default().fg(Color::LightGreen);
-    let percent_cell = Cell::from(Span::styled(format!("{bar}{percent_label}"), bar_style));
+    let percent_cell = if bar_width == 0 {
+        Cell::from(Span::styled(format!("{percent_label} {size_label}"), bar_style))
+    } else {
+        Cell::from(Span::styled(format!("{bar}{percent_label} {size_label}"), bar_style))
+    };
     cells.push(percent_cell);
-    cells.push(Cell::from(size_label));
 
     Row::new(cells).style(style)
 }
