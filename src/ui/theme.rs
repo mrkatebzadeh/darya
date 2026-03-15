@@ -15,6 +15,8 @@
 
 use ratatui::style::Color;
 
+pub const TILE_PALETTE_SIZE: usize = 10;
+
 /// Color palette for the application.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Theme {
@@ -24,7 +26,13 @@ pub struct Theme {
     pub directory: Color,
     pub file: Color,
     pub bar: Color,
-    pub bar_alt: Color,
+    pub tile_palette: [Color; TILE_PALETTE_SIZE],
+}
+
+impl Theme {
+    pub fn tile_color(&self, index: usize) -> Color {
+        self.tile_palette[index % TILE_PALETTE_SIZE]
+    }
 }
 
 impl Default for Theme {
@@ -36,7 +44,18 @@ impl Default for Theme {
             directory: Color::Cyan,
             file: Color::Gray,
             bar: Color::LightGreen,
-            bar_alt: Color::LightYellow,
+            tile_palette: [
+                Color::LightGreen,
+                Color::LightYellow,
+                Color::LightBlue,
+                Color::LightMagenta,
+                Color::LightCyan,
+                Color::Yellow,
+                Color::LightRed,
+                Color::Green,
+                Color::Magenta,
+                Color::Cyan,
+            ],
         }
     }
 }
@@ -54,6 +73,8 @@ mod tests {
         assert_eq!(theme.directory, Color::Cyan);
         assert_eq!(theme.file, Color::Gray);
         assert_eq!(theme.bar, Color::LightGreen);
-        assert_eq!(theme.bar_alt, Color::LightYellow);
+        assert_eq!(theme.tile_palette.len(), TILE_PALETTE_SIZE);
+        assert_eq!(theme.tile_color(0), Color::LightGreen);
+        assert_eq!(theme.tile_color(5), Color::Yellow);
     }
 }
