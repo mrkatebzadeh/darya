@@ -183,7 +183,7 @@ impl AppState {
     }
 
     pub fn ensure_selection_visible(&mut self) {
-        let ids = self.tree.visible_ids();
+        let ids = self.visible_node_ids();
         if ids.is_empty() {
             self.selection = Some(self.tree.root());
             return;
@@ -194,6 +194,23 @@ impl AppState {
             }
         }
         self.selection = Some(ids[0]);
+    }
+
+    pub fn visible_node_ids(&self) -> Vec<NodeId> {
+        self.tree
+            .visible_ids()
+            .into_iter()
+            .filter(|id| {
+                if self.display_options.show_hidden {
+                    return true;
+                }
+                if let Some(node) = self.tree.node(*id) {
+                    !node.name.starts_with('.')
+                } else {
+                    true
+                }
+            })
+            .collect()
     }
 }
 

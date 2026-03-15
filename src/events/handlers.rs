@@ -71,6 +71,17 @@ pub(crate) fn handle_input_action(
             state.set_sort_mode(next);
             state.update_status(format!("sort mode: {}", sort_mode_label(next)));
         }
+        InputAction::ToggleHidden => {
+            state.display_options.show_hidden = !state.display_options.show_hidden;
+            state.refresh_treemap_nodes();
+            state.ensure_selection_visible();
+            let status = if state.display_options.show_hidden {
+                "hidden files shown"
+            } else {
+                "hidden files hidden"
+            };
+            state.update_status(status);
+        }
         InputAction::ToggleHelp => {
             state.show_help = !state.show_help;
             if state.show_help {
@@ -119,7 +130,7 @@ fn sort_mode_label(mode: SortMode) -> &'static str {
 }
 
 fn select_previous(state: &mut AppState) {
-    let ids = state.tree.visible_ids();
+    let ids = state.visible_node_ids();
     if ids.is_empty() {
         state.selection = None;
         return;
@@ -133,7 +144,7 @@ fn select_previous(state: &mut AppState) {
 }
 
 fn select_next(state: &mut AppState) {
-    let ids = state.tree.visible_ids();
+    let ids = state.visible_node_ids();
     if ids.is_empty() {
         state.selection = None;
         return;
@@ -151,14 +162,14 @@ fn select_next(state: &mut AppState) {
 }
 
 fn select_first(state: &mut AppState) {
-    let ids = state.tree.visible_ids();
+    let ids = state.visible_node_ids();
     if let Some(&first) = ids.first() {
         state.selection = Some(first);
     }
 }
 
 fn select_last(state: &mut AppState) {
-    let ids = state.tree.visible_ids();
+    let ids = state.visible_node_ids();
     if let Some(&last) = ids.last() {
         state.selection = Some(last);
     }

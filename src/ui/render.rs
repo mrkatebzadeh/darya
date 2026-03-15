@@ -215,6 +215,7 @@ impl Ui {
             Line::from("  /: start filter, c: clear filter"),
             Line::from("  b: size mode, s: sort mode, r: rescan, R: start scan"),
             Line::from("  E/I: export/import snapshot"),
+            Line::from("  H: toggle hidden files"),
             Line::from("  ?: toggle this help, q: quit"),
         ];
 
