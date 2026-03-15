@@ -30,7 +30,6 @@ pub struct TreemapTile {
     pub node: TreemapNode,
     pub rect: Rect,
     pub depth: usize,
-    pub shade_variant: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -66,7 +65,6 @@ pub fn squarified_treemap(
 
     let mut remaining = bounds;
     let mut row: Vec<WeightedNode> = Vec::new();
-    let mut row_variant = false;
     let mut output = Vec::with_capacity(weighted.len());
 
     while let Some(candidate) = weighted.first().cloned() {
@@ -87,15 +85,7 @@ pub fn squarified_treemap(
             row.push(candidate);
             weighted.remove(0);
         } else {
-            remaining = layout_row(
-                row.as_slice(),
-                remaining,
-                &mut output,
-                None,
-                false,
-                0,
-                &mut row_variant,
-            );
+            remaining = layout_row(row.as_slice(), remaining, &mut output, None, false, 0);
             row.clear();
             if remaining.width == 0 || remaining.height == 0 {
                 break;
@@ -104,15 +94,7 @@ pub fn squarified_treemap(
     }
 
     if !row.is_empty() && remaining.width > 0 && remaining.height > 0 {
-        layout_row(
-            row.as_slice(),
-            remaining,
-            &mut output,
-            None,
-            true,
-            0,
-            &mut row_variant,
-        );
+        layout_row(row.as_slice(), remaining, &mut output, None, true, 0);
     }
 
     output
@@ -200,7 +182,6 @@ fn layout_row(
     mut node_rects: Option<&mut HashMap<usize, Rect>>,
     is_last_row: bool,
     depth: usize,
-    variant: &mut bool,
 ) -> Rect {
     if row.is_empty() || area.width == 0 || area.height == 0 {
         return area;
@@ -222,7 +203,6 @@ fn layout_row(
         let mut x = area.x;
         let mut remaining_width = area.width;
 
-        let mut current_variant = *variant;
         for (idx, item) in row.iter().enumerate() {
             if remaining_width == 0 {
                 break;
@@ -246,17 +226,14 @@ fn layout_row(
                 node: item.node.clone(),
                 rect: Rect::new(x, area.y, width, row_height),
                 depth,
-                shade_variant: current_variant,
             };
             insert_node_rect(node_rects.as_deref_mut(), &tile);
             output.push(tile);
 
             x = x.saturating_add(width);
             remaining_width = remaining_width.saturating_sub(width);
-            current_variant = !current_variant;
         }
 
-        *variant = !*variant;
         Rect::new(
             area.x,
             area.y.saturating_add(row_height),
@@ -276,7 +253,6 @@ fn layout_row(
         let mut y = area.y;
         let mut remaining_height = area.height;
 
-        let mut current_variant = *variant;
         for (idx, item) in row.iter().enumerate() {
             if remaining_height == 0 {
                 break;
@@ -300,17 +276,14 @@ fn layout_row(
                 node: item.node.clone(),
                 rect: Rect::new(area.x, y, row_width, height),
                 depth,
-                shade_variant: current_variant,
             };
             insert_node_rect(node_rects.as_deref_mut(), &tile);
             output.push(tile);
 
             y = y.saturating_add(height);
             remaining_height = remaining_height.saturating_sub(height);
-            current_variant = !current_variant;
         }
 
-        *variant = !*variant;
         Rect::new(
             area.x.saturating_add(row_width),
             area.y,
@@ -381,7 +354,6 @@ where
 
         let mut remaining = area;
         let mut row: Vec<WeightedNode> = Vec::new();
-        let mut row_variant = false;
 
         while let Some(candidate) = weighted.first().cloned() {
             if row.is_empty() {
@@ -408,7 +380,6 @@ where
                     Some(&mut self.node_rects),
                     false,
                     depth,
-                    &mut row_variant,
                 );
                 row.clear();
                 if remaining.width == 0 || remaining.height == 0 {
@@ -425,7 +396,6 @@ where
                 Some(&mut self.node_rects),
                 true,
                 depth,
-                &mut row_variant,
             );
         }
     }
