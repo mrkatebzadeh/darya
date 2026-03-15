@@ -14,6 +14,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use ratatui::layout::Rect;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TreemapNode {
@@ -21,12 +22,20 @@ pub struct TreemapNode {
     pub name: String,
     pub size: u64,
     pub is_directory: bool,
+    pub is_aggregated: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TreemapTile {
     pub node: TreemapNode,
     pub rect: Rect,
+    pub depth: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct TreemapLayout {
+    pub tiles: Vec<TreemapTile>,
+    pub node_rects: HashMap<usize, Rect>,
 }
 
 #[derive(Debug, Clone)]
@@ -44,12 +53,8 @@ pub fn squarified_treemap(
         return Vec::new();
     }
 
-    let total_cells = u32::from(bounds.width) * u32::from(bounds.height);
-    let min_tile_area_cells = 2_u32;
-    let max_by_area = (total_cells / min_tile_area_cells).max(1) as usize;
-    let effective_max_nodes = max_nodes.min(max_by_area);
-
-    let mut weighted = normalize_areas(nodes, bounds, effective_max_nodes)
+    let max_nodes = max_nodes.max(1);
+    let mut weighted = normalize_areas(nodes, bounds, max_nodes)
         .into_iter()
         .map(|(node, area)| WeightedNode { node, area })
         .collect::<Vec<_>>();
@@ -80,7 +85,7 @@ pub fn squarified_treemap(
             row.push(candidate);
             weighted.remove(0);
         } else {
-            remaining = layout_row(row.as_slice(), remaining, &mut output, false);
+            remaining = layout_row(row.as_slice(), remaining, &mut output, None, false, 0);
             row.clear();
             if remaining.width == 0 || remaining.height == 0 {
                 break;
@@ -89,7 +94,7 @@ pub fn squarified_treemap(
     }
 
     if !row.is_empty() && remaining.width > 0 && remaining.height > 0 {
-        layout_row(row.as_slice(), remaining, &mut output, true);
+        layout_row(row.as_slice(), remaining, &mut output, None, true, 0);
     }
 
     output
@@ -105,7 +110,13 @@ pub fn normalize_areas(
     }
 
     let mut filtered: Vec<TreemapNode> = nodes.iter().filter(|n| n.size > 0).cloned().collect();
-    filtered.sort_unstable_by(|a, b| b.size.cmp(&a.size).then_with(|| a.name.cmp(&b.name)));
+
+    filtered.sort_unstable_by(|a, b| {
+        b.size
+            .cmp(&a.size)
+            .then_with(|| a.name.cmp(&b.name))
+            .then_with(|| a.node_id.cmp(&b.node_id))
+    });
     filtered.truncate(max_nodes);
 
     let total_cells = u32::from(bounds.width) * u32::from(bounds.height);
@@ -168,7 +179,9 @@ fn layout_row(
     row: &[WeightedNode],
     area: Rect,
     output: &mut Vec<TreemapTile>,
+    mut node_rects: Option<&mut HashMap<usize, Rect>>,
     is_last_row: bool,
+    depth: usize,
 ) -> Rect {
     if row.is_empty() || area.width == 0 || area.height == 0 {
         return area;
@@ -209,10 +222,13 @@ fn layout_row(
                 }
             };
 
-            output.push(TreemapTile {
+            let tile = TreemapTile {
                 node: item.node.clone(),
                 rect: Rect::new(x, area.y, width, row_height),
-            });
+                depth,
+            };
+            insert_node_rect(node_rects.as_deref_mut(), &tile);
+            output.push(tile);
 
             x = x.saturating_add(width);
             remaining_width = remaining_width.saturating_sub(width);
@@ -256,10 +272,13 @@ fn layout_row(
                 }
             };
 
-            output.push(TreemapTile {
+            let tile = TreemapTile {
                 node: item.node.clone(),
                 rect: Rect::new(area.x, y, row_width, height),
-            });
+                depth,
+            };
+            insert_node_rect(node_rects.as_deref_mut(), &tile);
+            output.push(tile);
 
             y = y.saturating_add(height);
             remaining_height = remaining_height.saturating_sub(height);
@@ -271,5 +290,178 @@ fn layout_row(
             area.width.saturating_sub(row_width),
             area.height,
         )
+    }
+}
+
+pub fn contextual_treemap_layout<F>(
+    root_nodes: &[TreemapNode],
+    bounds: Rect,
+    selection_path: &[usize],
+    max_nodes_per_level: usize,
+    child_provider: F,
+) -> TreemapLayout
+where
+    F: FnMut(usize, usize) -> Vec<TreemapNode>,
+{
+    let max_nodes = max_nodes_per_level.max(2);
+    let mut builder = ContextualLayoutBuilder::new(max_nodes, child_provider);
+    builder.layout_nodes(root_nodes, bounds, 0, 0);
+    builder.layout_selection_path(selection_path);
+    builder.finish()
+}
+
+struct ContextualLayoutBuilder<F>
+where
+    F: FnMut(usize, usize) -> Vec<TreemapNode>,
+{
+    tiles: Vec<TreemapTile>,
+    node_rects: HashMap<usize, Rect>,
+    max_nodes: usize,
+    child_provider: F,
+}
+
+impl<F> ContextualLayoutBuilder<F>
+where
+    F: FnMut(usize, usize) -> Vec<TreemapNode>,
+{
+    fn new(max_nodes: usize, child_provider: F) -> Self {
+        Self {
+            tiles: Vec::new(),
+            node_rects: HashMap::new(),
+            max_nodes,
+            child_provider,
+        }
+    }
+
+    fn layout_nodes(&mut self, nodes: &[TreemapNode], area: Rect, depth: usize, parent_id: usize) {
+        if area.width == 0 || area.height == 0 {
+            return;
+        }
+
+        let prepared = prepare_nodes(nodes, self.max_nodes, parent_id);
+        if prepared.is_empty() {
+            return;
+        }
+
+        let mut weighted = normalize_areas(&prepared, area, prepared.len().max(1))
+            .into_iter()
+            .map(|(node, area)| WeightedNode { node, area })
+            .collect::<Vec<_>>();
+        weighted.retain(|w| w.area > 0);
+        if weighted.is_empty() {
+            return;
+        }
+
+        let mut remaining = area;
+        let mut row: Vec<WeightedNode> = Vec::new();
+
+        while let Some(candidate) = weighted.first().cloned() {
+            if row.is_empty() {
+                row.push(candidate);
+                weighted.remove(0);
+                continue;
+            }
+
+            let side = f64::from(remaining.width.min(remaining.height).max(1));
+            let current_worst = worst_ratio(&row, side);
+
+            let mut with_candidate = row.clone();
+            with_candidate.push(candidate.clone());
+            let next_worst = worst_ratio(&with_candidate, side);
+
+            if next_worst <= current_worst {
+                row.push(candidate);
+                weighted.remove(0);
+            } else {
+                remaining = layout_row(
+                    row.as_slice(),
+                    remaining,
+                    &mut self.tiles,
+                    Some(&mut self.node_rects),
+                    false,
+                    depth,
+                );
+                row.clear();
+                if remaining.width == 0 || remaining.height == 0 {
+                    break;
+                }
+            }
+        }
+
+        if !row.is_empty() && remaining.width > 0 && remaining.height > 0 {
+            layout_row(
+                row.as_slice(),
+                remaining,
+                &mut self.tiles,
+                Some(&mut self.node_rects),
+                true,
+                depth,
+            );
+        }
+    }
+
+    fn layout_selection_path(&mut self, path: &[usize]) {
+        let mut depth = 1;
+        for &node_id in path {
+            let parent_rect = match self.node_rects.get(&node_id) {
+                Some(rect) => *rect,
+                None => break,
+            };
+            let children = (self.child_provider)(node_id, self.max_nodes);
+            self.layout_nodes(&children, parent_rect, depth, node_id);
+            depth = depth.saturating_add(1);
+        }
+    }
+
+    fn finish(self) -> TreemapLayout {
+        TreemapLayout {
+            tiles: self.tiles,
+            node_rects: self.node_rects,
+        }
+    }
+}
+
+fn prepare_nodes(nodes: &[TreemapNode], max_nodes: usize, parent_id: usize) -> Vec<TreemapNode> {
+    let mut filtered: Vec<TreemapNode> = nodes.iter().filter(|n| n.size > 0).cloned().collect();
+
+    if filtered.is_empty() {
+        return filtered;
+    }
+
+    let max_nodes = max_nodes.max(2);
+    filtered.sort_unstable_by(|a, b| {
+        b.size
+            .cmp(&a.size)
+            .then_with(|| a.name.cmp(&b.name))
+            .then_with(|| a.node_id.cmp(&b.node_id))
+    });
+
+    if filtered.len() <= max_nodes {
+        return filtered;
+    }
+
+    let other_nodes = filtered.split_off(max_nodes - 1);
+    let other_size: u64 = other_nodes.iter().map(|n| n.size).sum();
+    filtered.truncate(max_nodes - 1);
+    filtered.push(TreemapNode {
+        node_id: synthetic_other_id(parent_id),
+        name: "other".to_string(),
+        size: other_size,
+        is_directory: false,
+        is_aggregated: true,
+    });
+
+    filtered
+}
+
+fn synthetic_other_id(parent_id: usize) -> usize {
+    usize::MAX.saturating_sub(parent_id)
+}
+
+fn insert_node_rect(map: Option<&mut HashMap<usize, Rect>>, tile: &TreemapTile) {
+    if !tile.node.is_aggregated {
+        if let Some(rect_map) = map {
+            rect_map.insert(tile.node.node_id, tile.rect);
+        }
     }
 }

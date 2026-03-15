@@ -15,7 +15,7 @@
 
 use crate::state::{AppState, ScanState};
 use crate::theme::Theme;
-use crate::treemap::squarified_treemap;
+use crate::treemap::{TreemapLayout, TreemapNode, TreemapTile, contextual_treemap_layout};
 use crate::ui::{helpers::*, layout::LayoutRegions};
 use ratatui::layout::{Alignment, Constraint, Rect};
 use ratatui::style::Style;
@@ -24,11 +24,21 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Table};
 
 /// Renderer responsible for drawing the main UI panels.
-pub struct Ui;
+pub struct Ui {
+    treemap_cache: TreemapLayoutCache,
+}
+
+impl Default for Ui {
+    fn default() -> Self {
+        Self {
+            treemap_cache: TreemapLayoutCache::default(),
+        }
+    }
+}
 
 impl Ui {
     pub fn draw(
-        &self,
+        &mut self,
         frame: &mut Frame<'_>,
         layout: LayoutRegions,
         state: &AppState,
@@ -131,7 +141,7 @@ impl Ui {
         frame.render_widget(footer, area);
     }
 
-    fn draw_treemap(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
+    fn draw_treemap(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
         let title = format!("treemap ({})", treemap_scope_name(state));
         let panel = Block::default().borders(Borders::ALL).title(title);
         let inner = panel.inner(area);
@@ -143,8 +153,16 @@ impl Ui {
 
         let max_tiles_for_panel = usize::from(inner.width) * usize::from(inner.height) / 2;
         let max_tiles = 200_usize.min(max_tiles_for_panel.max(1));
-        let tiles = squarified_treemap(&state.treemap_nodes, inner, max_tiles);
-        if tiles.is_empty() {
+        let path = selection_path(state);
+        let layout = self.treemap_cache.layout_for(
+            inner,
+            &path,
+            state.treemap_revision,
+            &state.treemap_nodes,
+            max_tiles,
+            |parent, limit| gather_child_nodes(parent, state, limit),
+        );
+        if layout.tiles.is_empty() {
             frame.render_widget(
                 Paragraph::new("No sized children")
                     .alignment(Alignment::Center)
@@ -154,37 +172,15 @@ impl Ui {
             return;
         }
 
-        let path = selection_path(state);
-        let highlighted_id = path.first().copied();
-        let overlays = selection_highlight_overlays(&tiles, &path, state);
-
-        for tile in tiles {
-            let is_highlighted = Some(tile.node.node_id) == highlighted_id;
-            self.draw_treemap_tile(frame, tile, theme, is_highlighted);
+        for tile in &layout.tiles {
+            draw_treemap_tile(frame, tile, theme);
         }
 
-        for overlay in overlays {
-            fill_rect(frame, overlay, theme.selection, theme.background);
+        if let Some(selection) = state.selection {
+            if let Some(&selection_rect) = layout.node_rects.get(&selection) {
+                fill_rect(frame, selection_rect, theme.selection, theme.background);
+            }
         }
-    }
-
-    fn draw_treemap_tile(
-        &self,
-        frame: &mut Frame<'_>,
-        tile: crate::treemap::TreemapTile,
-        theme: Theme,
-        is_highlighted: bool,
-    ) {
-        if tile.rect.width == 0 || tile.rect.height == 0 {
-            return;
-        }
-
-        let color = if is_highlighted {
-            theme.selection
-        } else {
-            theme.bar
-        };
-        fill_rect(frame, tile.rect, color, theme.background);
     }
 
     fn draw_details(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
@@ -274,4 +270,63 @@ fn split_detail_line(line: &str) -> (&str, &str, &str) {
     let key = parts.next().unwrap_or("");
     let value = parts.next().unwrap_or("");
     (glyph, key, value)
+}
+
+fn draw_treemap_tile(frame: &mut Frame<'_>, tile: &TreemapTile, theme: Theme) {
+    if tile.rect.width == 0 || tile.rect.height == 0 {
+        return;
+    }
+
+    fill_rect(frame, tile.rect, theme.bar, theme.background);
+}
+
+#[derive(Default)]
+struct TreemapLayoutCache {
+    key: Option<TreemapLayoutKey>,
+    layout: Option<TreemapLayout>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TreemapLayoutKey {
+    bounds: Rect,
+    revision: u64,
+    selection_path: Vec<usize>,
+}
+
+impl TreemapLayoutCache {
+    fn layout_for<F>(
+        &mut self,
+        bounds: Rect,
+        selection_path: &[usize],
+        revision: u64,
+        root_nodes: &[TreemapNode],
+        max_nodes: usize,
+        child_provider: F,
+    ) -> &TreemapLayout
+    where
+        F: FnMut(usize, usize) -> Vec<TreemapNode>,
+    {
+        let mut provider = child_provider;
+        let key = TreemapLayoutKey {
+            bounds,
+            revision,
+            selection_path: selection_path.to_vec(),
+        };
+
+        if self.key.as_ref() == Some(&key) {
+            return self.layout.as_ref().unwrap();
+        }
+
+        let layout = contextual_treemap_layout(
+            root_nodes,
+            bounds,
+            selection_path,
+            max_nodes,
+            move |parent, limit| provider(parent, limit),
+        );
+
+        self.key = Some(key);
+        self.layout = Some(layout);
+        self.layout.as_ref().unwrap()
+    }
 }

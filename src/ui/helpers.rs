@@ -18,7 +18,7 @@ use crate::display::DisplayOptions;
 use crate::state::{AppState, SizeDisplayMode};
 use crate::theme::Theme;
 use crate::tree::{FileTree, NodeType, TreeNode};
-use crate::treemap::{TreemapNode, TreemapTile, squarified_treemap};
+use crate::treemap::TreemapNode;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Color;
 use ratatui::terminal::Frame;
@@ -375,47 +375,11 @@ pub(crate) fn selection_path(state: &AppState) -> Vec<usize> {
     stack
 }
 
-pub(crate) fn selection_highlight_overlays(
-    tiles: &[TreemapTile],
-    path: &[usize],
+pub(crate) fn gather_child_nodes(
+    parent_id: usize,
     state: &AppState,
-) -> Vec<Rect> {
-    if path.is_empty() {
-        return Vec::new();
-    }
-
-    let root_tile = tiles.iter().find(|tile| tile.node.node_id == path[0]);
-    let mut current_rect = match root_tile {
-        Some(tile) => tile.rect,
-        None => return Vec::new(),
-    };
-
-    let mut overlays = Vec::new();
-    let mut parent_id = path[0];
-
-    for &child_id in &path[1..] {
-        let children = gather_child_nodes(parent_id, state);
-        if children.is_empty() {
-            break;
-        }
-
-        let child_tiles = squarified_treemap(&children, current_rect, children.len().max(1));
-        if let Some(child_tile) = child_tiles
-            .into_iter()
-            .find(|tile| tile.node.node_id == child_id)
-        {
-            overlays.push(child_tile.rect);
-            current_rect = child_tile.rect;
-            parent_id = child_id;
-        } else {
-            break;
-        }
-    }
-
-    overlays
-}
-
-fn gather_child_nodes(parent_id: usize, state: &AppState) -> Vec<TreemapNode> {
+    max_children: usize,
+) -> Vec<TreemapNode> {
     let mut nodes = Vec::new();
     let parent = match state.tree.node(parent_id) {
         Some(node) => node,
@@ -434,12 +398,14 @@ fn gather_child_nodes(parent_id: usize, state: &AppState) -> Vec<TreemapNode> {
                 name: child.name.clone(),
                 size,
                 is_directory: child.file_type == NodeType::Directory,
+                is_aggregated: false,
             });
         }
     }
 
     nodes.sort_unstable_by(|a, b| b.size.cmp(&a.size).then_with(|| a.name.cmp(&b.name)));
-    nodes.truncate(200);
+    let limit = max_children.max(1);
+    nodes.truncate(limit);
     nodes
 }
 
@@ -553,37 +519,5 @@ mod tests {
         assert!(inner.height < outer.height);
         assert!(inner.x > outer.x);
         assert!(inner.y > outer.y);
-    }
-
-    #[test]
-    fn deep_selection_highlight_overlays_for_nested_entry() {
-        use crate::treemap::squarified_treemap;
-
-        let mut state =
-            crate::state::AppState::new(PathBuf::from("/root"), crate::config::SortMode::SizeDesc);
-        let top = state.tree.add_child(
-            0,
-            TreeNode::new(PathBuf::from("/root/top"), NodeType::Directory),
-        );
-        let deep = state.tree.add_child(
-            top,
-            TreeNode::new(PathBuf::from("/root/top/deep"), NodeType::File),
-        );
-
-        if let Some(node) = state.tree.node_mut(top) {
-            node.size = 10;
-        }
-        if let Some(node) = state.tree.node_mut(deep) {
-            node.size = 3;
-        }
-
-        state.selection = Some(deep);
-        state.refresh_treemap_nodes();
-
-        let tiles = squarified_treemap(&state.treemap_nodes, Rect::new(0, 0, 80, 20), 200);
-        let path = selection_path(&state);
-        let overlays = selection_highlight_overlays(&tiles, &path, &state);
-
-        assert!(!overlays.is_empty());
     }
 }

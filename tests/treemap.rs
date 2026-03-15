@@ -23,30 +23,35 @@ fn sample_nodes() -> Vec<TreemapNode> {
             name: "alpha".to_string(),
             size: 400,
             is_directory: true,
+            is_aggregated: false,
         },
         TreemapNode {
             node_id: 2,
             name: "beta".to_string(),
             size: 250,
             is_directory: false,
+            is_aggregated: false,
         },
         TreemapNode {
             node_id: 3,
             name: "gamma".to_string(),
             size: 200,
             is_directory: true,
+            is_aggregated: false,
         },
         TreemapNode {
             node_id: 4,
             name: "delta".to_string(),
             size: 100,
             is_directory: false,
+            is_aggregated: false,
         },
         TreemapNode {
             node_id: 5,
             name: "zero".to_string(),
             size: 0,
             is_directory: false,
+            is_aggregated: false,
         },
     ]
 }
@@ -117,6 +122,7 @@ fn small_panel_never_overflows() {
             name: format!("n{i}"),
             size: 1,
             is_directory: false,
+            is_aggregated: false,
         });
     }
 

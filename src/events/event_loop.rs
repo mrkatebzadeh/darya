@@ -40,7 +40,7 @@ pub fn run_event_loop(
     theme: Theme,
 ) -> Result<()> {
     let mut input_state = InputState::new();
-    let ui = Ui;
+    let mut ui = Ui::default();
     let mut last_tick = Instant::now();
     let mut dirty = true;
     let mut should_quit = false;
