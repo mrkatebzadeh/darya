@@ -48,34 +48,34 @@ impl Theme {
 impl Default for Theme {
     fn default() -> Self {
         Self {
-            background: Color::Reset,
-            foreground: Color::White,
-            selection: Color::Blue,
-            directory: Color::Cyan,
-            file: Color::Gray,
-            bar: Color::LightGreen,
-            bar_bg: Color::Reset,
+            background: Color::Rgb(30, 30, 46),    // frappe base
+            foreground: Color::Rgb(198, 208, 245), // text
+            selection: Color::Rgb(140, 170, 238),  // overlay
+            directory: Color::Rgb(180, 184, 254),  // lavender
+            file: Color::Rgb(198, 208, 245),
+            bar: Color::Rgb(137, 180, 250), // sky
+            bar_bg: Color::Rgb(92, 108, 124),
             tile_palette: [
-                Color::LightGreen,
-                Color::LightYellow,
-                Color::LightBlue,
-                Color::LightMagenta,
-                Color::LightCyan,
-                Color::Yellow,
-                Color::LightRed,
-                Color::Green,
-                Color::Magenta,
-                Color::Cyan,
-                Color::Red,
-                Color::White,
-                Color::Gray,
-                Color::DarkGray,
-                Color::Black,
-                Color::Rgb(255, 165, 0),
-                Color::Rgb(128, 0, 128),
-                Color::Rgb(0, 128, 128),
-                Color::Rgb(128, 128, 0),
-                Color::Rgb(255, 192, 203),
+                Color::Rgb(245, 224, 220), // rosewater
+                Color::Rgb(242, 205, 205), // flamingo
+                Color::Rgb(245, 194, 231), // pink
+                Color::Rgb(203, 166, 247), // mauve
+                Color::Rgb(243, 139, 168), // red
+                Color::Rgb(235, 160, 172), // maroon
+                Color::Rgb(250, 179, 135), // peach
+                Color::Rgb(249, 226, 175), // yellow
+                Color::Rgb(166, 227, 161), // green
+                Color::Rgb(148, 226, 213), // teal
+                Color::Rgb(137, 180, 250), // sky
+                Color::Rgb(116, 199, 236), // sapphire
+                Color::Rgb(177, 190, 254), // lavender
+                Color::Rgb(146, 199, 248),
+                Color::Rgb(185, 123, 255),
+                Color::Rgb(255, 121, 198),
+                Color::Rgb(255, 195, 160),
+                Color::Rgb(255, 255, 255),
+                Color::Rgb(92, 108, 124),
+                Color::Rgb(17, 17, 27),
             ],
         }
     }
@@ -272,16 +272,16 @@ mod tests {
     #[test]
     fn default_palette_is_expected() {
         let theme = Theme::default();
-        assert_eq!(theme.background, Color::Reset);
-        assert_eq!(theme.foreground, Color::White);
-        assert_eq!(theme.selection, Color::Blue);
-        assert_eq!(theme.directory, Color::Cyan);
-        assert_eq!(theme.file, Color::Gray);
-        assert_eq!(theme.bar, Color::LightGreen);
-        assert_eq!(theme.bar_bg, Color::Reset);
+        assert_eq!(theme.background, Color::Rgb(30, 30, 46));
+        assert_eq!(theme.foreground, Color::Rgb(198, 208, 245));
+        assert_eq!(theme.selection, Color::Rgb(140, 170, 238));
+        assert_eq!(theme.directory, Color::Rgb(180, 184, 254));
+        assert_eq!(theme.file, Color::Rgb(198, 208, 245));
+        assert_eq!(theme.bar, Color::Rgb(137, 180, 250));
+        assert_eq!(theme.bar_bg, Color::Rgb(92, 108, 124));
         assert_eq!(theme.tile_palette.len(), TILE_PALETTE_SIZE);
-        assert_eq!(theme.tile_color(0), Color::LightGreen);
-        assert_eq!(theme.tile_color(5), Color::Yellow);
-        assert_eq!(theme.tile_color(19), Color::Rgb(255, 192, 203));
+        assert_eq!(theme.tile_color(0), Color::Rgb(245, 224, 220));
+        assert_eq!(theme.tile_color(5), Color::Rgb(235, 160, 172));
+        assert_eq!(theme.tile_color(19), Color::Rgb(17, 17, 27));
     }
 }
