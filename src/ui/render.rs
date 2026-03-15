@@ -41,6 +41,7 @@ impl Ui {
         self.draw_tree(frame, layout.tree, state, theme);
         self.draw_treemap(frame, layout.treemap, state, theme);
         self.draw_details(frame, layout.details, state, theme);
+        self.draw_activity(frame, layout.activity, state, theme);
         self.draw_footer(frame, layout.footer, state, theme);
         if state.show_help {
             self.draw_help_modal(frame, state, theme);
@@ -229,6 +230,63 @@ impl Ui {
                 Style::default().fg(theme.directory).bg(theme.background),
             );
         }
+    }
+
+    fn draw_activity(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
+        frame.render_widget(Clear, area);
+        let block = Block::default().borders(Borders::ALL).title("Activity");
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+
+        if inner.width == 0 || inner.height == 0 {
+            return;
+        }
+
+        let activity = state.scan_activity_snapshot();
+        let path_value = activity
+            .current_path
+            .as_deref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "idle".into());
+        let metrics = [
+            ("Path", path_value),
+            ("Queued dirs", activity.queued_directories.to_string()),
+            ("Permission denied", activity.permission_denied.to_string()),
+            ("Skipped mounts", activity.skipped_mounts.to_string()),
+            ("Skipped symlinks", activity.skipped_symlinks.to_string()),
+            ("Files processed", activity.files_processed.to_string()),
+        ];
+
+        let label_width = 17_u16;
+        let value_width = inner.width.saturating_sub(label_width + 1) as usize;
+        let mut lines = Vec::new();
+        for (label, value) in metrics {
+            if lines.len() as u16 >= inner.height {
+                break;
+            }
+            let trimmed_value = if value_width > 0 {
+                trim_to_width(&value, value_width)
+            } else {
+                String::new()
+            };
+            let line = Line::from(vec![
+                Span::styled(
+                    format!(
+                        "{label:<width$}",
+                        label = label,
+                        width = label_width as usize
+                    ),
+                    Style::default().fg(theme.directory),
+                ),
+                Span::raw(" "),
+                Span::styled(trimmed_value, Style::default().fg(theme.foreground)),
+            ]);
+            lines.push(line);
+        }
+
+        let paragraph =
+            Paragraph::new(lines).style(Style::default().fg(theme.foreground).bg(theme.background));
+        frame.render_widget(paragraph, inner);
     }
 
     fn draw_treemap(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {

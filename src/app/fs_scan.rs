@@ -17,6 +17,8 @@ use crate::tree::NodeType;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use std::collections::HashSet;
 use std::ffi::OsStr;
+#[cfg(unix)]
+use std::os::unix::fs::MetadataExt;
 use std::{
     path::PathBuf,
     sync::{
@@ -33,6 +35,7 @@ use walkdir::{DirEntry, Error as WalkError, WalkDir};
 pub enum ScanEvent {
     Node(ScanNode),
     Progress(ScanProgress),
+    Activity(ScanActivity),
     Error(ScanError),
     Completed,
 }
@@ -55,6 +58,17 @@ pub struct ScanNode {
 pub struct ScanProgress {
     pub scanned: u64,
     pub errors: u64,
+}
+
+/// Snapshot of the scanner activity for UI display.
+#[derive(Default, Debug, Clone)]
+pub struct ScanActivity {
+    pub current_path: Option<PathBuf>,
+    pub queued_directories: u64,
+    pub permission_denied: u64,
+    pub skipped_mounts: u64,
+    pub skipped_symlinks: u64,
+    pub files_processed: u64,
 }
 
 /// Errors emitted during scanning.
@@ -127,21 +141,50 @@ fn run_scan(
     let mut errors = 0;
     let mut seen_links: HashSet<(u64, u64)> = HashSet::new();
 
+    let custom_same_fs = options.same_file_system && cfg!(unix);
+    #[cfg(unix)]
+    let root_dev = if custom_same_fs {
+        root.metadata().ok().map(|meta| meta.dev())
+    } else {
+        None
+    };
+    #[cfg(not(unix))]
+    let root_dev = None;
+
     let walker = WalkDir::new(&root).follow_links(options.follow_symlinks);
-    let walker = if options.same_file_system {
+    let walker = if options.same_file_system && !custom_same_fs {
         walker.same_file_system(true)
     } else {
         walker
     };
 
-    for entry in walker.into_iter() {
+    let mut walker_iter = walker.into_iter();
+    let mut activity = ScanActivity::default();
+    let mut dir_stack: Vec<usize> = Vec::new();
+
+    while let Some(entry_result) = walker_iter.next() {
         if cancel.load(Ordering::Relaxed) {
             let _ = tx.send(ScanEvent::Completed);
             return;
         }
 
-        match entry {
+        match entry_result {
             Ok(entry) => {
+                activity.current_path = Some(entry.path().to_path_buf());
+                scanned += 1;
+                let depth = entry.depth();
+                while let Some(&last_depth) = dir_stack.last() {
+                    if last_depth >= depth {
+                        dir_stack.pop();
+                    } else {
+                        break;
+                    }
+                }
+                if entry.file_type().is_dir() {
+                    dir_stack.push(depth);
+                }
+                activity.queued_directories = dir_stack.len().saturating_sub(1) as u64;
+
                 if excludes
                     .as_ref()
                     .is_some_and(|set| set.is_match(entry.path()))
@@ -154,9 +197,22 @@ fn run_scan(
                 if options.skip_kernfs && is_kernfs_entry(&entry) {
                     continue;
                 }
-                scanned += 1;
+
                 match entry.metadata() {
                     Ok(metadata) => {
+                        if custom_same_fs
+                            && let Some(root_dev) = root_dev
+                            && let Some(entry_dev) = device_id(&metadata)
+                            && entry_dev != root_dev
+                        {
+                            activity.skipped_mounts += 1;
+                            if entry.file_type().is_dir() {
+                                walker_iter.skip_current_dir();
+                            }
+                            let _ = tx.send(ScanEvent::Activity(activity.clone()));
+                            continue;
+                        }
+
                         let mut size = metadata.len();
                         let mut disk_size = disk_usage_bytes(&metadata);
                         if options.count_hard_links_once
@@ -180,9 +236,17 @@ fn run_scan(
                         #[cfg(not(unix))]
                         let (permissions, uid, gid) = (None, None, None);
 
+                        let kind = classify(&entry);
+                        if kind == NodeType::File {
+                            activity.files_processed = activity.files_processed.saturating_add(1);
+                        }
+                        if kind == NodeType::Symlink && !options.follow_symlinks {
+                            activity.skipped_symlinks = activity.skipped_symlinks.saturating_add(1);
+                        }
+
                         let node = ScanNode {
                             path: entry.path().to_path_buf(),
-                            kind: classify(&entry),
+                            kind,
                             size,
                             disk_size,
                             modified: metadata.modified().ok(),
@@ -191,31 +255,46 @@ fn run_scan(
                             gid,
                         };
                         let _ = tx.send(ScanEvent::Node(node));
+                        let _ = tx.send(ScanEvent::Activity(activity.clone()));
                     }
                     Err(err) => {
+                        if err
+                            .io_error()
+                            .map(|inner| inner.kind() == std::io::ErrorKind::PermissionDenied)
+                            .unwrap_or(false)
+                        {
+                            activity.permission_denied =
+                                activity.permission_denied.saturating_add(1);
+                        }
                         errors += 1;
                         let _ = tx.send(ScanEvent::Error(ScanError {
                             path: entry.path().to_path_buf(),
                             source: err,
                         }));
+                        let _ = tx.send(ScanEvent::Activity(activity.clone()));
                     }
                 }
                 let _ = tx.send(ScanEvent::Progress(ScanProgress { scanned, errors }));
             }
             Err(err) => {
+                activity.current_path =
+                    err.path().map(PathBuf::from).or_else(|| Some(root.clone()));
                 errors += 1;
                 let _ = tx.send(ScanEvent::Error(ScanError {
-                    path: err
-                        .path()
-                        .map(PathBuf::from)
+                    path: activity
+                        .current_path
+                        .clone()
                         .unwrap_or_else(|| root.clone()),
                     source: err,
                 }));
+                let _ = tx.send(ScanEvent::Activity(activity.clone()));
                 let _ = tx.send(ScanEvent::Progress(ScanProgress { scanned, errors }));
             }
         }
     }
 
+    activity.current_path = None;
+    let _ = tx.send(ScanEvent::Activity(activity.clone()));
     let _ = tx.send(ScanEvent::Completed);
 }
 
@@ -285,6 +364,16 @@ fn classify(entry: &walkdir::DirEntry) -> NodeType {
     } else {
         NodeType::File
     }
+}
+
+#[cfg(unix)]
+fn device_id(metadata: &std::fs::Metadata) -> Option<u64> {
+    Some(metadata.dev())
+}
+
+#[cfg(not(unix))]
+fn device_id(_metadata: &std::fs::Metadata) -> Option<u64> {
+    None
 }
 
 #[cfg(test)]
