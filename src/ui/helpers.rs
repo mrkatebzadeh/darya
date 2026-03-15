@@ -25,6 +25,7 @@ use ratatui::terminal::Frame;
 use ratatui::widgets::{Cell, Row};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use throbber_widgets_tui::BRAILLE_EIGHT;
+const PERCENT_BAR_WIDTH: usize = 10;
 
 pub(crate) fn collect_tree_rows(
     tree: &FileTree,
@@ -110,7 +111,8 @@ pub(crate) fn build_row(
         } else {
             size_value as f64 / max_size as f64 * 100.0
         };
-        cells.push(Cell::from(format!("{percent:.1}%")));
+        let bar = percent_bar(percent, PERCENT_BAR_WIDTH);
+        cells.push(Cell::from(format!("{bar} {percent:.1}%")));
     }
 
     if options.show_item_count {
@@ -149,6 +151,13 @@ fn draw_bar(size: u64, max: u64, width: usize) -> String {
 
     let empty = width.saturating_sub(filled);
     format!("[{}{}]", "#".repeat(filled), " ".repeat(empty))
+}
+
+fn percent_bar(percent: f64, width: usize) -> String {
+    let ratio = (percent.clamp(0.0, 100.0) / 100.0).min(1.0);
+    let filled = ((ratio * width as f64).round() as usize).min(width);
+    let empty = width.saturating_sub(filled);
+    format!("{}{}", "█".repeat(filled), " ".repeat(empty))
 }
 
 fn format_size_custom(bytes: u64, use_si: bool) -> String {
