@@ -42,22 +42,31 @@ pub fn split_layout(area: Rect) -> LayoutRegions {
         .constraints([Constraint::Percentage(75), Constraint::Percentage(25)])
         .split(vertical[1]);
 
+    let mut top = center[0];
+    let mut bottom = center[1];
+    if bottom.height > 6 {
+        let diff = bottom.height - 6;
+        bottom.height = 6;
+        top.height += diff;
+        bottom.y = top.y + top.height;
+    }
+
     let main_row = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(75), Constraint::Percentage(25)])
-        .split(center[0]);
+        .split(top);
 
-    let bottom = Layout::default()
+    let bottom_split = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(center[1]);
+        .split(bottom);
 
     LayoutRegions {
         header: vertical[0],
         tree: main_row[0],
         treemap: main_row[1],
-        details: bottom[0],
-        activity: bottom[1],
+        details: bottom_split[0],
+        activity: bottom_split[1],
         footer: vertical[2],
     }
 }
