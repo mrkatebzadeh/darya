@@ -1,61 +1,27 @@
 # dar
-This project is the start of a modern, Rust-based replacement for ncdu that prioritizes responsiveness, configurability, and readable progress.
+[![Build](https://github.com/mrkatebzadeh/dar/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/mrkatebzadeh/dar/actions/workflows/ci.yaml)
+[![Coverage](https://codecov.io/gh/mrkatebzadeh/dar/branch/main/graph/badge.svg)](https://codecov.io/gh/mrkatebzadeh/dar)
 
-## Why using this tool
-- It begins to solve the pain of slow, hard-to-script disk explorers by combining a rich terminal UI with deliberate scan controls.
-- Rather than a drop-in clone, it rethinks ncdu’s workflow: scans only start when you’re ready, progress is tracked explicitly, and every pane is now housed under dedicated modules for clarity.
-- Because it embraces a modular architecture, it is easier to extend (for example to add filters, exports, or integrations) than the traditional ncdu codebase.
+`dar` is a terminal-first disk audit runner that keeps things responsive and readable while you explore storage. It’s in the same spirit as `du`, but TUI-based so you can scroll through directories without losing track of what’s happening. It lets you decide when scanning happens, keeps the panels focused, and surfaces the details you need without overwhelming you with noise.
 
-## How to install it
-1. Ensure you have the Rust toolchain installed (https://rustup.rs). Cargo will manage the build/install process.
-2. Clone the repository and switch to the `dev` branch if needed:
+## Installation
+1. Visit the [dar releases page](https://github.com/yourorg/dar/releases) and download the latest archive for your platform.
+2. Extract the archive and place the `dar` binary somewhere on your `PATH` (for example, `/usr/local/bin`).
+3. Optionally, verify the download by checking the accompanying checksum before you run it.
 
-```
-git clone https://github.com/yourorg/dar.git
-cd dar
-```
+If you're building from source, run `cargo test` and `cargo build --release` from the repository root, then install the resulting binary with `cargo install --path .`.
 
-3. Build the CLI and run the tests with Cargo:
+## Quick start
+- Launch `dar` in any directory to open the UI, then press `R` to start a scan.
+- Navigate with the keybindings shown at the bottom of the UI, toggle filters with `/` and `c`, and switch sorting/size modes with the letters shown in the help pane.
+- Use `-x`/`--one-file-system`, `-y`/`--show-hidden`, or the other CLI flags if you need to control what the scanner visits before you start the UI.
+- Export scans with the provided snapshot flags (`-f`, `-o`, `-O`) to share what you’ve found without rerunning a full scan.
 
-```
-cargo test
-cargo build --release
-```
+## Configuration and customization
+- Settings come from `~/.config/dar/config.toml` (or wherever you pointed `DAR_CONFIG`) and provide defaults for sorting, UI tweaks, and scan filters. Pass `--ignore-config` to skip it.
+- Overrides on the command line always win, so you can keep a mild default configuration and still tweak behavior at runtime.
+- The UI exposes controls for size mode, sorting, tree expansion, and help—use them interactively rather than diving into implementation details.
 
-4. Install the binary system-wide if desired:
-
-```
-```
-
-## How to use it
-1. Run the CLI with no arguments to scan the current directory once you press `R`:
-
-```
-```
-
-2. While the UI is running, use the keybindings shown in the help modal:
-   - `hjkl`: move selection
-   - `/`: start filter, `c`: clear
-   - `r`: rescan, `R`: start a new scan from root
-   - `p/u/x`: pause, resume, stop the scanner
-   - `b`, `s`, `E/I`: toggle size mode/sort/export/import
-
-3. Use `--one-file-system`, `--include-caches`, and other CLI flags to control follow-symlinks, caching rules, and thread counts before launching the UI.
-
-4. Import/export snapshots via `-f`, `-o`, or `-O` to share scans across systems or persist results.
-
-## How to config it
-- Configuration is loaded from the default TOML (as described in `src/config.rs`) unless you pass `--ignore-config`.
-- Overrides in the CLI (such as `--cross-file-system` or `--disk-usage`) take precedence over config values.
-- You can adjust display options (`--show-itemcount`, `--no-graph`, etc.) to tailor the table output, and these settings persist only per invocation unless codified in config.
-
-## Any project specific doc
-### Architecture
-- `src/app/` contains the CLI entrypoint, configuration loader, scan manager, and shared state logic.
-- `src/events/` now bifurcates event loop rendering (`event_loop.rs`) from action handlers (`handlers.rs`), allowing cleaner unit tests and targeted reuse.
-- `src/ui/` houses the renderer, helpers, layout, themes, and treemap calculations so UI concerns stay grouped.
-- `src/scan_control.rs` orchestrates pause/resume/stop/cancel signals that the UI, scan manager, and `fs_scan` module honor.
-
-### Progress and next steps
-- Scans wait for user confirmation via `R`, giving you full control over when disk I/O begins.
-- Future work includes hooking into configuration presets, exposing metrics, and polishing export/import workflows with a JSON schema.
+## Support and contributing
+- Report issues or feature requests on the GitHub issue tracker so the project can keep improving.
+- Contributions are welcome. Please follow the existing style and run `cargo fmt`, `cargo clippy`, and `cargo test` before opening a pull request.
