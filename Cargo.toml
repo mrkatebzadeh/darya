@@ -1,6 +1,6 @@
 [package]
 name = "dar"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "A fast, keyboard-driven disk usage explorer built on ratatui."
 license = "MIT OR Apache-2.0"
