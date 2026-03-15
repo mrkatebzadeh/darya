@@ -19,7 +19,9 @@ use crate::state::{AppState, SizeDisplayMode};
 use crate::theme::Theme;
 use crate::tree::{FileTree, NodeType, TreeNode};
 use crate::treemap::TreemapNode;
-use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::layout::Rect;
+#[cfg(test)]
+use ratatui::layout::{Constraint, Layout};
 use ratatui::style::{Color, Style};
 use ratatui::terminal::Frame;
 use ratatui::text::Span;
@@ -415,6 +417,7 @@ fn node_size(node: &TreeNode, mode: SizeDisplayMode) -> u64 {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     let popup_layout = Layout::default()
         .direction(ratatui::layout::Direction::Vertical)
