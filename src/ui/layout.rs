@@ -36,21 +36,21 @@ pub fn split_layout(area: Rect) -> LayoutRegions {
         ])
         .split(area);
 
-    let body = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
+    let center = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(75), Constraint::Percentage(25)])
         .split(vertical[1]);
 
-    let right = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
-        .split(body[1]);
+    let main_row = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(75), Constraint::Percentage(25)])
+        .split(center[0]);
 
     LayoutRegions {
         header: vertical[0],
-        tree: body[0],
-        treemap: right[0],
-        details: right[1],
+        tree: main_row[0],
+        treemap: main_row[1],
+        details: center[1],
         footer: vertical[2],
     }
 }
@@ -65,14 +65,11 @@ mod tests {
         let regions = split_layout(area);
         assert_eq!(regions.header.height, 3);
         assert_eq!(regions.footer.height, 3);
-        assert_eq!(regions.tree.height, 18);
-        assert_eq!(regions.tree.width, 56);
-        assert_eq!(regions.treemap.width, 24);
-        assert_eq!(regions.details.width, 24);
-        assert_eq!(
-            regions.treemap.height + regions.details.height,
-            regions.tree.height
-        );
+        assert_eq!(regions.tree.height, 14);
+        assert_eq!(regions.tree.width, 60);
+        assert_eq!(regions.treemap.width, 20);
+        assert_eq!(regions.details.width, 80);
+        assert_eq!(regions.details.height, 4);
         assert_eq!(regions.tree.y, regions.header.height);
         assert_eq!(regions.footer.y, area.height - regions.footer.height);
     }
