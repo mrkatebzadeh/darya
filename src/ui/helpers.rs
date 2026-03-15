@@ -26,30 +26,19 @@ use ratatui::widgets::{Cell, Row};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use throbber_widgets_tui::BRAILLE_EIGHT;
 
-pub(crate) fn build_rows(
+pub(crate) fn collect_tree_rows(
     tree: &FileTree,
-    selection: Option<usize>,
-    theme: Theme,
-    size_mode: SizeDisplayMode,
     filter_query: &str,
     filter_active: bool,
     options: DisplayOptions,
-) -> Vec<Row<'static>> {
+) -> Vec<TreeRow> {
     let mut rows = Vec::new();
     traverse(tree, tree.root(), 0, &mut rows, options);
     if filter_active && !filter_query.is_empty() {
         let filter = filter_query.to_lowercase();
         rows.retain(|row| row.name.to_lowercase().contains(&filter));
     }
-    let max_size = rows
-        .iter()
-        .map(|row| chosen_size(row, size_mode, options))
-        .max()
-        .unwrap_or(1);
-
-    rows.into_iter()
-        .map(|row| build_row(row, selection, theme, size_mode, max_size, options))
-        .collect()
+    rows
 }
 
 fn traverse(
@@ -83,8 +72,8 @@ fn traverse(
     }
 }
 
-fn build_row(
-    row: TreeRow,
+pub(crate) fn build_row(
+    row: &TreeRow,
     selection: Option<usize>,
     theme: Theme,
     size_mode: SizeDisplayMode,
@@ -139,7 +128,7 @@ fn build_row(
     Row::new(cells).style(style)
 }
 
-fn chosen_size(row: &TreeRow, mode: SizeDisplayMode, options: DisplayOptions) -> u64 {
+pub(crate) fn chosen_size(row: &TreeRow, mode: SizeDisplayMode, options: DisplayOptions) -> u64 {
     if options.prefer_disk {
         row.disk_size
     } else {
@@ -436,7 +425,7 @@ pub(crate) fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
         .split(popup_layout[1])[1]
 }
 
-struct TreeRow {
+pub(crate) struct TreeRow {
     id: usize,
     depth: usize,
     name: String,
@@ -445,6 +434,12 @@ struct TreeRow {
     kind: NodeType,
     child_count: usize,
     modified: Option<SystemTime>,
+}
+
+impl TreeRow {
+    pub fn id(&self) -> usize {
+        self.id
+    }
 }
 
 #[cfg(test)]

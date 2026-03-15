@@ -41,7 +41,7 @@ impl Ui {
         &mut self,
         frame: &mut Frame<'_>,
         layout: LayoutRegions,
-        state: &AppState,
+        state: &mut AppState,
         theme: Theme,
     ) {
         self.draw_header(frame, layout.header, state, theme);
@@ -86,17 +86,65 @@ impl Ui {
         frame.render_widget(header, area);
     }
 
-    fn draw_tree(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
-        let rows = build_rows(
+    fn draw_tree(&self, frame: &mut Frame<'_>, area: Rect, state: &mut AppState, theme: Theme) {
+        let tree_rows = collect_tree_rows(
             &state.tree,
-            state.selection,
-            theme,
-            state.size_mode,
             &state.filter_query,
             state.filter_active,
             state.display_options,
         );
-        let table = Table::new(rows)
+        let max_size = tree_rows
+            .iter()
+            .map(|row| chosen_size(row, state.size_mode, state.display_options))
+            .max()
+            .unwrap_or(1);
+
+        let visible_height = area.height.saturating_sub(2) as usize;
+        if tree_rows.is_empty() {
+            state.set_scroll_offset(0);
+        }
+
+        let mut offset = state.scroll_offset;
+        if !tree_rows.is_empty() && visible_height > 0 {
+            let selected_index = tree_rows
+                .iter()
+                .position(|row| Some(row.id()) == state.selection)
+                .unwrap_or(0);
+            if selected_index < offset {
+                offset = selected_index;
+            } else if selected_index >= offset + visible_height {
+                offset = selected_index + 1 - visible_height;
+            }
+            let max_offset = tree_rows.len().saturating_sub(visible_height);
+            if offset > max_offset {
+                offset = max_offset;
+            }
+        } else {
+            offset = 0;
+        }
+        state.set_scroll_offset(offset);
+
+        let table_rows = if visible_height == 0 {
+            Vec::new()
+        } else {
+            tree_rows
+                .iter()
+                .skip(offset)
+                .take(visible_height)
+                .map(|row| {
+                    build_row(
+                        row,
+                        state.selection,
+                        theme,
+                        state.size_mode,
+                        max_size,
+                        state.display_options,
+                    )
+                })
+                .collect()
+        };
+
+        let table = Table::new(table_rows)
             .block(Block::default().borders(Borders::ALL).title("filesystem"))
             .widths(&[
                 Constraint::Percentage(55),
