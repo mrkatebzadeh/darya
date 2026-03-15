@@ -272,6 +272,56 @@ fn format_node_metadata(node: &TreeNode) -> Option<String> {
     None
 }
 
+pub(crate) fn detail_panel_lines(state: &AppState) -> Vec<String> {
+    let empty = || {
+        vec![
+            detail_line("•", "path", ""),
+            detail_line("•", "type", ""),
+            detail_line("•", "apparent", ""),
+            detail_line("•", "disk", ""),
+            detail_line("•", "items", ""),
+        ]
+    };
+
+    let Some(selected) = state.selection else {
+        return empty();
+    };
+
+    let Some(node) = state.tree.node(selected) else {
+        return empty();
+    };
+
+    let apparent = format_size_custom(node.size, state.display_options.use_si);
+    let disk = format_size_custom(node.disk_size, state.display_options.use_si);
+    let ratio = if node.size == 0 {
+        0.0
+    } else {
+        (node.disk_size as f64 / node.size as f64) * 100.0
+    };
+    let kind_label = match node.file_type {
+        NodeType::Directory => "directory",
+        NodeType::File => "file",
+        NodeType::Symlink => "symlink",
+        NodeType::Other => "other",
+    };
+
+    vec![
+        detail_line("📂", "path", &node.path.display().to_string()),
+        detail_line("⬤", "type", kind_label),
+        detail_line("⚖", "apparent", &apparent),
+        detail_line("💾", "disk", &format!("{disk} ({ratio:.1}%)")),
+        if node.file_type == NodeType::Directory {
+            detail_line("📦", "items", &node.children.len().to_string())
+        } else {
+            detail_line("📦", "items", "")
+        },
+    ]
+}
+
+fn detail_line(glyph: &str, key: &str, value: &str) -> String {
+    format!("{glyph}\t{key}:\t{value}")
+}
+
 pub(crate) fn sort_mode_label(mode: SortMode) -> &'static str {
     match mode {
         SortMode::SizeDesc => "size_desc",
