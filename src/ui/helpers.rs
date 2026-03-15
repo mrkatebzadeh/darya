@@ -20,8 +20,9 @@ use crate::theme::Theme;
 use crate::tree::{FileTree, NodeType, TreeNode};
 use crate::treemap::{TreemapNode, TreemapTile, squarified_treemap};
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::Color;
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::terminal::Frame;
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Cell, Row};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use throbber_widgets_tui::BRAILLE_EIGHT;
@@ -270,6 +271,94 @@ fn format_node_metadata(node: &TreeNode) -> Option<String> {
     }
 
     None
+}
+
+pub(crate) fn detail_panel_lines(state: &AppState, theme: Theme) -> Vec<Line<'_>> {
+    let Some(selected) = state.selection else {
+        return vec![Line::from(Span::styled(
+            "details: no selection",
+            Style::default()
+                .fg(theme.file)
+                .add_modifier(Modifier::ITALIC),
+        ))];
+    };
+
+    let Some(node) = state.tree.node(selected) else {
+        return vec![Line::from(Span::styled(
+            "details: no node",
+            Style::default()
+                .fg(theme.file)
+                .add_modifier(Modifier::ITALIC),
+        ))];
+    };
+
+    let apparent = format_size_custom(node.size, state.display_options.use_si);
+    let disk = format_size_custom(node.disk_size, state.display_options.use_si);
+    let ratio = if node.size == 0 {
+        0.0
+    } else {
+        (node.disk_size as f64 / node.size as f64) * 100.0
+    };
+    let kind_color = match node.file_type {
+        NodeType::Directory => theme.directory,
+        NodeType::File => theme.file,
+        NodeType::Symlink => theme.selection,
+        NodeType::Other => theme.bar,
+    };
+    let kind_label = match node.file_type {
+        NodeType::Directory => "directory",
+        NodeType::File => "file",
+        NodeType::Symlink => "symlink",
+        NodeType::Other => "other",
+    };
+
+    let mut lines = vec![
+        Line::from(vec![
+            Span::styled("📂 path: ", Style::default().fg(theme.directory)),
+            Span::styled(
+                node.path.display().to_string(),
+                Style::default()
+                    .fg(theme.foreground)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("⬤ type: ", Style::default().fg(theme.selection)),
+            Span::styled(
+                kind_label,
+                Style::default().fg(kind_color).add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("⚖️ apparent: ", Style::default().fg(theme.bar)),
+            Span::styled(apparent, Style::default().fg(theme.foreground)),
+        ]),
+        Line::from(vec![
+            Span::styled("💾 disk: ", Style::default().fg(theme.directory)),
+            Span::styled(
+                disk,
+                Style::default()
+                    .fg(theme.selection)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                format!(" ({ratio:.1}%)"),
+                Style::default().fg(theme.file).add_modifier(Modifier::DIM),
+            ),
+        ]),
+    ];
+
+    if node.file_type == NodeType::Directory {
+        lines.push(Line::from(vec![
+            Span::styled("📦 items: ", Style::default().fg(theme.selection)),
+            Span::styled(
+                node.children.len().to_string(),
+                Style::default().fg(theme.bar).add_modifier(Modifier::BOLD),
+            ),
+        ]));
+    }
+
+    lines
 }
 
 pub(crate) fn sort_mode_label(mode: SortMode) -> &'static str {

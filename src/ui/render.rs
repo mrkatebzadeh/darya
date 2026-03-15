@@ -37,7 +37,7 @@ impl Ui {
         self.draw_header(frame, layout.header, state, theme);
         self.draw_tree(frame, layout.tree, state, theme);
         self.draw_treemap(frame, layout.treemap, state, theme);
-        self.draw_details(frame, layout.details, theme);
+        self.draw_details(frame, layout.details, state, theme);
         self.draw_footer(frame, layout.footer, state, theme);
         if state.show_help {
             self.draw_help_modal(frame, state, theme);
@@ -187,9 +187,10 @@ impl Ui {
         fill_rect(frame, tile.rect, color, theme.background);
     }
 
-    fn draw_details(&self, frame: &mut Frame<'_>, area: Rect, theme: Theme) {
-        let panel = Paragraph::new("Details")
-            .alignment(Alignment::Center)
+    fn draw_details(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
+        let detail_lines = detail_panel_lines(state, theme);
+        let content: Vec<Line> = detail_lines.into_iter().map(Line::from).collect();
+        let panel = Paragraph::new(content)
             .block(Block::default().borders(Borders::ALL).title("Details"))
             .style(Style::default().fg(theme.foreground).bg(theme.background));
 
