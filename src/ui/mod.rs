@@ -13,10 +13,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+pub mod components;
 pub mod display;
 pub mod layout;
 pub mod theme;
 pub mod treemap;
+pub mod view_model;
 
 mod helpers;
 mod render;

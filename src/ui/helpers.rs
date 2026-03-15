@@ -181,7 +181,7 @@ fn percent_bar(percent: f64, width: usize) -> String {
     format!("{}{}", "█".repeat(filled), "-".repeat(empty))
 }
 
-fn trim_to_width(value: &str, width: usize) -> String {
+pub(crate) fn trim_to_width(value: &str, width: usize) -> String {
     if width == 0 {
         return String::new();
     }

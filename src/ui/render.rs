@@ -16,7 +16,12 @@
 use crate::state::{AppState, ScanState};
 use crate::theme::Theme;
 use crate::treemap::{TreemapLayout, TreemapNode, TreemapTile, contextual_treemap_layout};
-use crate::ui::{helpers::*, layout::LayoutRegions};
+use crate::ui::{
+    components,
+    helpers::*,
+    layout::LayoutRegions,
+    view_model::{ActivityViewModel, DetailViewModel},
+};
 use ratatui::layout::{Alignment, Constraint, Rect};
 use ratatui::style::Style;
 use ratatui::terminal::Frame;
@@ -40,8 +45,10 @@ impl Ui {
         self.draw_header(frame, layout.header, state, theme);
         self.draw_tree(frame, layout.tree, state, theme);
         self.draw_treemap(frame, layout.treemap, state, theme);
-        self.draw_details(frame, layout.details, state, theme);
-        self.draw_activity(frame, layout.activity, state, theme);
+        let detail_vm = DetailViewModel::build(state);
+        components::draw_detail_panel(frame, layout.details, &detail_vm, theme);
+        let activity_vm = ActivityViewModel::build(state);
+        components::draw_activity_panel(frame, layout.activity, &activity_vm, theme);
         self.draw_footer(frame, layout.footer, state, theme);
         if state.show_help {
             self.draw_help_modal(frame, state, theme);
@@ -232,63 +239,6 @@ impl Ui {
         }
     }
 
-    fn draw_activity(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
-        frame.render_widget(Clear, area);
-        let block = Block::default().borders(Borders::ALL).title("Activity");
-        let inner = block.inner(area);
-        frame.render_widget(block, area);
-
-        if inner.width == 0 || inner.height == 0 {
-            return;
-        }
-
-        let activity = state.scan_activity_snapshot();
-        let path_value = activity
-            .current_path
-            .as_deref()
-            .map(|p| p.display().to_string())
-            .unwrap_or_else(|| "idle".into());
-        let metrics = [
-            ("Path", path_value),
-            ("Queued dirs", activity.queued_directories.to_string()),
-            ("Permission denied", activity.permission_denied.to_string()),
-            ("Skipped mounts", activity.skipped_mounts.to_string()),
-            ("Skipped symlinks", activity.skipped_symlinks.to_string()),
-            ("Files processed", activity.files_processed.to_string()),
-        ];
-
-        let label_width = 17_u16;
-        let value_width = inner.width.saturating_sub(label_width + 1) as usize;
-        let mut lines = Vec::new();
-        for (label, value) in metrics {
-            if lines.len() as u16 >= inner.height {
-                break;
-            }
-            let trimmed_value = if value_width > 0 {
-                trim_to_width(&value, value_width)
-            } else {
-                String::new()
-            };
-            let line = Line::from(vec![
-                Span::styled(
-                    format!(
-                        "{label:<width$}",
-                        label = label,
-                        width = label_width as usize
-                    ),
-                    Style::default().fg(theme.directory),
-                ),
-                Span::raw(" "),
-                Span::styled(trimmed_value, Style::default().fg(theme.foreground)),
-            ]);
-            lines.push(line);
-        }
-
-        let paragraph =
-            Paragraph::new(lines).style(Style::default().fg(theme.foreground).bg(theme.background));
-        frame.render_widget(paragraph, inner);
-    }
-
     fn draw_treemap(&mut self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
         let panel = Block::default().borders(Borders::ALL).title("Treemap");
         let inner = panel.inner(area);
@@ -328,56 +278,6 @@ impl Ui {
             .and_then(|selection| layout.node_rects.get(&selection).copied())
         {
             fill_rect(frame, selection_rect, theme.selection, theme.background);
-        }
-    }
-
-    fn draw_details(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
-        frame.render_widget(Clear, area);
-        let block = Block::default().borders(Borders::ALL).title("Details");
-        let inner = block.inner(area);
-        frame.render_widget(block, area);
-
-        if inner.width == 0 || inner.height == 0 {
-            return;
-        }
-
-        frame.render_widget(Clear, inner);
-        let lines = detail_panel_lines(state);
-
-        let glyph_col_width: u16 = 3;
-        let key_col_width: u16 = 13;
-        let value_start = glyph_col_width.saturating_add(key_col_width);
-        if inner.width <= value_start {
-            return;
-        }
-        let value_col_width = inner.width - value_start;
-
-        let buf = frame.buffer_mut();
-        for (idx, raw_line) in lines.iter().take(inner.height as usize).enumerate() {
-            let y = inner.y + idx as u16;
-            let (glyph, key, value) = split_detail_line(raw_line);
-
-            buf.set_stringn(
-                inner.x,
-                y,
-                glyph,
-                glyph_col_width as usize,
-                Style::default().fg(theme.selection),
-            );
-            buf.set_stringn(
-                inner.x + glyph_col_width,
-                y,
-                key,
-                key_col_width as usize,
-                Style::default().fg(theme.directory),
-            );
-            buf.set_stringn(
-                inner.x + value_start,
-                y,
-                value,
-                value_col_width as usize,
-                Style::default().fg(theme.foreground),
-            );
         }
     }
 
@@ -426,25 +326,6 @@ impl Ui {
 
         frame.render_widget(Clear, area);
         frame.render_widget(popup, area);
-    }
-}
-
-fn split_detail_line(line: &str) -> (&str, &str, &str) {
-    let mut parts = line.splitn(3, '\t');
-    let glyph = parts.next().unwrap_or("");
-    let key = parts.next().unwrap_or("");
-    let value = parts.next().unwrap_or("");
-    (glyph, key, value)
-}
-
-fn trim_to_width(value: &str, width: usize) -> String {
-    if width == 0 {
-        return String::new();
-    }
-    if value.len() <= width {
-        value.to_string()
-    } else {
-        value.chars().take(width).collect()
     }
 }
 
