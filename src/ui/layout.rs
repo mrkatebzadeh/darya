@@ -22,6 +22,7 @@ pub struct LayoutRegions {
     pub tree: Rect,
     pub treemap: Rect,
     pub details: Rect,
+    pub activity: Rect,
     pub footer: Rect,
 }
 
@@ -46,11 +47,17 @@ pub fn split_layout(area: Rect) -> LayoutRegions {
         .constraints([Constraint::Percentage(75), Constraint::Percentage(25)])
         .split(center[0]);
 
+    let bottom = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(center[1]);
+
     LayoutRegions {
         header: vertical[0],
         tree: main_row[0],
         treemap: main_row[1],
-        details: center[1],
+        details: bottom[0],
+        activity: bottom[1],
         footer: vertical[2],
     }
 }
@@ -68,8 +75,10 @@ mod tests {
         assert_eq!(regions.tree.height, 14);
         assert_eq!(regions.tree.width, 60);
         assert_eq!(regions.treemap.width, 20);
-        assert_eq!(regions.details.width, 80);
+        assert_eq!(regions.details.width, 40);
+        assert_eq!(regions.activity.width, 40);
         assert_eq!(regions.details.height, 4);
+        assert_eq!(regions.activity.height, 4);
         assert_eq!(regions.tree.y, regions.header.height);
         assert_eq!(regions.footer.y, area.height - regions.footer.height);
     }

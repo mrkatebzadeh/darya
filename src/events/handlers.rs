@@ -402,6 +402,9 @@ pub fn process_scan_event(state: &mut AppState, event: ScanEvent) {
             }
             state.update_status(format!("scanned {}", normalized.display()));
         }
+        ScanEvent::Activity(activity) => {
+            state.scan_activity = activity;
+        }
         ScanEvent::Progress(progress) => {
             state.mark_scan_progress(progress.clone());
             state.update_status(format!(

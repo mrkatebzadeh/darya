@@ -16,7 +16,7 @@
 use crate::{
     config::SortMode,
     display::DisplayOptions,
-    fs_scan::ScanProgress,
+    fs_scan::{ScanActivity, ScanProgress},
     snapshot::ExportOptions,
     tree::{FileTree, NodeId, NodeType},
     treemap::TreemapNode,
@@ -46,6 +46,7 @@ pub struct AppState {
     pub selection: Option<NodeId>,
     pub scroll_offset: usize,
     pub scan_state: ScanState,
+    pub scan_activity: ScanActivity,
     pub status_message: Option<String>,
     pub spinner_phase: usize,
     pub pending_delete: Option<NodeId>,
@@ -70,6 +71,7 @@ impl AppState {
             selection: None,
             scroll_offset: 0,
             scan_state: ScanState::Idle,
+            scan_activity: ScanActivity::default(),
             status_message: None,
             spinner_phase: 0,
             pending_delete: None,
@@ -153,6 +155,10 @@ impl AppState {
         self.filter_prompt_active = false;
         self.filter_query.clear();
         self.filter_active = false;
+    }
+
+    pub fn scan_activity_snapshot(&self) -> ScanActivity {
+        self.scan_activity.clone()
     }
 
     pub fn refresh_treemap_nodes(&mut self) {
