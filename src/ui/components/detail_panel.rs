@@ -17,7 +17,7 @@ use crate::theme::Theme;
 use crate::ui::helpers::trim_to_width;
 use crate::ui::view_model::DetailViewModel;
 use ratatui::layout::Rect;
-use ratatui::style::Style;
+use ratatui::style::{Color, Style};
 use ratatui::terminal::Frame;
 use ratatui::widgets::{Block, Borders, Clear};
 
@@ -28,7 +28,10 @@ pub fn draw_detail_panel(
     theme: Theme,
 ) {
     frame.render_widget(Clear, area);
-    let block = Block::default().borders(Borders::ALL).title("Details");
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title("Details")
+        .style(Style::default().bg(Color::Reset));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 

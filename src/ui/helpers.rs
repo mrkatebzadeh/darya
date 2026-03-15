@@ -98,13 +98,9 @@ pub(crate) fn build_row(
     };
 
     let style = if Some(row.id) == selection {
-        ratatui::style::Style::default()
-            .bg(theme.selection)
-            .fg(theme.background)
+        Style::default().bg(theme.selection).fg(theme.background)
     } else {
-        ratatui::style::Style::default()
-            .bg(theme.background)
-            .fg(theme.foreground)
+        Style::default().bg(Color::Reset).fg(theme.foreground)
     };
 
     let size_value = chosen_size(row, size_mode, _options);

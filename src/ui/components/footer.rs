@@ -18,7 +18,7 @@ use crate::state::ScanState;
 use crate::theme::Theme;
 use crate::ui::helpers::{spinner_symbol, trim_to_width};
 use ratatui::layout::Rect;
-use ratatui::style::Style;
+use ratatui::style::{Color, Style};
 use ratatui::terminal::Frame;
 use ratatui::widgets::Paragraph;
 
@@ -43,7 +43,7 @@ pub fn draw_footer_panel(frame: &mut Frame<'_>, area: Rect, state: &AppState, th
     };
 
     frame.render_widget(
-        Paragraph::new(" ").style(Style::default().bg(theme.background)),
+        Paragraph::new(" ").style(Style::default().bg(Color::Reset)),
         area,
     );
     if area.height == 0 {
@@ -67,7 +67,7 @@ pub fn draw_footer_panel(frame: &mut Frame<'_>, area: Rect, state: &AppState, th
             area.y,
             &status_trimmed,
             status_width as usize,
-            Style::default().fg(theme.foreground).bg(theme.background),
+            Style::default().fg(theme.foreground).bg(Color::Reset),
         );
     }
 
@@ -78,7 +78,7 @@ pub fn draw_footer_panel(frame: &mut Frame<'_>, area: Rect, state: &AppState, th
             area.y,
             hint,
             hint_width as usize,
-            Style::default().fg(theme.directory).bg(theme.background),
+            Style::default().fg(theme.directory).bg(Color::Reset),
         );
     }
 }

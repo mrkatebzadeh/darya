@@ -17,7 +17,7 @@ use crate::theme::Theme;
 use crate::ui::helpers::trim_to_width;
 use crate::ui::view_model::ActivityViewModel;
 use ratatui::layout::Rect;
-use ratatui::style::Style;
+use ratatui::style::{Color, Style};
 use ratatui::terminal::Frame;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
@@ -29,7 +29,10 @@ pub fn draw_activity_panel(
     theme: Theme,
 ) {
     frame.render_widget(Clear, area);
-    let block = Block::default().borders(Borders::ALL).title("Activity");
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title("Activity")
+        .style(Style::default().bg(Color::Reset));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -62,6 +65,6 @@ pub fn draw_activity_panel(
     }
 
     let paragraph =
-        Paragraph::new(lines).style(Style::default().fg(theme.foreground).bg(theme.background));
+        Paragraph::new(lines).style(Style::default().fg(theme.foreground).bg(Color::Reset));
     frame.render_widget(paragraph, inner);
 }

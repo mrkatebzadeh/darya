@@ -16,7 +16,7 @@
 use crate::theme::Theme;
 use crate::ui::view_model::FilesystemViewModel;
 use ratatui::layout::{Constraint, Rect};
-use ratatui::style::Style;
+use ratatui::style::{Color, Style};
 use ratatui::terminal::Frame;
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Table};
@@ -59,7 +59,7 @@ pub fn draw_filesystem_panel(
         let display_line = Line::from(view_model.filter_prompt.unwrap_or_else(|| " ".into()));
         let filter_box = Paragraph::new(display_line)
             .block(Block::default().title("Filter").borders(Borders::ALL))
-            .style(Style::default().fg(theme.foreground).bg(theme.background));
+            .style(Style::default().fg(theme.foreground).bg(Color::Reset));
         frame.render_widget(filter_box, filter_area);
     }
 }

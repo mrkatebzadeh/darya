@@ -18,7 +18,7 @@ use crate::theme::Theme;
 use crate::treemap::{TreemapLayout, TreemapNode, contextual_treemap_layout};
 use crate::ui::helpers::{draw_treemap_tile, fill_rect, gather_child_nodes, selection_path};
 use ratatui::layout::{Alignment, Rect};
-use ratatui::style::Style;
+use ratatui::style::{Color, Style};
 use ratatui::terminal::Frame;
 use ratatui::widgets::{Block, Borders, Paragraph};
 
@@ -29,7 +29,10 @@ pub fn draw_treemap_panel(
     theme: Theme,
     cache: &mut TreemapLayoutCache,
 ) {
-    let panel_block = Block::default().borders(Borders::ALL).title("Treemap");
+    let panel_block = Block::default()
+        .borders(Borders::ALL)
+        .title("Treemap")
+        .style(Style::default().bg(Color::Reset));
     let inner = panel_block.inner(area);
     frame.render_widget(panel_block, area);
 
@@ -52,7 +55,7 @@ pub fn draw_treemap_panel(
         frame.render_widget(
             Paragraph::new("No sized children")
                 .alignment(Alignment::Center)
-                .style(Style::default().fg(theme.foreground).bg(theme.background)),
+                .style(Style::default().fg(theme.foreground).bg(Color::Reset)),
             inner,
         );
         return;

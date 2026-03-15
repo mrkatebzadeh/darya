@@ -22,7 +22,7 @@ use crate::ui::{
     view_model::{ActivityViewModel, DetailViewModel, FilesystemViewModel},
 };
 use ratatui::layout::Rect;
-use ratatui::style::Style;
+use ratatui::style::{Color, Style};
 use ratatui::terminal::Frame;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
@@ -74,7 +74,7 @@ impl Ui {
             Span::raw(format!(" | sort:{} ", sort_mode_label(state.sort_mode))),
         ]))
         .block(Block::default().borders(Borders::ALL))
-        .style(Style::default().bg(theme.background));
+        .style(Style::default().bg(Color::Reset));
 
         frame.render_widget(header, area);
     }
@@ -120,7 +120,7 @@ impl Ui {
 
         let popup = Paragraph::new(lines)
             .block(Block::default().title("Help").borders(Borders::ALL))
-            .style(Style::default().fg(theme.foreground).bg(theme.background));
+            .style(Style::default().fg(theme.foreground).bg(Color::Reset));
 
         frame.render_widget(Clear, area);
         frame.render_widget(popup, area);
