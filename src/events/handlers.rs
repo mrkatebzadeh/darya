@@ -98,11 +98,6 @@ pub(crate) fn handle_input_action(
                     scanned: 0,
                     errors: 0,
                 });
-                if let Some(root_node) = state.tree.node(state.tree.root()) {
-                    state.update_status(format!("scanning {}", root_node.path.display()));
-                } else {
-                    state.update_status("scanning");
-                }
             }
         }
         _ => {}
