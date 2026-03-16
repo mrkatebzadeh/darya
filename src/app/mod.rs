@@ -81,6 +81,7 @@ pub fn run(cli_args: CliArgs, config_load: ConfigLoad) -> Result<()> {
         same_file_system,
         skip_caches,
         skip_kernfs,
+        collect_metadata: cli_args.extended,
     };
 
     let theme = config.theme.to_theme();

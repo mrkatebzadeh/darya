@@ -96,6 +96,7 @@ pub struct ScanOptions {
     pub same_file_system: bool,
     pub skip_caches: bool,
     pub skip_kernfs: bool,
+    pub collect_metadata: bool,
 }
 
 /// Control handle for the background scanner.
@@ -236,14 +237,22 @@ fn run_scan(
                             disk_size = 0;
                         }
 
+                        let modified = if options.collect_metadata {
+                            metadata.modified().ok()
+                        } else {
+                            None
+                        };
+
                         #[cfg(unix)]
-                        let (permissions, uid, gid) = {
+                        let (permissions, uid, gid) = if options.collect_metadata {
                             use std::os::unix::fs::{MetadataExt, PermissionsExt};
                             (
                                 Some(metadata.permissions().mode()),
                                 Some(metadata.uid()),
                                 Some(metadata.gid()),
                             )
+                        } else {
+                            (None, None, None)
                         };
                         #[cfg(not(unix))]
                         let (permissions, uid, gid) = (None, None, None);
@@ -261,7 +270,7 @@ fn run_scan(
                             kind,
                             size,
                             disk_size,
-                            modified: metadata.modified().ok(),
+                            modified,
                             permissions,
                             uid,
                             gid,
@@ -447,6 +456,7 @@ mod tests {
             same_file_system: false,
             skip_caches: false,
             skip_kernfs: false,
+            collect_metadata: false,
         };
         let (_handle, mut rx) = start_scan(base.clone(), options, Vec::new());
         let mut nodes = 0;
