@@ -17,7 +17,7 @@ use crate::config::SortMode;
 use crate::fs_scan::{ScanEvent, ScanNode, ScanProgress};
 use crate::input::InputAction;
 use crate::scan_control::{ScanTrigger, ScanTriggerSender};
-use crate::size::{normalize_path, total_size};
+use crate::size::total_size;
 use crate::snapshot::{self, SnapshotEndpoint, SnapshotFormat};
 use crate::state::{AppState, ScanState};
 use crate::tree::{NodeMetadata, NodeType};
@@ -120,8 +120,11 @@ fn next_sort_mode(current: SortMode) -> SortMode {
 }
 
 fn insert_scan_node(state: &mut AppState, node: &ScanNode) -> Option<(PathBuf, Option<usize>)> {
-    let normalized = normalize_path(&node.path);
-    let node_id = state.tree.ensure_node(normalized.clone(), node.kind);
+    // Keep scanner paths stable as emitted by walkdir.
+    // Canonicalizing each node can split parent/child chains when some entries
+    // cannot be canonicalized (permissions/symlinks), which breaks aggregation.
+    let path = node.path.clone();
+    let node_id = state.tree.ensure_node(path.clone(), node.kind);
     if node.kind == NodeType::File {
         state.tree.add_size(node_id, node.size);
         state.tree.add_disk_size(node_id, node.disk_size);
@@ -138,7 +141,7 @@ fn insert_scan_node(state: &mut AppState, node: &ScanNode) -> Option<(PathBuf, O
         );
     }
     let parent = state.tree.node(node_id).and_then(|node| node.parent);
-    Some((normalized, parent))
+    Some((path, parent))
 }
 
 fn sort_mode_label(mode: SortMode) -> &'static str {
