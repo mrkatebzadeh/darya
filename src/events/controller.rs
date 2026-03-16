@@ -431,6 +431,7 @@ pub fn process_scan_event(state: &mut AppState, event: ScanEvent) {
             if let Some(activity) = batch.activity {
                 state.scan_activity = activity;
             }
+            state.tree.recompute_sizes();
             state.refresh_treemap_nodes();
         }
         ScanEvent::Node(node) => {
