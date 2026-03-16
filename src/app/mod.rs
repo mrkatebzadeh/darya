@@ -86,12 +86,9 @@ pub fn run(cli_args: CliArgs, config_load: ConfigLoad) -> Result<()> {
 
     let theme = config.theme.to_theme();
     let thread_count = cli_args.thread_count.or(config.scan.thread_count);
+    let worker_threads = thread_count.filter(|t| *t > 0).unwrap_or(1);
     let mut builder = Builder::new_multi_thread();
-    if let Some(threads) = thread_count
-        && threads > 0
-    {
-        builder.worker_threads(threads);
-    }
+    builder.worker_threads(worker_threads);
     let export_options = export_options_from_cli(&cli_args);
     let runtime = builder.enable_all().build()?;
     runtime.block_on(async move {
