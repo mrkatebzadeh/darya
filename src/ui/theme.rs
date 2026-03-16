@@ -54,7 +54,7 @@ impl Default for Theme {
         Self {
             background: Color::Rgb(30, 30, 46),    // frappe base
             foreground: Color::Rgb(198, 208, 245), // text
-            selection: Color::Rgb(116, 199, 236),  // overlay
+            selection: Color::Rgb(250, 179, 135),  // peach
             directory: Color::Rgb(180, 184, 254),  // lavender
             file: Color::Rgb(198, 208, 245),
             bar: Color::Rgb(137, 180, 250), // sky
