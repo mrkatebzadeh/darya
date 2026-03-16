@@ -119,7 +119,7 @@ fn next_sort_mode(current: SortMode) -> SortMode {
     }
 }
 
-fn insert_scan_node(state: &mut AppState, node: &ScanNode) -> Option<PathBuf> {
+fn insert_scan_node(state: &mut AppState, node: &ScanNode) -> Option<(PathBuf, Option<usize>)> {
     let normalized = normalize_path(&node.path);
     let node_id = state.tree.ensure_node(normalized.clone(), node.kind);
     if node.kind == NodeType::File {
@@ -137,10 +137,8 @@ fn insert_scan_node(state: &mut AppState, node: &ScanNode) -> Option<PathBuf> {
             },
         );
     }
-    if let Some(parent) = state.tree.node(node_id).and_then(|node| node.parent) {
-        state.tree.sort_children(parent, state.sort_mode);
-    }
-    Some(normalized)
+    let parent = state.tree.node(node_id).and_then(|node| node.parent);
+    Some((normalized, parent))
 }
 
 fn sort_mode_label(mode: SortMode) -> &'static str {
@@ -406,8 +404,19 @@ pub fn process_scan_event(state: &mut AppState, event: ScanEvent) {
     match event {
         ScanEvent::Batch(batch) => {
             let mut last_path = None;
+            let mut parents = Vec::new();
             for node in batch.nodes {
-                last_path = insert_scan_node(state, &node);
+                if let Some((path, parent)) = insert_scan_node(state, &node) {
+                    last_path = Some(path);
+                    if let Some(parent_id) = parent {
+                        parents.push(parent_id);
+                    }
+                }
+            }
+            parents.sort_unstable();
+            parents.dedup();
+            for parent in parents {
+                state.tree.sort_children(parent, state.sort_mode);
             }
             if let Some(path) = last_path {
                 state.update_status(format!("scanned {}", path.display()));
@@ -425,7 +434,10 @@ pub fn process_scan_event(state: &mut AppState, event: ScanEvent) {
             state.refresh_treemap_nodes();
         }
         ScanEvent::Node(node) => {
-            if let Some(path) = insert_scan_node(state, &node) {
+            if let Some((path, parent)) = insert_scan_node(state, &node) {
+                if let Some(parent_id) = parent {
+                    state.tree.sort_children(parent_id, state.sort_mode);
+                }
                 state.update_status(format!("scanned {}", path.display()));
             }
         }
