@@ -432,6 +432,10 @@ pub fn process_scan_event(state: &mut AppState, event: ScanEvent) {
                 state.scan_activity = activity;
             }
             state.tree.recompute_sizes();
+            debug_assert!(
+                state.tree.verify_size_invariants(),
+                "tree size invariant violated after batch processing"
+            );
             state.refresh_treemap_nodes();
         }
         ScanEvent::Node(node) => {
@@ -459,6 +463,10 @@ pub fn process_scan_event(state: &mut AppState, event: ScanEvent) {
             state.mark_scan_complete();
             state.update_status("scan complete");
             state.tree.recompute_sizes();
+            debug_assert!(
+                state.tree.verify_size_invariants(),
+                "tree size invariant violated at scan completion"
+            );
         }
     }
 

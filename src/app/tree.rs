@@ -179,6 +179,33 @@ impl FileTree {
                 node.disk_size = total_disk;
             }
         }
+
+        debug_assert!(
+            self.verify_size_invariants(),
+            "tree size invariant violated after recompute_sizes"
+        );
+    }
+
+    pub fn verify_size_invariants(&self) -> bool {
+        for node in &self.nodes {
+            if node.children.is_empty() {
+                continue;
+            }
+            let mut sum_size = 0u64;
+            let mut sum_disk = 0u64;
+            for &child_id in &node.children {
+                if let Some(child) = self.nodes.get(child_id) {
+                    sum_size = sum_size.saturating_add(child.size);
+                    sum_disk = sum_disk.saturating_add(child.disk_size);
+                } else {
+                    return false;
+                }
+            }
+            if node.size != sum_size || node.disk_size != sum_disk {
+                return false;
+            }
+        }
+        true
     }
 
     pub fn node_id_for_path(&self, path: &Path) -> Option<NodeId> {
@@ -405,5 +432,31 @@ mod tests {
 
         assert_eq!(tree.node(dir).unwrap().size, 5);
         assert_eq!(tree.node(0).unwrap().size, 5);
+        assert!(tree.verify_size_invariants());
+    }
+
+    #[test]
+    fn verify_size_invariants_detects_mismatch() {
+        let mut tree = FileTree::new(PathBuf::from("/tmp"));
+        let dir = tree.add_child(
+            0,
+            TreeNode::new(PathBuf::from("/tmp/dir"), NodeType::Directory),
+        );
+        let file = tree.add_child(
+            dir,
+            TreeNode::new(PathBuf::from("/tmp/dir/a"), NodeType::File),
+        );
+        if let Some(node) = tree.node_mut(file) {
+            node.size = 10;
+            node.disk_size = 10;
+        }
+        if let Some(node) = tree.node_mut(dir) {
+            node.size = 3;
+            node.disk_size = 3;
+        }
+
+        assert!(!tree.verify_size_invariants());
+        tree.recompute_sizes();
+        assert!(tree.verify_size_invariants());
     }
 }
