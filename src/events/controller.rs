@@ -14,7 +14,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::config::SortMode;
-use crate::fs_scan::{ScanEvent, ScanProgress};
+use crate::fs_scan::{ScanEvent, ScanNode, ScanProgress};
 use crate::input::InputAction;
 use crate::scan_control::{ScanTrigger, ScanTriggerSender};
 use crate::size::{normalize_path, total_size};
@@ -22,6 +22,7 @@ use crate::snapshot::{self, SnapshotEndpoint, SnapshotFormat};
 use crate::state::{AppState, ScanState};
 use crate::tree::{NodeMetadata, NodeType};
 use std::fs;
+use std::path::PathBuf;
 use std::process::Command;
 
 pub fn handle_input_action(
@@ -116,6 +117,30 @@ fn next_sort_mode(current: SortMode) -> SortMode {
         SortMode::Name => SortMode::ModifiedTime,
         SortMode::ModifiedTime => SortMode::SizeDesc,
     }
+}
+
+fn insert_scan_node(state: &mut AppState, node: &ScanNode) -> Option<PathBuf> {
+    let normalized = normalize_path(&node.path);
+    let node_id = state.tree.ensure_node(normalized.clone(), node.kind);
+    if node.kind == NodeType::File {
+        state.tree.add_size(node_id, node.size);
+        state.tree.add_disk_size(node_id, node.disk_size);
+    }
+    if state.extended_mode {
+        state.tree.set_node_metadata(
+            node_id,
+            NodeMetadata {
+                modified: node.modified,
+                permissions: node.permissions,
+                uid: node.uid,
+                gid: node.gid,
+            },
+        );
+    }
+    if let Some(parent) = state.tree.node(node_id).and_then(|node| node.parent) {
+        state.tree.sort_children(parent, state.sort_mode);
+    }
+    Some(normalized)
 }
 
 fn sort_mode_label(mode: SortMode) -> &'static str {
@@ -379,28 +404,30 @@ fn open_command_for_platform() -> Command {
 
 pub fn process_scan_event(state: &mut AppState, event: ScanEvent) {
     match event {
+        ScanEvent::Batch(batch) => {
+            let mut last_path = None;
+            for node in batch.nodes {
+                last_path = insert_scan_node(state, &node);
+            }
+            if let Some(path) = last_path {
+                state.update_status(format!("scanned {}", path.display()));
+            }
+            if let Some(progress) = batch.progress {
+                state.mark_scan_progress(progress.clone());
+                state.update_status(format!(
+                    "scanned {} entries, {} errors",
+                    progress.scanned, progress.errors
+                ));
+            }
+            if let Some(activity) = batch.activity {
+                state.scan_activity = activity;
+            }
+            state.refresh_treemap_nodes();
+        }
         ScanEvent::Node(node) => {
-            let normalized = normalize_path(&node.path);
-            let node_id = state.tree.ensure_node(normalized.clone(), node.kind);
-            if node.kind == NodeType::File {
-                state.tree.add_size(node_id, node.size);
-                state.tree.add_disk_size(node_id, node.disk_size);
+            if let Some(path) = insert_scan_node(state, &node) {
+                state.update_status(format!("scanned {}", path.display()));
             }
-            if state.extended_mode {
-                state.tree.set_node_metadata(
-                    node_id,
-                    NodeMetadata {
-                        modified: node.modified,
-                        permissions: node.permissions,
-                        uid: node.uid,
-                        gid: node.gid,
-                    },
-                );
-            }
-            if let Some(parent) = state.tree.node(node_id).and_then(|node| node.parent) {
-                state.tree.sort_children(parent, state.sort_mode);
-            }
-            state.update_status(format!("scanned {}", normalized.display()));
         }
         ScanEvent::Activity(activity) => {
             state.scan_activity = activity;

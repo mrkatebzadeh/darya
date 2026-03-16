@@ -30,6 +30,8 @@ use std::{
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 use walkdir::{DirEntry, Error as WalkError, WalkDir};
 
+const SCAN_BATCH_SIZE: usize = 512;
+
 /// Indicates the events emitted by the background scanner.
 #[derive(Debug)]
 pub enum ScanEvent {
@@ -38,6 +40,15 @@ pub enum ScanEvent {
     Activity(ScanActivity),
     Error(ScanError),
     Completed,
+    Batch(ScanBatch),
+}
+
+/// Aggregated payload emitted at batch granularity.
+#[derive(Debug)]
+pub struct ScanBatch {
+    pub nodes: Vec<ScanNode>,
+    pub progress: Option<ScanProgress>,
+    pub activity: Option<ScanActivity>,
 }
 
 /// Provides details about a single filesystem entry discovered by the scanner.
@@ -161,6 +172,7 @@ fn run_scan(
     let mut walker_iter = walker.into_iter();
     let mut activity = ScanActivity::default();
     let mut dir_stack: Vec<usize> = Vec::new();
+    let mut node_batch = Vec::with_capacity(SCAN_BATCH_SIZE);
 
     while let Some(entry_result) = walker_iter.next() {
         if cancel.load(Ordering::Relaxed) {
@@ -244,7 +256,7 @@ fn run_scan(
                             activity.skipped_symlinks = activity.skipped_symlinks.saturating_add(1);
                         }
 
-                        let node = ScanNode {
+                        node_batch.push(ScanNode {
                             path: entry.path().to_path_buf(),
                             kind,
                             size,
@@ -253,9 +265,10 @@ fn run_scan(
                             permissions,
                             uid,
                             gid,
-                        };
-                        let _ = tx.send(ScanEvent::Node(node));
-                        let _ = tx.send(ScanEvent::Activity(activity.clone()));
+                        });
+                        if node_batch.len() >= SCAN_BATCH_SIZE {
+                            flush_batch(&tx, &mut node_batch, &activity, scanned, errors);
+                        }
                     }
                     Err(err) => {
                         if err
@@ -267,19 +280,19 @@ fn run_scan(
                                 activity.permission_denied.saturating_add(1);
                         }
                         errors += 1;
+                        flush_batch(&tx, &mut node_batch, &activity, scanned, errors);
                         let _ = tx.send(ScanEvent::Error(ScanError {
                             path: entry.path().to_path_buf(),
                             source: err,
                         }));
-                        let _ = tx.send(ScanEvent::Activity(activity.clone()));
                     }
                 }
-                let _ = tx.send(ScanEvent::Progress(ScanProgress { scanned, errors }));
             }
             Err(err) => {
                 activity.current_path =
                     err.path().map(PathBuf::from).or_else(|| Some(root.clone()));
                 errors += 1;
+                flush_batch(&tx, &mut node_batch, &activity, scanned, errors);
                 let _ = tx.send(ScanEvent::Error(ScanError {
                     path: activity
                         .current_path
@@ -287,12 +300,11 @@ fn run_scan(
                         .unwrap_or_else(|| root.clone()),
                     source: err,
                 }));
-                let _ = tx.send(ScanEvent::Activity(activity.clone()));
-                let _ = tx.send(ScanEvent::Progress(ScanProgress { scanned, errors }));
             }
         }
     }
 
+    flush_batch(&tx, &mut node_batch, &activity, scanned, errors);
     activity.current_path = None;
     let _ = tx.send(ScanEvent::Activity(activity.clone()));
     let _ = tx.send(ScanEvent::Completed);
@@ -346,6 +358,26 @@ fn is_kernfs_entry(entry: &DirEntry) -> bool {
         .path()
         .components()
         .any(|component| eq_component(component.as_os_str(), "kernfs"))
+}
+
+fn flush_batch(
+    tx: &UnboundedSender<ScanEvent>,
+    node_batch: &mut Vec<ScanNode>,
+    activity: &ScanActivity,
+    scanned: u64,
+    errors: u64,
+) {
+    if node_batch.is_empty() {
+        return;
+    }
+    let nodes = std::mem::take(node_batch);
+    node_batch.reserve(SCAN_BATCH_SIZE);
+    let batch = ScanBatch {
+        nodes,
+        progress: Some(ScanProgress { scanned, errors }),
+        activity: Some(activity.clone()),
+    };
+    let _ = tx.send(ScanEvent::Batch(batch));
 }
 
 fn eq_component(component: &OsStr, pattern: &str) -> bool {
@@ -420,7 +452,7 @@ mod tests {
         let mut nodes = 0;
         while let Some(event) = rx.recv().await {
             match event {
-                ScanEvent::Node(_) => nodes += 1,
+                ScanEvent::Batch(batch) => nodes += batch.nodes.len(),
                 ScanEvent::Completed => break,
                 _ => {}
             }

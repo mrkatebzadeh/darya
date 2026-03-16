@@ -298,7 +298,7 @@ mod tests {
         let theme = Theme::default();
         assert_eq!(theme.background, Color::Rgb(30, 30, 46));
         assert_eq!(theme.foreground, Color::Rgb(198, 208, 245));
-        assert_eq!(theme.selection, Color::Rgb(116, 199, 236));
+        assert_eq!(theme.selection, Color::Rgb(250, 179, 135));
         assert_eq!(theme.directory, Color::Rgb(180, 184, 254));
         assert_eq!(theme.file, Color::Rgb(198, 208, 245));
         assert_eq!(theme.bar, Color::Rgb(137, 180, 250));
