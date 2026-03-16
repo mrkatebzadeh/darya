@@ -150,30 +150,33 @@ impl FileTree {
         }
     }
 
-    /// Recompute all directory sizes based on the sizes of the files under them.
+    /// Recompute all directory sizes from the currently attached children.
     pub fn recompute_sizes(&mut self) {
-        let contributions: Vec<(NodeId, u64, u64)> = self
+        for node in self
             .nodes
-            .iter()
-            .filter(|node| node.file_type == NodeType::File)
-            .map(|node| (node.id, node.size, node.disk_size))
-            .collect();
-
-        for node in self.nodes.iter_mut() {
+            .iter_mut()
+            .filter(|node| node.file_type == NodeType::Directory)
+        {
             node.size = 0;
             node.disk_size = 0;
         }
 
-        for (id, size, disk) in contributions {
-            let mut current = Some(id);
-            while let Some(node_id) = current {
-                if let Some(node) = self.nodes.get_mut(node_id) {
-                    node.size = node.size.saturating_add(size);
-                    node.disk_size = node.disk_size.saturating_add(disk);
-                    current = node.parent;
-                } else {
-                    break;
+        for id in (0..self.nodes.len()).rev() {
+            let children = self.nodes[id].children.clone();
+            if children.is_empty() {
+                continue;
+            }
+            let mut total_size = 0u64;
+            let mut total_disk = 0u64;
+            for child_id in children {
+                if let Some(child) = self.nodes.get(child_id) {
+                    total_size = total_size.saturating_add(child.size);
+                    total_disk = total_disk.saturating_add(child.disk_size);
                 }
+            }
+            if let Some(node) = self.nodes.get_mut(id) {
+                node.size = total_size;
+                node.disk_size = total_disk;
             }
         }
     }
@@ -372,5 +375,35 @@ mod tests {
         assert_eq!(nav.selected, Some(5));
         nav.clear();
         assert!(nav.selected.is_none());
+    }
+
+    #[test]
+    fn recompute_sizes_matches_children_sum() {
+        let mut tree = FileTree::new(PathBuf::from("/tmp"));
+        let dir = tree.add_child(
+            0,
+            TreeNode::new(PathBuf::from("/tmp/dir"), NodeType::Directory),
+        );
+        let f1 = tree.add_child(
+            dir,
+            TreeNode::new(PathBuf::from("/tmp/dir/a"), NodeType::File),
+        );
+        let f2 = tree.add_child(
+            dir,
+            TreeNode::new(PathBuf::from("/tmp/dir/b"), NodeType::File),
+        );
+        if let Some(node) = tree.node_mut(f1) {
+            node.size = 2;
+            node.disk_size = 2;
+        }
+        if let Some(node) = tree.node_mut(f2) {
+            node.size = 3;
+            node.disk_size = 3;
+        }
+
+        tree.recompute_sizes();
+
+        assert_eq!(tree.node(dir).unwrap().size, 5);
+        assert_eq!(tree.node(0).unwrap().size, 5);
     }
 }
