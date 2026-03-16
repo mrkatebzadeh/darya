@@ -17,7 +17,7 @@ use crate::events::controller::{handle_input_action, process_scan_event};
 use crate::fs_scan::ScanEvent;
 use crate::input::{InputAction, InputState};
 use crate::scan_control::ScanTriggerSender;
-use crate::state::AppState;
+use crate::state::{AppState, ScanState};
 use crate::theme::Theme;
 use crate::ui::{Ui, layout};
 use anyhow::Result;
@@ -42,7 +42,7 @@ pub fn run_event_loop(
     let mut input_state = InputState::new();
     let mut ui = Ui::default();
     let mut last_tick = Instant::now();
-    let mut dirty = true;
+    let mut pending_draw = true;
     let mut should_quit = false;
 
     if state.selection.is_none() {
@@ -60,9 +60,9 @@ pub fn run_event_loop(
                         let _ = scan_trigger.send(crate::scan_control::ScanTrigger::Cancel);
                     }
                     handle_input_action(action, state, scan_trigger);
-                    dirty = true;
+                    pending_draw = true;
                 }
-                Event::Resize(_, _) => dirty = true,
+                Event::Resize(_, _) => pending_draw = true,
                 _ => {}
             }
         }
@@ -71,20 +71,26 @@ pub fn run_event_loop(
             match scanner_rx.try_recv() {
                 Ok(scan_event) => {
                     process_scan_event(state, scan_event);
-                    dirty = true;
+                    pending_draw = true;
                 }
                 Err(_) => break,
             }
         }
 
-        if last_tick.elapsed() >= TICK_RATE || dirty {
-            state.advance_spinner(BRAILLE_EIGHT.symbols.len());
-            terminal.draw(|frame| {
-                let regions = layout::split_layout(frame.size());
-                ui.draw(frame, regions, state, theme);
-            })?;
+        if last_tick.elapsed() >= TICK_RATE {
+            let running = matches!(state.scan_state, ScanState::Running(_));
+            if running {
+                state.advance_spinner(BRAILLE_EIGHT.symbols.len());
+            }
+            let should_draw = pending_draw || running;
+            if should_draw {
+                terminal.draw(|frame| {
+                    let regions = layout::split_layout(frame.size());
+                    ui.draw(frame, regions, state, theme);
+                })?;
+                pending_draw = false;
+            }
             last_tick = Instant::now();
-            dirty = false;
         }
     }
 
