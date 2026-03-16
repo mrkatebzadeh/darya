@@ -457,6 +457,7 @@ pub fn process_scan_event(state: &mut AppState, event: ScanEvent) {
         ScanEvent::Completed => {
             state.mark_scan_complete();
             state.update_status("scan complete");
+            state.tree.recompute_sizes();
         }
     }
 

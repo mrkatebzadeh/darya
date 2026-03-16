@@ -150,6 +150,34 @@ impl FileTree {
         }
     }
 
+    /// Recompute all directory sizes based on the sizes of the files under them.
+    pub fn recompute_sizes(&mut self) {
+        let contributions: Vec<(NodeId, u64, u64)> = self
+            .nodes
+            .iter()
+            .filter(|node| node.file_type == NodeType::File)
+            .map(|node| (node.id, node.size, node.disk_size))
+            .collect();
+
+        for node in self.nodes.iter_mut() {
+            node.size = 0;
+            node.disk_size = 0;
+        }
+
+        for (id, size, disk) in contributions {
+            let mut current = Some(id);
+            while let Some(node_id) = current {
+                if let Some(node) = self.nodes.get_mut(node_id) {
+                    node.size = node.size.saturating_add(size);
+                    node.disk_size = node.disk_size.saturating_add(disk);
+                    current = node.parent;
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
     pub fn node_id_for_path(&self, path: &Path) -> Option<NodeId> {
         self.path_index.get(path).copied()
     }
