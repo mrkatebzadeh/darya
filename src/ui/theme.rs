@@ -28,6 +28,10 @@ pub struct Theme {
     pub file: Color,
     pub bar: Color,
     pub bar_bg: Color,
+    pub percent_value: Color,
+    pub percent_value_selected: Color,
+    pub size_value: Color,
+    pub size_value_selected: Color,
     pub tile_palette: [Color; TILE_PALETTE_SIZE],
 }
 
@@ -50,11 +54,15 @@ impl Default for Theme {
         Self {
             background: Color::Rgb(30, 30, 46),    // frappe base
             foreground: Color::Rgb(198, 208, 245), // text
-            selection: Color::Rgb(140, 170, 238),  // overlay
+            selection: Color::Rgb(116, 199, 236),  // overlay
             directory: Color::Rgb(180, 184, 254),  // lavender
             file: Color::Rgb(198, 208, 245),
             bar: Color::Rgb(137, 180, 250), // sky
             bar_bg: Color::Rgb(92, 108, 124),
+            percent_value: Color::Rgb(198, 208, 245),
+            percent_value_selected: Color::Rgb(255, 255, 255),
+            size_value: Color::Rgb(198, 208, 245),
+            size_value_selected: Color::Rgb(255, 255, 255),
             tile_palette: [
                 Color::Rgb(245, 224, 220), // rosewater
                 Color::Rgb(242, 205, 205), // flamingo
@@ -97,6 +105,14 @@ pub struct ThemeConfig {
     pub bar: Color,
     #[serde(with = "color")]
     pub bar_bg: Color,
+    #[serde(with = "color")]
+    pub percent_value: Color,
+    #[serde(with = "color")]
+    pub percent_value_selected: Color,
+    #[serde(with = "color")]
+    pub size_value: Color,
+    #[serde(with = "color")]
+    pub size_value_selected: Color,
     #[serde(with = "color_vec")]
     pub tile_palette: Vec<Color>,
 }
@@ -112,6 +128,10 @@ impl Default for ThemeConfig {
             file: theme.file,
             bar: theme.bar,
             bar_bg: theme.bar_bg,
+            percent_value: theme.percent_value,
+            percent_value_selected: theme.percent_value_selected,
+            size_value: theme.size_value,
+            size_value_selected: theme.size_value_selected,
             tile_palette: theme.tile_palette.to_vec(),
         }
     }
@@ -142,6 +162,10 @@ impl ThemeConfig {
             file: self.file,
             bar: self.bar,
             bar_bg: self.bar_bg,
+            percent_value: self.percent_value,
+            percent_value_selected: self.percent_value_selected,
+            size_value: self.size_value,
+            size_value_selected: self.size_value_selected,
             tile_palette: palette,
         }
     }
@@ -274,7 +298,7 @@ mod tests {
         let theme = Theme::default();
         assert_eq!(theme.background, Color::Rgb(30, 30, 46));
         assert_eq!(theme.foreground, Color::Rgb(198, 208, 245));
-        assert_eq!(theme.selection, Color::Rgb(140, 170, 238));
+        assert_eq!(theme.selection, Color::Rgb(116, 199, 236));
         assert_eq!(theme.directory, Color::Rgb(180, 184, 254));
         assert_eq!(theme.file, Color::Rgb(198, 208, 245));
         assert_eq!(theme.bar, Color::Rgb(137, 180, 250));

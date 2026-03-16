@@ -122,8 +122,16 @@ pub(crate) fn build_row(
     } else {
         Style::default().fg(theme.bar).bg(theme.bar_bg)
     };
-    let percent_value_style = Style::default().fg(theme.foreground);
-    let size_value_style = Style::default().fg(theme.bar);
+    let percent_value_style = if Some(row.id) == selection {
+        Style::default().fg(theme.percent_value_selected)
+    } else {
+        Style::default().fg(theme.percent_value)
+    };
+    let size_value_style = if Some(row.id) == selection {
+        Style::default().fg(theme.size_value_selected)
+    } else {
+        Style::default().fg(theme.size_value)
+    };
     let percent_cell = if percent_column_width == 0 {
         Cell::from(Span::raw(String::new()))
     } else {
