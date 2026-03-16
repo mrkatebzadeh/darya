@@ -614,5 +614,45 @@ mod tests {
         process_scan_event(&mut state, ScanEvent::Batch(batch));
         let root = state.tree.node(0).unwrap();
         assert_eq!(root.size, 2048 + 4096);
+        assert!(state.tree.verify_size_invariants());
+    }
+
+    #[test]
+    fn batch_preserves_parent_child_sum() {
+        let mut state = AppState::new(PathBuf::from("/"), default_sort_mode());
+        let nodes = vec![
+            ScanNode {
+                path: PathBuf::from("/dir/a"),
+                kind: NodeType::File,
+                size: 1024,
+                disk_size: 1024,
+                modified: None,
+                permissions: None,
+                uid: None,
+                gid: None,
+            },
+            ScanNode {
+                path: PathBuf::from("/dir/b"),
+                kind: NodeType::File,
+                size: 2048,
+                disk_size: 2048,
+                modified: None,
+                permissions: None,
+                uid: None,
+                gid: None,
+            },
+        ];
+        let batch = ScanBatch {
+            nodes,
+            progress: Some(ScanProgress {
+                scanned: 2,
+                errors: 0,
+            }),
+            activity: Some(ScanActivity::default()),
+        };
+        process_scan_event(&mut state, ScanEvent::Batch(batch));
+        assert!(state.tree.verify_size_invariants());
+        let parent = state.tree.node(0).unwrap().children[0];
+        assert_eq!(state.tree.node(parent).unwrap().size, 3072);
     }
 }
