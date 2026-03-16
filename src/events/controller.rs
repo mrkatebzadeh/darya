@@ -466,6 +466,8 @@ pub fn process_scan_event(state: &mut AppState, event: ScanEvent) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fs_scan::ScanActivity;
+    use crate::fs_scan::ScanBatch;
     use crate::scan_control::ScanTriggerSender;
     use crate::state::AppState;
     use crate::tree::{NodeType, TreeNode};
@@ -564,5 +566,40 @@ mod tests {
         assert_eq!(next_sort_mode(SortMode::SizeAsc), SortMode::Name);
         assert_eq!(next_sort_mode(SortMode::Name), SortMode::ModifiedTime);
         assert_eq!(next_sort_mode(SortMode::ModifiedTime), SortMode::SizeDesc);
+    }
+
+    #[test]
+    fn batch_updates_root_size() {
+        let mut state = AppState::new(PathBuf::from("/"), default_sort_mode());
+        let nodes = vec![
+            ScanNode {
+                path: PathBuf::from("/a"),
+                kind: NodeType::File,
+                size: 2048,
+                disk_size: 2048,
+                modified: None,
+                permissions: None,
+                uid: None,
+                gid: None,
+            },
+            ScanNode {
+                path: PathBuf::from("/dir/b"),
+                kind: NodeType::File,
+                size: 4096,
+                disk_size: 4096,
+                modified: None,
+                permissions: None,
+                uid: None,
+                gid: None,
+            },
+        ];
+        let batch = ScanBatch {
+            nodes,
+            progress: None,
+            activity: Some(ScanActivity::default()),
+        };
+        process_scan_event(&mut state, ScanEvent::Batch(batch));
+        let root = state.tree.node(0).unwrap();
+        assert_eq!(root.size, 2048 + 4096);
     }
 }
