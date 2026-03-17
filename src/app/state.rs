@@ -21,6 +21,8 @@ use crate::{
     tree::{FileTree, NodeId, NodeType},
     treemap::TreemapNode,
 };
+
+use crate::fs_scan::ScanNode;
 use std::path::PathBuf;
 
 /// Tracks the current phase of the filesystem scanner.
@@ -61,6 +63,7 @@ pub struct AppState {
     pub extended_mode: bool,
     pub display_options: DisplayOptions,
     pub export_options: ExportOptions,
+    pub pending_scan_nodes: Vec<ScanNode>,
 }
 
 impl AppState {
@@ -86,6 +89,7 @@ impl AppState {
             extended_mode: false,
             display_options: DisplayOptions::default(),
             export_options: ExportOptions::default(),
+            pending_scan_nodes: Vec::new(),
         }
     }
 

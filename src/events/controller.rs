@@ -20,7 +20,7 @@ use crate::scan_control::{ScanTrigger, ScanTriggerSender};
 use crate::size::total_size;
 use crate::snapshot::{self, SnapshotEndpoint, SnapshotFormat};
 use crate::state::{AppState, ScanState};
-use crate::tree::{NodeMetadata, NodeType};
+use crate::tree::{FileTree, NodeMetadata, NodeType};
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -142,6 +142,32 @@ fn insert_scan_node(state: &mut AppState, node: &ScanNode) -> Option<(PathBuf, O
     }
     let parent = state.tree.node(node_id).and_then(|node| node.parent);
     Some((path, parent))
+}
+
+fn rebuild_tree_from_pending(state: &mut AppState) {
+    let root_path = state
+        .tree
+        .node(state.tree.root())
+        .map(|node| node.path.clone())
+        .unwrap_or_else(|| PathBuf::from("/"));
+    state.tree = FileTree::new(root_path);
+    let mut parents = Vec::new();
+    let drained_nodes: Vec<ScanNode> = state.pending_scan_nodes.drain(..).collect();
+    for node in drained_nodes {
+        if let Some((_path, Some(parent_id))) = insert_scan_node(state, &node) {
+            parents.push(parent_id);
+        }
+    }
+    parents.sort_unstable();
+    parents.dedup();
+    for parent in parents {
+        state.tree.sort_children(parent, state.sort_mode);
+    }
+    state.tree.recompute_sizes();
+    debug_assert!(
+        state.tree.verify_size_invariants(),
+        "tree size invariant violated after rebuilding"
+    );
 }
 
 fn sort_mode_label(mode: SortMode) -> &'static str {
@@ -406,21 +432,8 @@ fn open_command_for_platform() -> Command {
 pub fn process_scan_event(state: &mut AppState, event: ScanEvent) {
     match event {
         ScanEvent::Batch(batch) => {
-            let mut last_path = None;
-            let mut parents = Vec::new();
-            for node in batch.nodes {
-                if let Some((path, parent)) = insert_scan_node(state, &node) {
-                    last_path = Some(path);
-                    if let Some(parent_id) = parent {
-                        parents.push(parent_id);
-                    }
-                }
-            }
-            parents.sort_unstable();
-            parents.dedup();
-            for parent in parents {
-                state.tree.sort_children(parent, state.sort_mode);
-            }
+            let last_path = batch.nodes.last().map(|n| n.path.clone());
+            state.pending_scan_nodes.extend(batch.nodes);
             if let Some(path) = last_path {
                 state.update_status(format!("scanned {}", path.display()));
             }
@@ -434,20 +447,9 @@ pub fn process_scan_event(state: &mut AppState, event: ScanEvent) {
             if let Some(activity) = batch.activity {
                 state.scan_activity = activity;
             }
-            state.tree.recompute_sizes();
-            debug_assert!(
-                state.tree.verify_size_invariants(),
-                "tree size invariant violated after batch processing"
-            );
-            state.refresh_treemap_nodes();
         }
         ScanEvent::Node(node) => {
-            if let Some((path, parent)) = insert_scan_node(state, &node) {
-                if let Some(parent_id) = parent {
-                    state.tree.sort_children(parent_id, state.sort_mode);
-                }
-                state.update_status(format!("scanned {}", path.display()));
-            }
+            state.pending_scan_nodes.push(node);
         }
         ScanEvent::Activity(activity) => {
             state.scan_activity = activity;
@@ -465,11 +467,7 @@ pub fn process_scan_event(state: &mut AppState, event: ScanEvent) {
         ScanEvent::Completed => {
             state.mark_scan_complete();
             state.update_status("scan complete");
-            state.tree.recompute_sizes();
-            debug_assert!(
-                state.tree.verify_size_invariants(),
-                "tree size invariant violated at scan completion"
-            );
+            rebuild_tree_from_pending(state);
         }
     }
 
@@ -612,6 +610,7 @@ mod tests {
             activity: Some(ScanActivity::default()),
         };
         process_scan_event(&mut state, ScanEvent::Batch(batch));
+        process_scan_event(&mut state, ScanEvent::Completed);
         let root = state.tree.node(0).unwrap();
         assert_eq!(root.size, 2048 + 4096);
         assert!(state.tree.verify_size_invariants());
@@ -651,6 +650,7 @@ mod tests {
             activity: Some(ScanActivity::default()),
         };
         process_scan_event(&mut state, ScanEvent::Batch(batch));
+        process_scan_event(&mut state, ScanEvent::Completed);
         assert!(state.tree.verify_size_invariants());
         let parent = state.tree.node(0).unwrap().children[0];
         assert_eq!(state.tree.node(parent).unwrap().size, 3072);
@@ -687,6 +687,7 @@ mod tests {
             activity: Some(ScanActivity::default()),
         };
         process_scan_event(&mut state, ScanEvent::Batch(batch));
+        process_scan_event(&mut state, ScanEvent::Completed);
         assert!(state.tree.verify_size_invariants());
         let dir = state.tree.node_id_for_path(Path::new("/dir")).unwrap();
         let sub = state.tree.node_id_for_path(Path::new("/dir/sub")).unwrap();
