@@ -108,6 +108,7 @@ pub fn handle_input_action(
     }
 
     state.refresh_treemap_nodes();
+    state.mark_ui_dirty();
 }
 
 fn next_sort_mode(current: SortMode) -> SortMode {
@@ -488,6 +489,7 @@ pub fn process_scan_event(state: &mut AppState, event: ScanEvent) {
     }
 
     state.refresh_treemap_nodes();
+    state.mark_ui_dirty();
 }
 
 #[cfg(test)]

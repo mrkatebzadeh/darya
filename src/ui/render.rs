@@ -28,9 +28,21 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 
 /// Renderer responsible for drawing the main UI panels.
+struct TreeRowsCache {
+    revision: u64,
+    rows: Vec<TreeRow>,
+}
+
+impl TreeRowsCache {
+    fn new(revision: u64, rows: Vec<TreeRow>) -> Self {
+        Self { revision, rows }
+    }
+}
+
 #[derive(Default)]
 pub struct Ui {
     treemap_cache: components::TreemapLayoutCache,
+    tree_rows_cache: Option<TreeRowsCache>,
 }
 
 impl Ui {
@@ -42,7 +54,8 @@ impl Ui {
         theme: Theme,
     ) {
         self.draw_header(frame, layout.header, state, theme);
-        let filesystem_vm = FilesystemViewModel::build(state, layout.tree, theme);
+        let tree_rows = self.cached_tree_rows(state);
+        let filesystem_vm = FilesystemViewModel::build(state, layout.tree, theme, tree_rows);
         components::draw_filesystem_panel(frame, layout.tree, filesystem_vm, theme);
         components::draw_treemap_panel(
             frame,
@@ -59,6 +72,27 @@ impl Ui {
         if state.show_help {
             self.draw_help_modal(frame, state, theme);
         }
+    }
+
+    fn cached_tree_rows(&mut self, state: &AppState) -> &[TreeRow] {
+        let revision = state.ui_revision();
+        let needs_refresh = self
+            .tree_rows_cache
+            .as_ref()
+            .map(|cache| cache.revision != revision)
+            .unwrap_or(true);
+
+        if needs_refresh {
+            let rows = collect_tree_rows(
+                &state.tree,
+                &state.filter_query,
+                state.filter_active,
+                state.display_options,
+            );
+            self.tree_rows_cache = Some(TreeRowsCache::new(revision, rows));
+        }
+
+        &self.tree_rows_cache.as_ref().unwrap().rows
     }
 
     fn draw_header(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {

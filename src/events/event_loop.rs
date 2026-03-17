@@ -50,6 +50,7 @@ pub fn run_event_loop(
         state.selection = Some(state.tree.root());
     }
     state.refresh_treemap_nodes();
+    state.mark_ui_dirty();
 
     while !should_quit {
         if event::poll(Duration::from_millis(50))? {

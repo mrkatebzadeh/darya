@@ -59,6 +59,7 @@ pub struct AppState {
     pub show_help: bool,
     pub treemap_nodes: Vec<TreemapNode>,
     pub treemap_revision: u64,
+    pub ui_revision: u64,
     pub allow_modifications: bool,
     pub extended_mode: bool,
     pub display_options: DisplayOptions,
@@ -85,6 +86,7 @@ impl AppState {
             filter_prompt_active: false,
             treemap_nodes: Vec::new(),
             treemap_revision: 0,
+            ui_revision: 0,
             allow_modifications: true,
             extended_mode: false,
             display_options: DisplayOptions::default(),
@@ -213,6 +215,14 @@ impl AppState {
             return;
         }
         self.selection = Some(ids[0]);
+    }
+
+    pub fn mark_ui_dirty(&mut self) {
+        self.ui_revision = self.ui_revision.wrapping_add(1);
+    }
+
+    pub fn ui_revision(&self) -> u64 {
+        self.ui_revision
     }
 
     pub fn visible_node_ids(&self) -> Vec<NodeId> {

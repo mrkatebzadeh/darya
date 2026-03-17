@@ -15,9 +15,7 @@
 
 use crate::state::AppState;
 use crate::theme::Theme;
-use crate::ui::helpers::{
-    ColumnWidths, build_row, chosen_size, collect_tree_rows, detail_panel_lines,
-};
+use crate::ui::helpers::{ColumnWidths, TreeRow, build_row, chosen_size, detail_panel_lines};
 use ratatui::layout::Rect;
 use ratatui::widgets::Row;
 
@@ -113,14 +111,13 @@ pub struct FilesystemViewModel {
 }
 
 impl FilesystemViewModel {
-    pub fn build(state: &mut AppState, area: Rect, theme: Theme) -> Self {
+    pub(crate) fn build(
+        state: &mut AppState,
+        area: Rect,
+        theme: Theme,
+        tree_rows: &[TreeRow],
+    ) -> Self {
         const OVERLAY_HEIGHT: u16 = 3;
-        let tree_rows = collect_tree_rows(
-            &state.tree,
-            &state.filter_query,
-            state.filter_active,
-            state.display_options,
-        );
         let max_size = tree_rows
             .iter()
             .map(|row| chosen_size(row, state.size_mode, state.display_options))
