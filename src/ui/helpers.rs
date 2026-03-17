@@ -197,22 +197,19 @@ pub(crate) fn trim_to_width(value: &str, width: usize) -> String {
 }
 
 fn format_size_custom(bytes: u64, use_si: bool) -> String {
-    let (unit, div) = if use_si {
-        ("kB", 1000.0)
+    let div = if use_si { 1000.0 } else { 1024.0 };
+    let (kib, mib, gib) = if use_si {
+        ("kB", "MB", "GB")
     } else {
-        ("KiB", 1024.0)
+        ("KiB", "MiB", "GiB")
     };
     let value = bytes as f64;
     if value >= div * div * div {
-        format!(
-            "{:.1} {}",
-            value / (div * div * div),
-            unit.replace('k', "G")
-        )
+        format!("{:.1} {}", value / (div * div * div), gib)
     } else if value >= div * div {
-        format!("{:.1} {}", value / (div * div), unit.replace('k', "M"))
+        format!("{:.1} {}", value / (div * div), mib)
     } else if value >= div {
-        format!("{:.1} {}", value / div, unit)
+        format!("{:.1} {}", value / div, kib)
     } else {
         format!("{bytes} B")
     }

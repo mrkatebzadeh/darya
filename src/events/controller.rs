@@ -145,11 +145,16 @@ fn insert_scan_node(state: &mut AppState, node: &ScanNode) -> Option<(PathBuf, O
 }
 
 fn rebuild_tree_from_pending(state: &mut AppState) {
-    let root_path = state
-        .tree
-        .node(state.tree.root())
-        .map(|node| node.path.clone())
-        .unwrap_or_else(|| PathBuf::from("/"));
+    let selected_path = state
+        .selection
+        .and_then(|id| state.tree.node(id).map(|node| node.path.clone()));
+    let root_path = selected_path.clone().unwrap_or_else(|| {
+        state
+            .tree
+            .node(state.tree.root())
+            .map(|node| node.path.clone())
+            .unwrap_or_else(|| PathBuf::from("/"))
+    });
     state.tree = FileTree::new(root_path);
     let mut parents = Vec::new();
     let drained_nodes: Vec<ScanNode> = state.pending_scan_nodes.drain(..).collect();
@@ -168,6 +173,17 @@ fn rebuild_tree_from_pending(state: &mut AppState) {
         state.tree.verify_size_invariants(),
         "tree size invariant violated after rebuilding"
     );
+    restore_selection(state, selected_path);
+}
+
+fn restore_selection(state: &mut AppState, path: Option<PathBuf>) {
+    if let Some(path) = path
+        && let Some(id) = state.tree.node_id_for_path(&path)
+    {
+        state.selection = Some(id);
+        return;
+    }
+    state.selection = Some(state.tree.root());
 }
 
 fn sort_mode_label(mode: SortMode) -> &'static str {
@@ -610,7 +626,9 @@ mod tests {
             activity: Some(ScanActivity::default()),
         };
         process_scan_event(&mut state, ScanEvent::Batch(batch));
-        process_scan_event(&mut state, ScanEvent::Completed);
+        if matches!(state.scan_state, ScanState::Completed) {
+            process_scan_event(&mut state, ScanEvent::Completed);
+        }
         let root = state.tree.node(0).unwrap();
         assert_eq!(root.size, 2048 + 4096);
         assert!(state.tree.verify_size_invariants());
