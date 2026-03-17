@@ -484,7 +484,7 @@ mod tests {
     use crate::scan_control::ScanTriggerSender;
     use crate::state::AppState;
     use crate::tree::{NodeType, TreeNode};
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use tokio::sync::mpsc;
 
     fn sample_state() -> AppState {
@@ -654,5 +654,43 @@ mod tests {
         assert!(state.tree.verify_size_invariants());
         let parent = state.tree.node(0).unwrap().children[0];
         assert_eq!(state.tree.node(parent).unwrap().size, 3072);
+    }
+
+    #[test]
+    fn multi_level_batch_sums() {
+        let mut state = AppState::new(PathBuf::from("/"), default_sort_mode());
+        let nodes = vec![
+            ScanNode {
+                path: PathBuf::from("/dir/sub/file1"),
+                kind: NodeType::File,
+                size: 4096,
+                disk_size: 4096,
+                modified: None,
+                permissions: None,
+                uid: None,
+                gid: None,
+            },
+            ScanNode {
+                path: PathBuf::from("/dir/sub/file2"),
+                kind: NodeType::File,
+                size: 2048,
+                disk_size: 2048,
+                modified: None,
+                permissions: None,
+                uid: None,
+                gid: None,
+            },
+        ];
+        let batch = ScanBatch {
+            nodes,
+            progress: None,
+            activity: Some(ScanActivity::default()),
+        };
+        process_scan_event(&mut state, ScanEvent::Batch(batch));
+        assert!(state.tree.verify_size_invariants());
+        let dir = state.tree.node_id_for_path(Path::new("/dir")).unwrap();
+        let sub = state.tree.node_id_for_path(Path::new("/dir/sub")).unwrap();
+        assert_eq!(state.tree.node(sub).unwrap().size, 6144);
+        assert_eq!(state.tree.node(dir).unwrap().size, 6144);
     }
 }
