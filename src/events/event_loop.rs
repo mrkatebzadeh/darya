@@ -43,6 +43,7 @@ pub fn run_event_loop(
     let mut ui = Ui::default();
     let mut last_tick = Instant::now();
     let mut pending_draw = true;
+    let mut force_redraw = false;
     let mut should_quit = false;
 
     if state.selection.is_none() {
@@ -70,11 +71,25 @@ pub fn run_event_loop(
         for _ in 0..MAX_SCAN_EVENTS_PER_CYCLE {
             match scanner_rx.try_recv() {
                 Ok(scan_event) => {
+                    if matches!(scan_event, ScanEvent::Completed) {
+                        force_redraw = true;
+                    }
                     process_scan_event(state, scan_event);
                     pending_draw = true;
                 }
                 Err(_) => break,
             }
+        }
+
+        if force_redraw {
+            terminal.draw(|frame| {
+                let regions = layout::split_layout(frame.size());
+                ui.draw(frame, regions, state, theme);
+            })?;
+            force_redraw = false;
+            pending_draw = false;
+            last_tick = Instant::now();
+            continue;
         }
 
         if last_tick.elapsed() >= TICK_RATE {
