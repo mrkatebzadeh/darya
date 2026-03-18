@@ -2,7 +2,7 @@
 [![Build](https://github.com/mrkatebzadeh/dar/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/mrkatebzadeh/dar/actions/workflows/ci.yaml)
 [![Coverage](https://codecov.io/gh/mrkatebzadeh/dar/branch/main/graph/badge.svg)](https://codecov.io/gh/mrkatebzadeh/dar)
 
-`dar` is a terminal-first disk audit runner that keeps things responsive and readable while you explore storage. It’s in the same spirit as `du`, but TUI-based so you can scroll through directories without losing track of what’s happening. It lets you decide when scanning happens, keeps the panels focused, and surfaces the details you need without overwhelming you with noise.
+`dar` is a text-mode disk usage analyzer that runs anywhere you can open a terminal—think remote servers without a graphical setup, but feel free to fire it up on a desktop as well. Inspired by classic tools, it strives to be fast, simple, and easy to use while keeping the UI responsive and lightweight on every POSIX-like system. The TUI keeps directories navigable, the scan cadence under your control, and the details readable without overwhelming you with noise.
 
 ## Installation
 1. Visit the [dar releases page](https://github.com/yourorg/dar/releases) and download the latest archive for your platform.
@@ -21,7 +21,3 @@ If you're building from source, run `cargo test` and `cargo build --release` fro
 - Settings come from `~/.config/dar/config.toml` (or wherever you pointed `DAR_CONFIG`) and provide defaults for sorting, UI tweaks, and scan filters. Pass `--ignore-config` to skip it.
 - Overrides on the command line always win, so you can keep a mild default configuration and still tweak behavior at runtime.
 - The UI exposes controls for size mode, sorting, tree expansion, and help—use them interactively rather than diving into implementation details.
-
-## Support and contributing
-- Report issues or feature requests on the GitHub issue tracker so the project can keep improving.
-- Contributions are welcome. Please follow the existing style and run `cargo fmt`, `cargo clippy`, and `cargo test` before opening a pull request.
