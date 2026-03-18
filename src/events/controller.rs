@@ -460,6 +460,8 @@ pub fn process_scan_event(state: &mut AppState, event: ScanEvent) {
                     "scanned {} entries, {} errors",
                     progress.scanned, progress.errors
                 ));
+            } else {
+                state.mark_scan_complete();
             }
             if let Some(activity) = batch.activity {
                 state.scan_activity = activity;
