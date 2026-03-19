@@ -23,6 +23,7 @@ use crate::{
 };
 
 use crate::fs_scan::ScanNode;
+use std::fmt;
 use std::path::PathBuf;
 
 /// Tracks the current phase of the filesystem scanner.
@@ -34,7 +35,104 @@ pub enum ScanState {
     Error(String),
 }
 
-pub const SCAN_COMPLETE_MESSAGE: &str = "scan complete";
+/// High-level outcome of an action that can succeed or fail.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StatusOutcome {
+    Success,
+    Failure(String),
+}
+
+impl StatusOutcome {
+    pub fn failure(message: impl fmt::Display) -> Self {
+        Self::Failure(message.to_string())
+    }
+}
+
+/// Structured status messages that drive the footer line.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StatusMessage {
+    FilterPrompt,
+    FilterActive(String),
+    FilterCleared,
+    SortMode(SortMode),
+    HiddenFilesVisible(bool),
+    HelpOpened,
+    HelpClosed,
+    ScanHint(PathBuf),
+    ScanPath(PathBuf),
+    ScanProgress {
+        scanned: u64,
+        errors: u64,
+    },
+    ScanComplete,
+    ImportReadOnly,
+    DeleteConfirmation(PathBuf),
+    DeleteSuccess(PathBuf),
+    DeleteFailure(PathBuf),
+    OpenResult {
+        path: PathBuf,
+        outcome: StatusOutcome,
+    },
+    ExportResult {
+        path: PathBuf,
+        outcome: StatusOutcome,
+    },
+    ImportResult {
+        path: PathBuf,
+        outcome: StatusOutcome,
+    },
+    RescanResult {
+        path: PathBuf,
+        outcome: StatusOutcome,
+    },
+    Custom(String),
+}
+
+impl fmt::Display for StatusMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StatusMessage::FilterPrompt => write!(f, "filter: type name substring and press Enter"),
+            StatusMessage::FilterActive(query) => write!(f, "filter active: {query}"),
+            StatusMessage::FilterCleared => write!(f, "filter cleared"),
+            StatusMessage::SortMode(mode) => write!(f, "sort mode: {}", sort_mode_label(*mode)),
+            StatusMessage::HiddenFilesVisible(true) => write!(f, "hidden files shown"),
+            StatusMessage::HiddenFilesVisible(false) => write!(f, "hidden files hidden"),
+            StatusMessage::HelpOpened => write!(f, "help opened"),
+            StatusMessage::HelpClosed => write!(f, "help closed"),
+            StatusMessage::ScanHint(path) => write!(f, "press R to scan {}", path.display()),
+            StatusMessage::ScanPath(path) => write!(f, "scanned {}", path.display()),
+            StatusMessage::ScanProgress { scanned, errors } => {
+                write!(f, "scanned {scanned} entries, {errors} errors")
+            }
+            StatusMessage::ScanComplete => write!(f, "scan complete"),
+            StatusMessage::ImportReadOnly => write!(f, "imported scan is read-only"),
+            StatusMessage::DeleteConfirmation(path) => {
+                write!(f, "press d again to delete {}", path.display())
+            }
+            StatusMessage::DeleteSuccess(path) => write!(f, "deleted {}", path.display()),
+            StatusMessage::DeleteFailure(path) => write!(f, "delete failed: {}", path.display()),
+            StatusMessage::OpenResult { path, outcome } => match outcome {
+                StatusOutcome::Success => write!(f, "opened {}", path.display()),
+                StatusOutcome::Failure(err) => {
+                    write!(f, "open failed for {}: {err}", path.display())
+                }
+            },
+            StatusMessage::ExportResult { path, outcome } => match outcome {
+                StatusOutcome::Success => write!(f, "scan exported to {}", path.display()),
+                StatusOutcome::Failure(err) => write!(f, "export failed: {err}"),
+            },
+            StatusMessage::ImportResult { path, outcome } => match outcome {
+                StatusOutcome::Success => write!(f, "scan imported from {}", path.display()),
+                StatusOutcome::Failure(err) => write!(f, "import failed: {err}"),
+            },
+            StatusMessage::RescanResult { path, outcome } => match outcome {
+                StatusOutcome::Success => write!(f, "rescanned {}", path.display()),
+                StatusOutcome::Failure(err) => write!(f, "rescan failed: {err}"),
+            },
+            StatusMessage::Custom(text) => write!(f, "{text}"),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SizeDisplayMode {
@@ -51,7 +149,7 @@ pub struct AppState {
     pub scroll_offset: usize,
     pub scan_state: ScanState,
     pub scan_activity: ScanActivity,
-    pub status_message: Option<String>,
+    pub status_message: Option<StatusMessage>,
     pub spinner_phase: usize,
     pub pending_delete: Option<NodeId>,
     pub size_mode: SizeDisplayMode,
@@ -121,12 +219,19 @@ impl AppState {
         self.scroll_offset = offset;
     }
 
-    pub fn update_status(&mut self, message: impl Into<String>) {
-        self.status_message = Some(message.into());
+    pub fn update_status(&mut self, message: StatusMessage) {
+        self.status_message = Some(message);
     }
 
     pub fn clear_status(&mut self) {
         self.status_message = None;
+    }
+
+    pub fn status_text(&self) -> String {
+        self.status_message
+            .as_ref()
+            .map(|message| message.to_string())
+            .unwrap_or_else(|| "ready".to_string())
     }
 
     pub fn set_sort_mode(&mut self, mode: SortMode) {
@@ -245,6 +350,15 @@ impl AppState {
     }
 }
 
+fn sort_mode_label(mode: SortMode) -> &'static str {
+    match mode {
+        SortMode::SizeDesc => "size_desc",
+        SortMode::SizeAsc => "size_asc",
+        SortMode::Name => "name",
+        SortMode::ModifiedTime => "modified_time",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -295,8 +409,12 @@ mod tests {
     #[test]
     fn status_message_behaves() {
         let mut state = state();
-        state.update_status("hello");
-        assert_eq!(state.status_message.as_deref(), Some("hello"));
+        state.update_status(StatusMessage::Custom("hello".to_string()));
+        assert_eq!(
+            state.status_message,
+            Some(StatusMessage::Custom("hello".to_string()))
+        );
+        assert_eq!(state.status_text(), "hello");
         state.clear_status();
         assert!(state.status_message.is_none());
     }

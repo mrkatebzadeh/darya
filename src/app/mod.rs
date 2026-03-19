@@ -21,7 +21,7 @@ use self::scan_control::{
 };
 use self::size::normalize_path;
 use self::snapshot::ExportOptions;
-use self::state::AppState;
+use self::state::{AppState, StatusMessage};
 use crate::theme::Theme;
 use anyhow::{Result, anyhow};
 use std::path::PathBuf;
@@ -165,7 +165,7 @@ async fn run_interactive_mode(
     let mut state = AppState::new(root.clone(), config.sorting.mode);
     state.set_extended_mode(extended);
     state.set_export_options(export_options);
-    state.update_status(format!("press R to scan {}", root.display()));
+    state.update_status(StatusMessage::ScanHint(root.clone()));
     run_ui_thread(state, scan_event_rx, scan_trigger_tx.clone(), theme).await?;
     drop(scan_trigger_tx);
     manager

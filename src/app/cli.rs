@@ -97,7 +97,7 @@ pub struct DarCli {
     #[arg(long, value_name = "BYTES")]
     pub export_block_size: Option<usize>,
 
-    /// Force ncurses UI mode (default)
+    /// Force UI mode (default)
     #[arg(long = "0")]
     pub force_tui: bool,
 

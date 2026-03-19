@@ -18,10 +18,5 @@ If you're building from source, run `cargo test` and `cargo build --release` fro
 - Export scans with the provided snapshot flags (`-f`, `-o`, `-O`) to share what you’ve found without rerunning a full scan.
 
 ## Configuration and customization
-- Settings come from `~/.config/dar/config.toml` (or wherever you pointed `DAR_CONFIG`) and provide defaults for sorting, UI tweaks, and scan filters. Pass `--ignore-config` to skip it.
+- Settings come from `~/.config/dar/config.toml` and provide defaults for sorting, UI tweaks, and scan filters. Pass `--ignore-config` to skip it.
 - Overrides on the command line always win, so you can keep a mild default configuration and still tweak behavior at runtime.
-- The UI exposes controls for size mode, sorting, tree expansion, and help—use them interactively rather than diving into implementation details.
-
-## Support and contributing
-- Report issues or feature requests on the GitHub issue tracker so the project can keep improving.
-- Contributions are welcome. Please follow the existing style and run `cargo fmt`, `cargo clippy`, and `cargo test` before opening a pull request.
