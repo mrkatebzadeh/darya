@@ -4,6 +4,8 @@
 
 `dar` is a terminal-first disk audit runner that keeps things responsive and readable while you explore storage. It’s in the same spirit as `du`, but TUI-based so you can scroll through directories without losing track of what’s happening. It lets you decide when scanning happens, keeps the panels focused, and surfaces the details you need without overwhelming you with noise.
 
+![dar](https://github.com/user-attachments/assets/548e252f-76e7-4ea5-acf6-e1ca764bbe37)
+
 ## Installation
 1. Visit the [dar releases page](https://github.com/yourorg/dar/releases) and download the latest archive for your platform.
 2. Extract the archive and place the `dar` binary somewhere on your `PATH` (for example, `/usr/local/bin`).
@@ -18,10 +20,5 @@ If you're building from source, run `cargo test` and `cargo build --release` fro
 - Export scans with the provided snapshot flags (`-f`, `-o`, `-O`) to share what you’ve found without rerunning a full scan.
 
 ## Configuration and customization
-- Settings come from `~/.config/dar/config.toml` (or wherever you pointed `DAR_CONFIG`) and provide defaults for sorting, UI tweaks, and scan filters. Pass `--ignore-config` to skip it.
+- Settings come from `~/.config/dar/config.toml` and provide defaults for sorting, UI tweaks, and scan filters. Pass `--ignore-config` to skip it.
 - Overrides on the command line always win, so you can keep a mild default configuration and still tweak behavior at runtime.
-- The UI exposes controls for size mode, sorting, tree expansion, and help—use them interactively rather than diving into implementation details.
-
-## Support and contributing
-- Report issues or feature requests on the GitHub issue tracker so the project can keep improving.
-- Contributions are welcome. Please follow the existing style and run `cargo fmt`, `cargo clippy`, and `cargo test` before opening a pull request.
