@@ -34,6 +34,8 @@ pub enum ScanState {
     Error(String),
 }
 
+pub const SCAN_COMPLETE_MESSAGE: &str = "scan complete";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SizeDisplayMode {
     Apparent,

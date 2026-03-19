@@ -19,7 +19,7 @@ use crate::input::InputAction;
 use crate::scan_control::{ScanTrigger, ScanTriggerSender};
 use crate::size::total_size;
 use crate::snapshot::{self, SnapshotEndpoint, SnapshotFormat};
-use crate::state::{AppState, ScanState};
+use crate::state::{AppState, ScanState, SCAN_COMPLETE_MESSAGE};
 use crate::tree::{FileTree, NodeMetadata, NodeType};
 use std::fs;
 use std::path::PathBuf;
@@ -485,7 +485,7 @@ pub fn process_scan_event(state: &mut AppState, event: ScanEvent) {
         }
         ScanEvent::Completed => {
             state.mark_scan_complete();
-            state.update_status("scan complete");
+            state.update_status(SCAN_COMPLETE_MESSAGE);
             rebuild_tree_from_pending(state);
         }
     }

@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::state::AppState;
-use crate::state::ScanState;
+use crate::state::{AppState, ScanState, SCAN_COMPLETE_MESSAGE};
 use crate::theme::Theme;
 use crate::ui::helpers::{spinner_symbol, trim_to_width};
 use ratatui::layout::Rect;
@@ -38,7 +37,7 @@ pub fn draw_footer_panel(frame: &mut Frame<'_>, area: Rect, state: &AppState, th
             )
         }
         ScanState::Error(message) => format!("error: {message}"),
-        ScanState::Completed => "scan complete".into(),
+        ScanState::Completed => SCAN_COMPLETE_MESSAGE.into(),
         _ => "scan idle".into(),
     };
 
