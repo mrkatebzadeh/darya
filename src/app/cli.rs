@@ -166,7 +166,9 @@ pub struct DarCli {
 impl DarCli {
     /// Preprocess argv so that `-0`, `-1`, `-2` become `--0`, `--1`, `--2` for interface mode.
     /// Call this before parsing when using parse_from_iter for tests.
-    pub fn preprocess_interface_args(args: impl IntoIterator<Item = std::ffi::OsString>) -> Vec<std::ffi::OsString> {
+    pub fn preprocess_interface_args(
+        args: impl IntoIterator<Item = std::ffi::OsString>,
+    ) -> Vec<std::ffi::OsString> {
         args.into_iter()
             .map(|a| {
                 let s = a.to_string_lossy();
@@ -183,7 +185,10 @@ impl DarCli {
     /// Parse from the environment, with -0/-1/-2 preprocessing.
     pub fn try_parse() -> Result<Self, clap::Error> {
         let args: Vec<std::ffi::OsString> = env::args_os().collect();
-        let program = args.first().cloned().unwrap_or_else(|| std::ffi::OsString::from("dar"));
+        let program = args
+            .first()
+            .cloned()
+            .unwrap_or_else(|| std::ffi::OsString::from("dar"));
         let rest = Self::preprocess_interface_args(args.into_iter().skip(1));
         Self::try_parse_from(std::iter::once(program).chain(rest))
     }
@@ -194,8 +199,10 @@ impl DarCli {
         I: IntoIterator<Item = std::ffi::OsString>,
     {
         let preprocessed = Self::preprocess_interface_args(iter);
-        let raw = Self::try_parse_from(std::iter::once(std::ffi::OsString::from("dar")).chain(preprocessed))
-            .map_err(|e| CliParseError::Clap(e))?;
+        let raw = Self::try_parse_from(
+            std::iter::once(std::ffi::OsString::from("dar")).chain(preprocessed),
+        )
+        .map_err(CliParseError::Clap)?;
         raw.into_cli_args()
     }
 
@@ -292,31 +299,40 @@ impl DarCli {
             display_options.show_graph = false;
         }
 
-        if let Some(t) = self.thread_count {
-            if t == 0 {
-                return Err(CliParseError::InvalidThreadCount(t.to_string()));
-            }
+        if self.thread_count == Some(0) {
+            return Err(CliParseError::InvalidThreadCount("0".to_string()));
         }
-        if let Some(l) = self.compress_level {
-            if l == 0 || l > 9 {
+        match self.compress_level {
+            Some(l) if l == 0 || l > 9 => {
                 return Err(CliParseError::InvalidCompressionLevel(l.to_string()));
             }
+            _ => {}
         }
-        if let Some(b) = self.export_block_size {
-            if b == 0 {
-                return Err(CliParseError::InvalidExportBlockSize(b.to_string()));
-            }
+        if self.export_block_size == Some(0) {
+            return Err(CliParseError::InvalidExportBlockSize("0".to_string()));
         }
 
-        let import_snapshot = self
-            .import_snapshot
-            .map(|s| if s == "-" { SnapshotEndpoint::StdIo } else { SnapshotEndpoint::File(PathBuf::from(s)) });
-        let export_json = self
-            .export_json
-            .map(|s| if s == "-" { SnapshotEndpoint::StdIo } else { SnapshotEndpoint::File(PathBuf::from(s)) });
-        let export_binary = self
-            .export_binary
-            .map(|s| if s == "-" { SnapshotEndpoint::StdIo } else { SnapshotEndpoint::File(PathBuf::from(s)) });
+        let import_snapshot = self.import_snapshot.map(|s| {
+            if s == "-" {
+                SnapshotEndpoint::StdIo
+            } else {
+                SnapshotEndpoint::File(PathBuf::from(s))
+            }
+        });
+        let export_json = self.export_json.map(|s| {
+            if s == "-" {
+                SnapshotEndpoint::StdIo
+            } else {
+                SnapshotEndpoint::File(PathBuf::from(s))
+            }
+        });
+        let export_binary = self.export_binary.map(|s| {
+            if s == "-" {
+                SnapshotEndpoint::StdIo
+            } else {
+                SnapshotEndpoint::File(PathBuf::from(s))
+            }
+        });
 
         Ok(CliArgs {
             root,
