@@ -19,7 +19,7 @@ use crate::input::InputAction;
 use crate::scan_control::{ScanTrigger, ScanTriggerSender};
 use crate::size::total_size;
 use crate::snapshot::{self, SnapshotEndpoint, SnapshotFormat};
-use crate::state::{AppState, ScanState};
+use crate::state::{AppState, ScanState, StatusMessage, StatusOutcome};
 use crate::tree::{FileTree, NodeMetadata, NodeType};
 use std::fs;
 use std::path::PathBuf;
@@ -46,7 +46,7 @@ pub fn handle_input_action(
         InputAction::StartFilter => {
             state.filter_active = true;
             state.filter_prompt_active = true;
-            state.update_status("filter: type name substring and press Enter");
+            state.update_status(StatusMessage::FilterPrompt);
         }
         InputAction::FilterChar(ch) => {
             state.filter_query.push(ch);
@@ -59,39 +59,36 @@ pub fn handle_input_action(
             state.filter_prompt_active = false;
             if state.filter_query.is_empty() {
                 state.filter_active = false;
-                state.update_status("filter cleared");
+                state.update_status(StatusMessage::FilterCleared);
             } else {
                 state.filter_active = true;
-                state.update_status(format!("filter active: {}", state.filter_query));
+                state.update_status(StatusMessage::FilterActive(state.filter_query.clone()));
             }
         }
         InputAction::ClearFilter => {
             state.filter_prompt_active = false;
             state.clear_filter();
-            state.update_status("filter cleared");
+            state.update_status(StatusMessage::FilterCleared);
         }
         InputAction::CycleSort => {
             let next = next_sort_mode(state.sort_mode);
             state.set_sort_mode(next);
-            state.update_status(format!("sort mode: {}", sort_mode_label(next)));
+            state.update_status(StatusMessage::SortMode(next));
         }
         InputAction::ToggleHidden => {
             state.display_options.show_hidden = !state.display_options.show_hidden;
             state.refresh_treemap_nodes();
             state.ensure_selection_visible();
-            let status = if state.display_options.show_hidden {
-                "hidden files shown"
-            } else {
-                "hidden files hidden"
-            };
-            state.update_status(status);
+            state.update_status(StatusMessage::HiddenFilesVisible(
+                state.display_options.show_hidden,
+            ));
         }
         InputAction::ToggleHelp => {
             state.show_help = !state.show_help;
             if state.show_help {
-                state.update_status("help opened");
+                state.update_status(StatusMessage::HelpOpened);
             } else {
-                state.update_status("help closed");
+                state.update_status(StatusMessage::HelpClosed);
             }
         }
         InputAction::Collapse => collapse_selection(state),
@@ -187,15 +184,6 @@ fn restore_selection(state: &mut AppState, path: Option<PathBuf>) {
     state.selection = Some(state.tree.root());
 }
 
-fn sort_mode_label(mode: SortMode) -> &'static str {
-    match mode {
-        SortMode::SizeDesc => "size_desc",
-        SortMode::SizeAsc => "size_asc",
-        SortMode::Name => "name",
-        SortMode::ModifiedTime => "modified_time",
-    }
-}
-
 fn select_previous(state: &mut AppState) {
     let ids = state.visible_node_ids();
     if ids.is_empty() {
@@ -279,7 +267,7 @@ fn toggle_selection(state: &mut AppState) {
 
 fn delete_selection(state: &mut AppState) {
     if !state.allow_modifications {
-        state.update_status("imported scan is read-only");
+        state.update_status(StatusMessage::ImportReadOnly);
         return;
     }
     let Some(selected_id) = state.selection else {
@@ -289,7 +277,7 @@ fn delete_selection(state: &mut AppState) {
     if state.pending_delete != Some(selected_id) {
         state.pending_delete = Some(selected_id);
         if let Some(node) = state.tree.node(selected_id) {
-            state.update_status(format!("press d again to delete {}", node.path.display()));
+            state.update_status(StatusMessage::DeleteConfirmation(node.path.clone()));
         }
         return;
     }
@@ -315,11 +303,11 @@ fn delete_selection(state: &mut AppState) {
                 node.children.clear();
                 node.expanded = false;
             }
-            state.update_status(format!("deleted {}", target.display()));
+            state.update_status(StatusMessage::DeleteSuccess(target.clone()));
         }
         Err(err) => {
             state.mark_scan_error(format!("delete failed for {}: {err}", target.display()));
-            state.update_status(format!("delete failed: {}", target.display()));
+            state.update_status(StatusMessage::DeleteFailure(target.clone()));
         }
     }
     state.pending_delete = None;
@@ -327,7 +315,7 @@ fn delete_selection(state: &mut AppState) {
 
 fn open_selection(state: &mut AppState) {
     if !state.allow_modifications {
-        state.update_status("imported scan is read-only");
+        state.update_status(StatusMessage::ImportReadOnly);
         return;
     }
     let Some(selected_id) = state.selection else {
@@ -341,16 +329,28 @@ fn open_selection(state: &mut AppState) {
     command.arg(&path);
 
     match command.spawn() {
-        Ok(_) => state.update_status(format!("opened {}", path.display())),
-        Err(err) => state.update_status(format!("open failed for {}: {err}", path.display())),
+        Ok(_) => state.update_status(StatusMessage::OpenResult {
+            path: path.clone(),
+            outcome: StatusOutcome::Success,
+        }),
+        Err(err) => state.update_status(StatusMessage::OpenResult {
+            path: path.clone(),
+            outcome: StatusOutcome::failure(err),
+        }),
     }
 }
 
 fn export_scan(state: &mut AppState) {
     let snapshot_path = std::path::Path::new("/tmp/dar-scan.json");
     match snapshot::export_tree(&state.tree, snapshot_path, state.export_options) {
-        Ok(()) => state.update_status(format!("scan exported to {}", snapshot_path.display())),
-        Err(err) => state.update_status(format!("export failed: {err}")),
+        Ok(()) => state.update_status(StatusMessage::ExportResult {
+            path: snapshot_path.to_path_buf(),
+            outcome: StatusOutcome::Success,
+        }),
+        Err(err) => state.update_status(StatusMessage::ExportResult {
+            path: snapshot_path.to_path_buf(),
+            outcome: StatusOutcome::failure(err),
+        }),
     }
 }
 
@@ -370,15 +370,21 @@ fn import_scan(state: &mut AppState) {
         Ok(tree) => {
             state.tree = tree;
             state.selection = Some(state.tree.root());
-            state.update_status(format!("scan imported from {}", snapshot_path.display()));
+            state.update_status(StatusMessage::ImportResult {
+                path: snapshot_path.to_path_buf(),
+                outcome: StatusOutcome::Success,
+            });
         }
-        Err(err) => state.update_status(format!("import failed: {err}")),
+        Err(err) => state.update_status(StatusMessage::ImportResult {
+            path: snapshot_path.to_path_buf(),
+            outcome: StatusOutcome::failure(err),
+        }),
     }
 }
 
 fn rescan_selection(state: &mut AppState) {
     if !state.allow_modifications {
-        state.update_status("imported scan is read-only");
+        state.update_status(StatusMessage::ImportReadOnly);
         return;
     }
     let Some(selected_id) = state.selection else {
@@ -389,11 +395,15 @@ fn rescan_selection(state: &mut AppState) {
     };
 
     let previous_size = node.size;
+    let node_path = node.path.clone();
     let refreshed_size = if node.file_type == NodeType::Directory {
         match total_size(&node.path, false) {
             Ok(size) => size,
             Err(err) => {
-                state.update_status(format!("rescan failed: {err}"));
+                state.update_status(StatusMessage::RescanResult {
+                    path: node_path.clone(),
+                    outcome: StatusOutcome::failure(err),
+                });
                 return;
             }
         }
@@ -401,7 +411,10 @@ fn rescan_selection(state: &mut AppState) {
         match std::fs::metadata(&node.path) {
             Ok(meta) => meta.len(),
             Err(err) => {
-                state.update_status(format!("rescan failed: {err}"));
+                state.update_status(StatusMessage::RescanResult {
+                    path: node_path.clone(),
+                    outcome: StatusOutcome::failure(err),
+                });
                 return;
             }
         }
@@ -411,7 +424,10 @@ fn rescan_selection(state: &mut AppState) {
         current.size = refreshed_size;
     }
     adjust_ancestors_after_rescan(state, node.parent, previous_size, refreshed_size);
-    state.update_status(format!("rescanned {}", node.path.display()));
+    state.update_status(StatusMessage::RescanResult {
+        path: node_path,
+        outcome: StatusOutcome::Success,
+    });
 }
 
 fn adjust_ancestors_after_rescan(
@@ -452,14 +468,14 @@ pub fn process_scan_event(state: &mut AppState, event: ScanEvent) {
             let last_path = batch.nodes.last().map(|n| n.path.clone());
             state.pending_scan_nodes.extend(batch.nodes);
             if let Some(path) = last_path {
-                state.update_status(format!("scanned {}", path.display()));
+                state.update_status(StatusMessage::ScanPath(path));
             }
             if let Some(progress) = batch.progress {
                 state.mark_scan_progress(progress.clone());
-                state.update_status(format!(
-                    "scanned {} entries, {} errors",
-                    progress.scanned, progress.errors
-                ));
+                state.update_status(StatusMessage::ScanProgress {
+                    scanned: progress.scanned,
+                    errors: progress.errors,
+                });
             } else {
                 state.mark_scan_complete();
             }
@@ -475,17 +491,17 @@ pub fn process_scan_event(state: &mut AppState, event: ScanEvent) {
         }
         ScanEvent::Progress(progress) => {
             state.mark_scan_progress(progress.clone());
-            state.update_status(format!(
-                "scanned {} entries, {} errors",
-                progress.scanned, progress.errors
-            ));
+            state.update_status(StatusMessage::ScanProgress {
+                scanned: progress.scanned,
+                errors: progress.errors,
+            });
         }
         ScanEvent::Error(error) => {
             state.mark_scan_error(format!("{}: {}", error.path.display(), error.source));
         }
         ScanEvent::Completed => {
             state.mark_scan_complete();
-            state.update_status("scan complete");
+            state.update_status(StatusMessage::ScanComplete);
             rebuild_tree_from_pending(state);
         }
     }

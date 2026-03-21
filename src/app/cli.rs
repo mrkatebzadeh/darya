@@ -8,62 +8,336 @@
 // This program is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
+// GNU General Public License for details.
 //
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{display::DisplayOptions, snapshot::SnapshotEndpoint};
+use clap::Parser;
 use std::env;
-use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const VERSION_TEXT: &str = concat!(env!("CARGO_PKG_NAME"), " ", env!("CARGO_PKG_VERSION"));
-const HELP_TEXT: &str = concat!(
-    env!("CARGO_PKG_NAME"),
-    " ",
-    env!("CARGO_PKG_VERSION"),
-    " - ncdu-inspired disk usage explorer\n",
-    "See https://dev.yorhel.nl/ncdu/man for the reference ncdu manual.\n\n",
-    "USAGE:\n    ",
-    env!("CARGO_PKG_NAME"),
-    " [PATH]\n\n",
-    "ARGS:\n",
-    "    PATH        Optional starting directory (default: current working directory)\n\n",
-    "OPTIONS:\n",
-    "    -h, --help  Print this help screen\n",
-    "    -v, --version  Print the version information\n",
-    "    -f FILE  Import snapshot from FILE (use '-' for stdin, JSON only)\n",
-    "    -o FILE  Export scan tree to FILE in JSON format\n",
-    "    -O FILE  Export scan tree to FILE in binary format\n",
-    "    -e, --extended  Enable extended metadata mode for owner/permissions/mtime\n",
-    "    --no-extended  Disable extended metadata mode\n",
-    "    -x, --one-file-system  Stay on the starting filesystem\n",
-    "    --cross-file-system  Allow crossing filesystem boundaries\n",
-    "    -L, --follow-symlinks  Follow symbolic links while scanning\n",
-    "    --no-follow-symlinks  Do not follow symlinks\n",
-    "    --include-caches  Explicitly include cache directories\n",
-    "    --exclude-caches  Skip directories named cache\n",
-    "    --include-kernfs  Include kernfs-mounted directories\n",
-    "    --exclude-kernfs  Skip kernfs namespaces\n",
-    "    -t N  Limit the runtime worker threads to N\n",
-    "    -c, --compress  Compress the exported JSON with gzip\n",
-    "    --compress-level N  Set gzip compression level (1-9)\n",
-    "    --export-block-size BYTES  Set buffered block size for exports\n",
-    "    -0  Force ncurses UI mode (default)\n",
-    "    -1  Print a textual progress report instead of the UI\n",
-    "    -2  Print a simple summary after scanning\n",
-    "    --ignore-config  Do not load configuration files\n",
-    "    --exclude PATTERN  Exclude files/directories by glob pattern (repeatable)\n"
-);
+/// Ncdu-inspired disk usage explorer.
+///
+/// See https://dev.yorhel.nl/ncdu/man for the reference ncdu manual.
+#[derive(Debug, Parser)]
+#[command(name = "dar", version, about, long_about = None)]
+pub struct DarCli {
+    /// Optional starting directory (default: current working directory)
+    #[arg(value_name = "PATH")]
+    pub root: Option<PathBuf>,
 
-/// Represents the CLI command to run.
-#[derive(Debug)]
-pub enum CliCommand {
-    Run(CliArgs),
-    Help,
-    Version,
+    /// Import snapshot from FILE (use '-' for stdin, JSON only)
+    #[arg(short = 'f', long, value_name = "FILE")]
+    pub import_snapshot: Option<String>,
+
+    /// Export scan tree to FILE in JSON format
+    #[arg(short = 'o', value_name = "FILE")]
+    pub export_json: Option<String>,
+
+    /// Export scan tree to FILE in binary format
+    #[arg(short = 'O', value_name = "FILE")]
+    pub export_binary: Option<String>,
+
+    /// Enable extended metadata mode for owner/permissions/mtime
+    #[arg(short = 'e', long)]
+    pub extended: bool,
+
+    /// Disable extended metadata mode
+    #[arg(long)]
+    pub no_extended: bool,
+
+    /// Stay on the starting filesystem
+    #[arg(short = 'x', long)]
+    pub one_file_system: bool,
+
+    /// Allow crossing filesystem boundaries
+    #[arg(long)]
+    pub cross_file_system: bool,
+
+    /// Follow symbolic links while scanning
+    #[arg(short = 'L', long)]
+    pub follow_symlinks: bool,
+
+    /// Do not follow symlinks
+    #[arg(long)]
+    pub no_follow_symlinks: bool,
+
+    /// Explicitly include cache directories
+    #[arg(long)]
+    pub include_caches: bool,
+
+    /// Skip directories named cache
+    #[arg(long)]
+    pub exclude_caches: bool,
+
+    /// Include kernfs-mounted directories
+    #[arg(long)]
+    pub include_kernfs: bool,
+
+    /// Skip kernfs namespaces
+    #[arg(long)]
+    pub exclude_kernfs: bool,
+
+    /// Limit the runtime worker threads to N
+    #[arg(short = 't', long, value_name = "N")]
+    pub thread_count: Option<usize>,
+
+    /// Compress the exported JSON with gzip
+    #[arg(short = 'c', long)]
+    pub compress: bool,
+
+    /// Set gzip compression level (1-9)
+    #[arg(long, value_name = "N")]
+    pub compress_level: Option<u32>,
+
+    /// Set buffered block size for exports
+    #[arg(long, value_name = "BYTES")]
+    pub export_block_size: Option<usize>,
+
+    /// Force UI mode (default)
+    #[arg(long = "0")]
+    pub force_tui: bool,
+
+    /// Print a textual progress report instead of the UI
+    #[arg(long = "1")]
+    pub force_progress: bool,
+
+    /// Print a simple summary after scanning
+    #[arg(long = "2")]
+    pub force_summary: bool,
+
+    /// Do not load configuration files
+    #[arg(long)]
+    pub ignore_config: bool,
+
+    /// Exclude files/directories by glob pattern (repeatable)
+    #[arg(long, value_name = "PATTERN")]
+    pub exclude: Vec<String>,
+
+    /// Read exclude patterns from FILE (one pattern per line, # for comments)
+    #[arg(short = 'X', long = "exclude-from", value_name = "FILE")]
+    pub exclude_from: Vec<PathBuf>,
+
+    // Display options
+    /// Use SI units (1k = 1000) instead of binary (1k = 1024)
+    #[arg(long)]
+    pub si: bool,
+
+    /// Show disk usage instead of apparent size
+    #[arg(long)]
+    pub disk_usage: bool,
+
+    /// Show apparent size instead of disk usage
+    #[arg(long)]
+    pub apparent_size: bool,
+
+    #[arg(long)]
+    pub show_hidden: bool,
+
+    #[arg(long)]
+    pub hide_hidden: bool,
+
+    #[arg(long)]
+    pub show_itemcount: bool,
+
+    #[arg(long)]
+    pub hide_itemcount: bool,
+
+    #[arg(long)]
+    pub show_mtime: bool,
+
+    #[arg(long)]
+    pub hide_mtime: bool,
+
+    #[arg(long)]
+    pub show_percent: bool,
+
+    #[arg(long)]
+    pub hide_percent: bool,
+
+    /// Disable the size bar graph
+    #[arg(long)]
+    pub no_graph: bool,
+}
+
+impl DarCli {
+    /// Preprocess argv so that `-0`, `-1`, `-2` become `--0`, `--1`, `--2` for interface mode.
+    /// Call this before parsing when using parse_from_iter for tests.
+    pub fn preprocess_interface_args(args: impl IntoIterator<Item = std::ffi::OsString>) -> Vec<std::ffi::OsString> {
+        args.into_iter()
+            .map(|a| {
+                let s = a.to_string_lossy();
+                match s.as_ref() {
+                    "-0" => std::ffi::OsString::from("--0"),
+                    "-1" => std::ffi::OsString::from("--1"),
+                    "-2" => std::ffi::OsString::from("--2"),
+                    _ => a,
+                }
+            })
+            .collect()
+    }
+
+    /// Parse from the environment, with -0/-1/-2 preprocessing.
+    pub fn try_parse() -> Result<Self, clap::Error> {
+        let args: Vec<std::ffi::OsString> = env::args_os().collect();
+        let program = args.first().cloned().unwrap_or_else(|| std::ffi::OsString::from("dar"));
+        let rest = Self::preprocess_interface_args(args.into_iter().skip(1));
+        Self::try_parse_from(std::iter::once(program).chain(rest))
+    }
+
+    /// Parse from the given iterator (for tests). Call preprocess_interface_args on the args first.
+    pub fn parse_from_iter<I>(iter: I) -> Result<CliArgs, CliParseError>
+    where
+        I: IntoIterator<Item = std::ffi::OsString>,
+    {
+        let preprocessed = Self::preprocess_interface_args(iter);
+        let raw = Self::try_parse_from(std::iter::once(std::ffi::OsString::from("dar")).chain(preprocessed))
+            .map_err(|e| CliParseError::Clap(e))?;
+        raw.into_cli_args()
+    }
+
+    /// Convert parsed CLI into the app's CliArgs (resolve root, merge exclude-from, etc.).
+    pub fn into_cli_args(self) -> Result<CliArgs, CliParseError> {
+        let root = self
+            .root
+            .map(Ok)
+            .unwrap_or_else(|| env::current_dir().map_err(CliParseError::CurrentDir))?;
+
+        let mut exclude_patterns = self.exclude;
+        for path in &self.exclude_from {
+            let patterns = read_patterns_from_file(path)?;
+            exclude_patterns.extend(patterns);
+        }
+
+        let extended = self.extended && !self.no_extended;
+
+        let same_fs_override = if self.cross_file_system {
+            Some(false)
+        } else if self.one_file_system {
+            Some(true)
+        } else {
+            None
+        };
+
+        let cache_policy = if self.exclude_caches {
+            Some(false)
+        } else if self.include_caches {
+            Some(true)
+        } else {
+            None
+        };
+
+        let kernfs_policy = if self.exclude_kernfs {
+            Some(false)
+        } else if self.include_kernfs {
+            Some(true)
+        } else {
+            None
+        };
+
+        let follow_symlinks_override = if self.no_follow_symlinks {
+            Some(false)
+        } else if self.follow_symlinks {
+            Some(true)
+        } else {
+            None
+        };
+
+        let interface_mode = if self.force_summary {
+            InterfaceMode::Summary
+        } else if self.force_progress {
+            InterfaceMode::Progress
+        } else {
+            InterfaceMode::Tui
+        };
+
+        let mut display_options = DisplayOptions::default();
+        if self.si {
+            display_options.use_si = true;
+        }
+        if self.disk_usage {
+            display_options.prefer_disk = true;
+        }
+        if self.apparent_size {
+            display_options.prefer_disk = false;
+        }
+        if self.show_hidden {
+            display_options.show_hidden = true;
+        }
+        if self.hide_hidden {
+            display_options.show_hidden = false;
+        }
+        if self.show_itemcount {
+            display_options.show_item_count = true;
+        }
+        if self.hide_itemcount {
+            display_options.show_item_count = false;
+        }
+        if self.show_mtime {
+            display_options.show_mtime = true;
+        }
+        if self.hide_mtime {
+            display_options.show_mtime = false;
+        }
+        if self.show_percent {
+            display_options.show_percent = true;
+        }
+        if self.hide_percent {
+            display_options.show_percent = false;
+        }
+        if self.no_graph {
+            display_options.show_graph = false;
+        }
+
+        if let Some(t) = self.thread_count {
+            if t == 0 {
+                return Err(CliParseError::InvalidThreadCount(t.to_string()));
+            }
+        }
+        if let Some(l) = self.compress_level {
+            if l == 0 || l > 9 {
+                return Err(CliParseError::InvalidCompressionLevel(l.to_string()));
+            }
+        }
+        if let Some(b) = self.export_block_size {
+            if b == 0 {
+                return Err(CliParseError::InvalidExportBlockSize(b.to_string()));
+            }
+        }
+
+        let import_snapshot = self
+            .import_snapshot
+            .map(|s| if s == "-" { SnapshotEndpoint::StdIo } else { SnapshotEndpoint::File(PathBuf::from(s)) });
+        let export_json = self
+            .export_json
+            .map(|s| if s == "-" { SnapshotEndpoint::StdIo } else { SnapshotEndpoint::File(PathBuf::from(s)) });
+        let export_binary = self
+            .export_binary
+            .map(|s| if s == "-" { SnapshotEndpoint::StdIo } else { SnapshotEndpoint::File(PathBuf::from(s)) });
+
+        Ok(CliArgs {
+            root,
+            exclude_patterns,
+            extended,
+            import_snapshot,
+            export_json,
+            export_binary,
+            ignore_config: self.ignore_config,
+            same_fs_override,
+            cache_policy,
+            kernfs_policy,
+            thread_count: self.thread_count,
+            follow_symlinks_override,
+            export_compress: self.compress,
+            export_compress_level: self.compress_level,
+            export_block_size: self.export_block_size,
+            interface_mode,
+            display_options,
+        })
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -71,202 +345,6 @@ pub enum InterfaceMode {
     Tui,
     Progress,
     Summary,
-}
-
-impl CliCommand {
-    /// Parse the arguments coming from the environment.
-    pub fn parse() -> Result<Self, CliParseError> {
-        Self::parse_from_iter(env::args_os().skip(1))
-    }
-
-    fn parse_from_iter<I>(iter: I) -> Result<Self, CliParseError>
-    where
-        I: IntoIterator<Item = OsString>,
-    {
-        let args: Vec<OsString> = iter.into_iter().collect();
-        if args.iter().any(|arg| is_help_flag(arg)) {
-            return Ok(Self::Help);
-        }
-        if args.iter().any(|arg| is_version_flag(arg)) {
-            return Ok(Self::Version);
-        }
-
-        let mut args = args.into_iter().peekable();
-        let mut root: Option<PathBuf> = None;
-        let mut exclude_patterns = Vec::new();
-        let mut import_snapshot = None;
-        let mut export_json = None;
-        let mut export_binary = None;
-        let mut extended = false;
-        let mut ignore_config = false;
-        let mut same_fs_override: Option<bool> = None;
-        let mut cache_policy: Option<bool> = None;
-        let mut kernfs_policy: Option<bool> = None;
-        let mut thread_count: Option<usize> = None;
-        let mut follow_override: Option<bool> = None;
-        let mut export_compress = false;
-        let mut export_compress_level = None;
-        let mut export_block_size = None;
-        let mut display_options = DisplayOptions::default();
-        let mut interface_mode = InterfaceMode::Tui;
-
-        while let Some(arg) = args.next() {
-            match arg.to_str() {
-                Some("--exclude") => {
-                    let value = take_option_value(&mut args, "--exclude")?;
-                    exclude_patterns.push(value.to_string_lossy().into_owned());
-                }
-                Some("-X") | Some("--exclude-from") => {
-                    let value = take_option_value(&mut args, arg.to_str().unwrap())?;
-                    let path = PathBuf::from(value);
-                    let patterns = read_patterns_from_file(&path)?;
-                    exclude_patterns.extend(patterns);
-                }
-                Some("-c") | Some("--compress") => {
-                    export_compress = true;
-                }
-                Some("--compress-level") => {
-                    let value = take_option_value(&mut args, "--compress-level")?;
-                    export_compress_level = Some(parse_compression_level(&value)?);
-                }
-                Some("--export-block-size") => {
-                    let value = take_option_value(&mut args, "--export-block-size")?;
-                    export_block_size = Some(parse_block_size(&value)?);
-                }
-                Some("--si") => {
-                    display_options.use_si = true;
-                }
-                Some("--disk-usage") => {
-                    display_options.prefer_disk = true;
-                }
-                Some("--apparent-size") => {
-                    display_options.prefer_disk = false;
-                }
-                Some("--show-hidden") => display_options.show_hidden = true,
-                Some("--hide-hidden") => display_options.show_hidden = false,
-                Some("--show-itemcount") => display_options.show_item_count = true,
-                Some("--hide-itemcount") => display_options.show_item_count = false,
-                Some("--show-mtime") => display_options.show_mtime = true,
-                Some("--hide-mtime") => display_options.show_mtime = false,
-                Some("--show-percent") => display_options.show_percent = true,
-                Some("--hide-percent") => display_options.show_percent = false,
-                Some("--no-graph") => display_options.show_graph = false,
-                Some("-f") => {
-                    let value = take_option_value(&mut args, "-f")?;
-                    import_snapshot = Some(parse_endpoint(&value));
-                }
-                Some("-o") => {
-                    let value = take_option_value(&mut args, "-o")?;
-                    export_json = Some(parse_endpoint(&value));
-                }
-                Some("-O") => {
-                    let value = take_option_value(&mut args, "-O")?;
-                    export_binary = Some(parse_endpoint(&value));
-                }
-                Some("-e") | Some("--extended") => {
-                    extended = true;
-                }
-                Some("--no-extended") => {
-                    extended = false;
-                }
-                Some("-x") | Some("--one-file-system") => {
-                    same_fs_override = Some(true);
-                }
-                Some("--cross-file-system") => {
-                    same_fs_override = Some(false);
-                }
-                Some("--include-caches") => {
-                    cache_policy = Some(true);
-                }
-                Some("--exclude-caches") => {
-                    cache_policy = Some(false);
-                }
-                Some("--include-kernfs") => {
-                    kernfs_policy = Some(true);
-                }
-                Some("--exclude-kernfs") => {
-                    kernfs_policy = Some(false);
-                }
-                Some("-t") => {
-                    let value = take_option_value(&mut args, "-t")?;
-                    thread_count = Some(parse_thread_count(&value)?);
-                }
-                Some("-L") | Some("--follow-symlinks") => {
-                    follow_override = Some(true);
-                }
-                Some("--no-follow-symlinks") => {
-                    follow_override = Some(false);
-                }
-                Some("--ignore-config") => {
-                    ignore_config = true;
-                }
-                Some("-0") => interface_mode = InterfaceMode::Tui,
-                Some("-1") => interface_mode = InterfaceMode::Progress,
-                Some("-2") => interface_mode = InterfaceMode::Summary,
-                Some(value) if value.starts_with('-') => {
-                    return Err(CliParseError::UnknownOption(value.to_string()));
-                }
-                _ => {
-                    if root.is_none() {
-                        root = Some(PathBuf::from(arg));
-                    } else {
-                        return Err(CliParseError::TooManyArguments);
-                    }
-                }
-            }
-        }
-
-        let cli = if let Some(root) = root {
-            CliArgs {
-                root,
-                exclude_patterns,
-                extended,
-                import_snapshot,
-                export_json,
-                export_binary,
-                ignore_config,
-                same_fs_override,
-                cache_policy,
-                kernfs_policy,
-                thread_count,
-                follow_symlinks_override: follow_override,
-                export_compress,
-                export_compress_level,
-                export_block_size,
-                display_options,
-                interface_mode,
-            }
-        } else {
-            let mut cli = CliArgs::from_current_dir()?;
-            cli.exclude_patterns = exclude_patterns;
-            cli.extended = extended;
-            cli.import_snapshot = import_snapshot;
-            cli.export_json = export_json;
-            cli.export_binary = export_binary;
-            cli.ignore_config = ignore_config;
-            cli.same_fs_override = same_fs_override;
-            cli.cache_policy = cache_policy;
-            cli.kernfs_policy = kernfs_policy;
-            cli.thread_count = thread_count;
-            cli.follow_symlinks_override = follow_override;
-            cli.export_compress = export_compress;
-            cli.export_compress_level = export_compress_level;
-            cli.export_block_size = export_block_size;
-            cli.interface_mode = interface_mode;
-            cli.display_options = display_options;
-            cli
-        };
-        Ok(Self::Run(cli))
-    }
-
-    /// Return the help text displayed when `--help` is requested.
-    pub fn help_text() -> &'static str {
-        HELP_TEXT
-    }
-
-    pub fn version_text() -> &'static str {
-        VERSION_TEXT
-    }
 }
 
 /// Represents validated CLI arguments when running the application.
@@ -291,69 +369,6 @@ pub struct CliArgs {
     pub display_options: DisplayOptions,
 }
 
-impl CliArgs {
-    fn from_current_dir() -> Result<Self, CliParseError> {
-        let root = env::current_dir().map_err(CliParseError::CurrentDir)?;
-        Ok(Self {
-            root,
-            exclude_patterns: Vec::new(),
-            extended: false,
-            import_snapshot: None,
-            export_json: None,
-            export_binary: None,
-            ignore_config: false,
-            same_fs_override: None,
-            cache_policy: None,
-            kernfs_policy: None,
-            thread_count: None,
-            follow_symlinks_override: None,
-            export_compress: false,
-            export_compress_level: None,
-            export_block_size: None,
-            interface_mode: InterfaceMode::Tui,
-            display_options: DisplayOptions::default(),
-        })
-    }
-}
-
-fn take_option_value<I>(args: &mut I, flag: &str) -> Result<OsString, CliParseError>
-where
-    I: Iterator<Item = OsString>,
-{
-    args.next()
-        .ok_or_else(|| CliParseError::MissingOptionValue(flag.to_string()))
-}
-
-fn parse_endpoint(value: &OsStr) -> SnapshotEndpoint {
-    if value == OsStr::new("-") {
-        SnapshotEndpoint::StdIo
-    } else {
-        SnapshotEndpoint::File(PathBuf::from(value))
-    }
-}
-
-fn parse_compression_level(value: &OsStr) -> Result<u32, CliParseError> {
-    let text = value.to_string_lossy();
-    let level = text
-        .parse::<u32>()
-        .map_err(|_| CliParseError::InvalidCompressionLevel(text.to_string()))?;
-    if level > 9 {
-        return Err(CliParseError::InvalidCompressionLevel(text.to_string()));
-    }
-    Ok(level)
-}
-
-fn parse_block_size(value: &OsStr) -> Result<usize, CliParseError> {
-    let text = value.to_string_lossy();
-    let size = text
-        .parse::<usize>()
-        .map_err(|_| CliParseError::InvalidExportBlockSize(text.to_string()))?;
-    if size == 0 {
-        return Err(CliParseError::InvalidExportBlockSize(text.to_string()));
-    }
-    Ok(size)
-}
-
 fn read_patterns_from_file(path: &Path) -> Result<Vec<String>, CliParseError> {
     let contents = fs::read_to_string(path)
         .map_err(|err| CliParseError::ExcludeFile(path.to_path_buf(), err))?;
@@ -365,44 +380,21 @@ fn read_patterns_from_file(path: &Path) -> Result<Vec<String>, CliParseError> {
         .collect())
 }
 
-fn parse_thread_count(value: &OsStr) -> Result<usize, CliParseError> {
-    let text = value.to_string_lossy().to_string();
-    let parsed = text
-        .parse::<usize>()
-        .map_err(|_| CliParseError::InvalidThreadCount(text.clone()))?;
-    if parsed == 0 {
-        return Err(CliParseError::InvalidThreadCount(text));
-    }
-    Ok(parsed)
-}
-
-fn is_help_flag(arg: &OsStr) -> bool {
-    matches!(arg.to_str(), Some("--help") | Some("-h"))
-}
-
-fn is_version_flag(arg: &OsStr) -> bool {
-    matches!(arg.to_str(), Some("-v") | Some("-V") | Some("--version"))
-}
-
 /// Errors that can occur while parsing CLI arguments.
 #[derive(Debug, thiserror::Error)]
 pub enum CliParseError {
-    #[error("too many arguments were provided")]
-    TooManyArguments,
-    #[error("unknown option: {0}")]
-    UnknownOption(String),
-    #[error("missing value for option: {0}")]
-    MissingOptionValue(String),
-    #[error("invalid thread count: {0}")]
-    InvalidThreadCount(String),
-    #[error("invalid compression level: {0}")]
-    InvalidCompressionLevel(String),
-    #[error("invalid export block size: {0}")]
-    InvalidExportBlockSize(String),
+    #[error("clap error: {0}")]
+    Clap(#[from] clap::Error),
     #[error("failed to read exclude-from file {0}: {1}")]
     ExcludeFile(PathBuf, #[source] std::io::Error),
     #[error("unable to determine current directory: {0}")]
     CurrentDir(#[from] std::io::Error),
+    #[error("invalid thread count: {0} (must be at least 1)")]
+    InvalidThreadCount(String),
+    #[error("invalid compression level: {0} (must be 1-9)")]
+    InvalidCompressionLevel(String),
+    #[error("invalid export block size: {0} (must be at least 1)")]
+    InvalidExportBlockSize(String),
 }
 
 #[cfg(test)]
@@ -410,31 +402,33 @@ mod tests {
     use super::*;
     use crate::snapshot::SnapshotEndpoint;
     use std::ffi::OsString;
-    use std::fs::File;
     use std::io::Write;
 
-    #[test]
-    fn parse_help_flag_returns_help() {
-        assert!(matches!(
-            CliCommand::parse_from_iter(vec![OsString::from("--help")]),
-            Ok(CliCommand::Help)
-        ));
+    fn parse(args: Vec<OsString>) -> Result<CliArgs, CliParseError> {
+        DarCli::parse_from_iter(args)
     }
 
     #[test]
-    fn parse_version_flag_returns_version() {
-        assert!(matches!(
-            CliCommand::parse_from_iter(vec![OsString::from("-V")]),
-            Ok(CliCommand::Version)
-        ));
+    fn parse_help_flag_returns_error_with_help_message() {
+        let err = parse(vec![OsString::from("--help")]).unwrap_err();
+        assert!(matches!(err, CliParseError::Clap(_)));
+        // clap exits with help when --help is used; try_parse returns Err
+        if let CliParseError::Clap(e) = err {
+            assert!(e.to_string().contains("help"));
+        }
+    }
+
+    #[test]
+    fn parse_version_flag_returns_error_with_version() {
+        let err = parse(vec![OsString::from("-V")]).unwrap_err();
+        assert!(matches!(err, CliParseError::Clap(_)));
     }
 
     #[test]
     fn parse_import_flag_sets_endpoint() {
         let args = vec![OsString::from("-f"), OsString::from("-")];
-        assert!(
-            matches!(CliCommand::parse_from_iter(args), Ok(CliCommand::Run(cli)) if matches!(cli.import_snapshot, Some(SnapshotEndpoint::StdIo)))
-        );
+        let cli = parse(args).unwrap();
+        assert!(matches!(cli.import_snapshot, Some(SnapshotEndpoint::StdIo)));
     }
 
     #[test]
@@ -445,52 +439,37 @@ mod tests {
             OsString::from("-O"),
             OsString::from("export.bin"),
         ];
-        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
-            assert!(matches!(cli.export_json, Some(SnapshotEndpoint::File(_))));
-            assert!(matches!(cli.export_binary, Some(SnapshotEndpoint::File(_))));
-        } else {
-            panic!("expected run command");
-        }
+        let cli = parse(args).unwrap();
+        assert!(matches!(cli.export_json, Some(SnapshotEndpoint::File(_))));
+        assert!(matches!(cli.export_binary, Some(SnapshotEndpoint::File(_))));
     }
 
     #[test]
     fn parse_one_file_system_sets_override() {
         let args = vec![OsString::from("-x")];
-        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
-            assert_eq!(cli.same_fs_override, Some(true));
-        } else {
-            panic!("expected run command");
-        }
+        let cli = parse(args).unwrap();
+        assert_eq!(cli.same_fs_override, Some(true));
     }
 
     #[test]
     fn parse_cross_file_system_sets_override() {
         let args = vec![OsString::from("--cross-file-system")];
-        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
-            assert_eq!(cli.same_fs_override, Some(false));
-        } else {
-            panic!("expected run command");
-        }
+        let cli = parse(args).unwrap();
+        assert_eq!(cli.same_fs_override, Some(false));
     }
 
     #[test]
     fn parse_follow_symlinks_sets_override() {
         let args = vec![OsString::from("-L")];
-        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
-            assert_eq!(cli.follow_symlinks_override, Some(true));
-        } else {
-            panic!("expected run command");
-        }
+        let cli = parse(args).unwrap();
+        assert_eq!(cli.follow_symlinks_override, Some(true));
     }
 
     #[test]
     fn parse_thread_count_sets_override() {
         let args = vec![OsString::from("-t"), OsString::from("3")];
-        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
-            assert_eq!(cli.thread_count, Some(3));
-        } else {
-            panic!("expected run command");
-        }
+        let cli = parse(args).unwrap();
+        assert_eq!(cli.thread_count, Some(3));
     }
 
     #[test]
@@ -504,37 +483,31 @@ mod tests {
             OsString::from("--show-percent"),
             OsString::from("--no-graph"),
         ];
-        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
-            assert!(cli.display_options.use_si);
-            assert!(cli.display_options.prefer_disk);
-            assert!(cli.display_options.show_hidden);
-            assert!(cli.display_options.show_item_count);
-            assert!(cli.display_options.show_mtime);
-            assert!(cli.display_options.show_percent);
-            assert!(!cli.display_options.show_graph);
-        } else {
-            panic!("expected run command");
-        }
+        let cli = parse(args).unwrap();
+        assert!(cli.display_options.use_si);
+        assert!(cli.display_options.prefer_disk);
+        assert!(cli.display_options.show_hidden);
+        assert!(cli.display_options.show_item_count);
+        assert!(cli.display_options.show_mtime);
+        assert!(cli.display_options.show_percent);
+        assert!(!cli.display_options.show_graph);
     }
 
     #[test]
     fn parse_exclude_from_reads_patterns() {
         let path = std::env::temp_dir().join("dar-exclude.tmp");
-        let mut file = File::create(&path).unwrap();
-        writeln!(file, "ignored").unwrap();
-        writeln!(file, "foo").unwrap();
-        writeln!(file, "# comment").unwrap();
+        let mut file = std::fs::File::create(&path).unwrap();
+        std::io::Write::write_all(&mut file, b"ignored\n").unwrap();
+        std::io::Write::write_all(&mut file, b"foo\n").unwrap();
+        std::io::Write::write_all(&mut file, b"# comment\n").unwrap();
         file.flush().unwrap();
 
         let args = vec![
             OsString::from("-X"),
             OsString::from(path.to_string_lossy().into_owned()),
         ];
-        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
-            assert_eq!(cli.exclude_patterns, vec!["ignored", "foo"]);
-        } else {
-            panic!("expected run command");
-        }
+        let cli = parse(args).unwrap();
+        assert_eq!(cli.exclude_patterns, vec!["ignored", "foo"]);
 
         let _ = std::fs::remove_file(path);
     }
@@ -542,31 +515,22 @@ mod tests {
     #[test]
     fn parse_extended_flag_sets_mode() {
         let args = vec![OsString::from("-e"), OsString::from("/tmp")];
-        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
-            assert!(cli.extended);
-        } else {
-            panic!("expected run command");
-        }
+        let cli = parse(args).unwrap();
+        assert!(cli.extended);
     }
 
     #[test]
     fn parse_no_extended_flag_unsets_mode() {
         let args = vec![OsString::from("--no-extended"), OsString::from("/tmp")];
-        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
-            assert!(!cli.extended);
-        } else {
-            panic!("expected run command");
-        }
+        let cli = parse(args).unwrap();
+        assert!(!cli.extended);
     }
 
     #[test]
     fn parse_ignore_config_presets_flag() {
         let args = vec![OsString::from("--ignore-config")];
-        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
-            assert!(cli.ignore_config);
-        } else {
-            panic!("expected run command");
-        }
+        let cli = parse(args).unwrap();
+        assert!(cli.ignore_config);
     }
 
     #[test]
@@ -578,32 +542,23 @@ mod tests {
             OsString::from("--export-block-size"),
             OsString::from("16384"),
         ];
-        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
-            assert!(cli.export_compress);
-            assert_eq!(cli.export_compress_level, Some(5));
-            assert_eq!(cli.export_block_size, Some(16384));
-        } else {
-            panic!("expected run command");
-        }
+        let cli = parse(args).unwrap();
+        assert!(cli.export_compress);
+        assert_eq!(cli.export_compress_level, Some(5));
+        assert_eq!(cli.export_block_size, Some(16384));
     }
 
     #[test]
     fn parse_interface_mode_progress() {
         let args = vec![OsString::from("-1")];
-        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
-            assert_eq!(cli.interface_mode, InterfaceMode::Progress);
-        } else {
-            panic!("expected run command");
-        }
+        let cli = parse(args).unwrap();
+        assert_eq!(cli.interface_mode, InterfaceMode::Progress);
     }
 
     #[test]
     fn parse_interface_mode_summary() {
         let args = vec![OsString::from("-2")];
-        if let Ok(CliCommand::Run(cli)) = CliCommand::parse_from_iter(args) {
-            assert_eq!(cli.interface_mode, InterfaceMode::Summary);
-        } else {
-            panic!("expected run command");
-        }
+        let cli = parse(args).unwrap();
+        assert_eq!(cli.interface_mode, InterfaceMode::Summary);
     }
 }

@@ -14,23 +14,17 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use anyhow::Result;
-use dar::{app, cli::CliCommand, config};
+use dar::{app, cli::DarCli, config};
 
 fn run() -> Result<()> {
-    match CliCommand::parse()? {
-        CliCommand::Run(cli_args) => {
-            let config_load = config::load(cli_args.ignore_config);
-            app::run(cli_args, config_load)?;
-        }
-        CliCommand::Help => {
-            println!("{}", CliCommand::help_text());
-            return Ok(());
-        }
-        CliCommand::Version => {
-            println!("{}", CliCommand::version_text());
-            return Ok(());
-        }
-    }
+    let dar_cli = match DarCli::try_parse() {
+        Ok(c) => c,
+        Err(e) => e.exit(),
+    };
+
+    let cli_args = dar_cli.into_cli_args().map_err(|e| anyhow::anyhow!("{e}"))?;
+    let config_load = config::load(cli_args.ignore_config);
+    app::run(cli_args, config_load)?;
 
     Ok(())
 }

@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::state::AppState;
-use crate::state::ScanState;
+use crate::state::{AppState, ScanState, StatusMessage};
 use crate::theme::Theme;
 use crate::ui::helpers::{spinner_symbol, trim_to_width};
 use ratatui::layout::Rect;
@@ -23,11 +22,11 @@ use ratatui::terminal::Frame;
 use ratatui::widgets::Paragraph;
 
 pub fn draw_footer_panel(frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
-    let base_status = state.status_message.as_deref().unwrap_or("ready");
+    let base_status = state.status_text();
     let status_text = if matches!(state.scan_state, ScanState::Running(_)) {
         ""
     } else {
-        base_status
+        base_status.as_str()
     };
     let progress_label = match &state.scan_state {
         ScanState::Running(progress) => {
@@ -38,7 +37,7 @@ pub fn draw_footer_panel(frame: &mut Frame<'_>, area: Rect, state: &AppState, th
             )
         }
         ScanState::Error(message) => format!("error: {message}"),
-        ScanState::Completed => "scan complete".into(),
+        ScanState::Completed => StatusMessage::ScanComplete.to_string(),
         _ => "scan idle".into(),
     };
 
