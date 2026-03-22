@@ -22,7 +22,9 @@ fn run() -> Result<()> {
         Err(e) => e.exit(),
     };
 
-    let cli_args = dar_cli.into_cli_args().map_err(|e| anyhow::anyhow!("{e}"))?;
+    let cli_args = dar_cli
+        .into_cli_args()
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
     let config_load = config::load(cli_args.ignore_config);
     app::run(cli_args, config_load)?;
 
