@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use dar::treemap::{TreemapNode, normalize_areas, squarified_treemap};
+use darya::treemap::{TreemapNode, normalize_areas, squarified_treemap};
 use ratatui::layout::Rect;
 
 fn sample_nodes() -> Vec<TreemapNode> {

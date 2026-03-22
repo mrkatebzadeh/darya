@@ -525,7 +525,7 @@ mod tests {
 
     #[test]
     fn selected_info_contains_metadata_fields() {
-        let temp = std::env::temp_dir().join("dar-info-panel-test");
+        let temp = std::env::temp_dir().join("darya-info-panel-test");
         fs::write(&temp, b"x").unwrap();
 
         let mut state =

@@ -132,7 +132,7 @@ fn config_file_paths() -> Vec<PathBuf> {
 }
 
 fn system_config_path() -> Option<PathBuf> {
-    let path = PathBuf::from("/etc/dar/config");
+    let path = PathBuf::from("/etc/darya/config");
     if path.exists() { Some(path) } else { None }
 }
 
@@ -182,7 +182,7 @@ pub fn load(ignore_config: bool) -> ConfigLoad {
 }
 
 fn config_file_path() -> Option<PathBuf> {
-    ProjectDirs::from("org", "dar", "dar").map(|dirs| dirs.config_dir().join("config.toml"))
+    ProjectDirs::from("org", "darya", "darya").map(|dirs| dirs.config_dir().join("config.toml"))
 }
 
 fn parse_config_file(path: &Path) -> Result<Config, ConfigError> {

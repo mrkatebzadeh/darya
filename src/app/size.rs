@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn normalize_path_resolves_components() {
-        let base = create_temp_dir("dar-size");
+        let base = create_temp_dir("darya-size");
         let subdir = base.join("sub");
         fs::create_dir_all(&subdir).expect("create subdir");
         let nested = subdir.join("..");
@@ -110,7 +110,7 @@ mod tests {
 
     #[test]
     fn total_size_sums_files() {
-        let base = create_temp_dir("dar-size-sum");
+        let base = create_temp_dir("darya-size-sum");
         let file_a = base.join("a.txt");
         let file_b = base.join("nested/b.txt");
         fs::create_dir_all(file_b.parent().unwrap()).unwrap();

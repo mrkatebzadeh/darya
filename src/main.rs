@@ -14,15 +14,15 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use anyhow::Result;
-use dar::{app, cli::DarCli, config};
+use darya::{app, cli::DaryaCli, config};
 
 fn run() -> Result<()> {
-    let dar_cli = match DarCli::try_parse() {
+    let darya_cli = match DaryaCli::try_parse() {
         Ok(c) => c,
         Err(e) => e.exit(),
     };
 
-    let cli_args = dar_cli
+    let cli_args = darya_cli
         .into_cli_args()
         .map_err(|e| anyhow::anyhow!("{e}"))?;
     let config_load = config::load(cli_args.ignore_config);
@@ -33,7 +33,7 @@ fn run() -> Result<()> {
 
 fn main() {
     if let Err(err) = run() {
-        eprintln!("dar: {err}");
+        eprintln!("darya: {err}");
         std::process::exit(1);
     }
 }

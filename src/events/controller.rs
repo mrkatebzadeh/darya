@@ -341,7 +341,7 @@ fn open_selection(state: &mut AppState) {
 }
 
 fn export_scan(state: &mut AppState) {
-    let snapshot_path = std::path::Path::new("/tmp/dar-scan.json");
+    let snapshot_path = std::path::Path::new("/tmp/darya-scan.json");
     match snapshot::export_tree(&state.tree, snapshot_path, state.export_options) {
         Ok(()) => state.update_status(StatusMessage::ExportResult {
             path: snapshot_path.to_path_buf(),
@@ -355,7 +355,7 @@ fn export_scan(state: &mut AppState) {
 }
 
 fn import_scan(state: &mut AppState) {
-    let snapshot_path = std::path::Path::new("/tmp/dar-scan.json");
+    let snapshot_path = std::path::Path::new("/tmp/darya-scan.json");
     let default_root = state
         .tree
         .node(state.tree.root())

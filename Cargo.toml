@@ -1,5 +1,5 @@
 [package]
-name = "dar"
+name = "darya"
 version = "0.1.2"
 edition = "2024"
 description = "A fast, keyboard-driven disk usage explorer built on ratatui."

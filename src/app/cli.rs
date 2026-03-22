@@ -23,8 +23,8 @@ use std::path::{Path, PathBuf};
 ///
 /// See https://dev.yorhel.nl/ncdu/man for the reference ncdu manual.
 #[derive(Debug, Parser)]
-#[command(name = "dar", version, about, long_about = None)]
-pub struct DarCli {
+#[command(name = "darya", version, about, long_about = None)]
+pub struct DaryaCli {
     /// Optional starting directory (default: current working directory)
     #[arg(value_name = "PATH")]
     pub root: Option<PathBuf>,
@@ -163,7 +163,7 @@ pub struct DarCli {
     pub no_graph: bool,
 }
 
-impl DarCli {
+impl DaryaCli {
     /// Preprocess argv so that `-0`, `-1`, `-2` become `--0`, `--1`, `--2` for interface mode.
     /// Call this before parsing when using parse_from_iter for tests.
     pub fn preprocess_interface_args(
@@ -188,7 +188,7 @@ impl DarCli {
         let program = args
             .first()
             .cloned()
-            .unwrap_or_else(|| std::ffi::OsString::from("dar"));
+            .unwrap_or_else(|| std::ffi::OsString::from("darya"));
         let rest = Self::preprocess_interface_args(args.into_iter().skip(1));
         Self::try_parse_from(std::iter::once(program).chain(rest))
     }
@@ -200,7 +200,7 @@ impl DarCli {
     {
         let preprocessed = Self::preprocess_interface_args(iter);
         let raw = Self::try_parse_from(
-            std::iter::once(std::ffi::OsString::from("dar")).chain(preprocessed),
+            std::iter::once(std::ffi::OsString::from("darya")).chain(preprocessed),
         )
         .map_err(CliParseError::Clap)?;
         raw.into_cli_args()
@@ -421,7 +421,7 @@ mod tests {
     use std::io::Write;
 
     fn parse(args: Vec<OsString>) -> Result<CliArgs, CliParseError> {
-        DarCli::parse_from_iter(args)
+        DaryaCli::parse_from_iter(args)
     }
 
     #[test]
@@ -511,7 +511,7 @@ mod tests {
 
     #[test]
     fn parse_exclude_from_reads_patterns() {
-        let path = std::env::temp_dir().join("dar-exclude.tmp");
+        let path = std::env::temp_dir().join("darya-exclude.tmp");
         let mut file = std::fs::File::create(&path).unwrap();
         std::io::Write::write_all(&mut file, b"ignored\n").unwrap();
         std::io::Write::write_all(&mut file, b"foo\n").unwrap();

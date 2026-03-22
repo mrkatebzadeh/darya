@@ -1,7 +1,7 @@
-use dar::app::fs_scan::{ScanOptions, start_scan};
-use dar::app::state::{AppState, ScanState};
-use dar::config::SortMode;
-use dar::events::controller::process_scan_event;
+use darya::app::fs_scan::{ScanOptions, start_scan};
+use darya::app::state::{AppState, ScanState};
+use darya::config::SortMode;
+use darya::events::controller::process_scan_event;
 use std::fs;
 use tempfile::tempdir;
 

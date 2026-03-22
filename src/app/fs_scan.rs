@@ -446,7 +446,7 @@ mod tests {
 
     #[tokio::test]
     async fn scanner_emits_events() {
-        let base = create_tmp_dir("dar-scan");
+        let base = create_tmp_dir("darya-scan");
         let file = base.join("file.txt");
         write_file(&file, 4);
 

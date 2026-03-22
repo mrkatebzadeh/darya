@@ -283,29 +283,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dar"
-version = "0.1.2"
-dependencies = [
- "anyhow",
- "bincode",
- "clap",
- "crossterm 0.29.0",
- "directories",
- "flate2",
- "globset",
- "ratatui 0.24.0",
- "rayon",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "throbber-widgets-tui",
- "tokio",
- "toml",
- "walkdir",
-]
-
-[[package]]
 name = "darling"
 version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -337,6 +314,29 @@ dependencies = [
  "darling_core",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "darya"
+version = "0.1.2"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "clap",
+ "crossterm 0.29.0",
+ "directories",
+ "flate2",
+ "globset",
+ "ratatui 0.24.0",
+ "rayon",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "throbber-widgets-tui",
+ "tokio",
+ "toml",
+ "walkdir",
 ]
 
 [[package]]

@@ -199,7 +199,7 @@ mod tests {
 
     #[test]
     fn export_then_import_roundtrip_json() {
-        let root = PathBuf::from("/tmp/dar-snap-root");
+        let root = PathBuf::from("/tmp/darya-snap-root");
         let mut tree = FileTree::new(root.clone());
         let child = tree.add_child(0, TreeNode::new(root.join("child"), NodeType::File));
         if let Some(node) = tree.node_mut(child) {
@@ -207,7 +207,7 @@ mod tests {
             node.disk_size = 4096;
         }
 
-        let path = std::env::temp_dir().join("dar-snapshot-test.json");
+        let path = std::env::temp_dir().join("darya-snapshot-test.json");
         export_tree(&tree, &path, ExportOptions::default()).unwrap();
         let imported = import_from_destination(
             SnapshotEndpoint::File(path.clone()),
@@ -222,7 +222,7 @@ mod tests {
 
     #[test]
     fn export_then_import_roundtrip_binary() {
-        let root = PathBuf::from("/tmp/dar-snap-root");
+        let root = PathBuf::from("/tmp/darya-snap-root");
         let mut tree = FileTree::new(root.clone());
         let child = tree.add_child(0, TreeNode::new(root.join("binary-child"), NodeType::File));
         if let Some(node) = tree.node_mut(child) {
@@ -230,7 +230,7 @@ mod tests {
             node.disk_size = 8192;
         }
 
-        let path = std::env::temp_dir().join("dar-snapshot-test.bin");
+        let path = std::env::temp_dir().join("darya-snapshot-test.bin");
         let binary_options = ExportOptions {
             format: SnapshotFormat::Binary,
             compress: false,
