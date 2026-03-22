@@ -88,23 +88,23 @@ jobs:
       - name: Build binaries
         run: |
           if [ "${{ matrix.use_cross }}" = "true" ]; then
-            cross build --release --target "${{ matrix.target }}" --bin dar
+            cross build --release --target "${{ matrix.target }}" --bin darya
           else
-            cargo build --release --target "${{ matrix.target }}" --bin dar
+            cargo build --release --target "${{ matrix.target }}" --bin darya
           fi
 
       - name: Archive artifacts
         run: |
-          ARTIFACT_NAME="dar-${{ matrix.target }}"
+          ARTIFACT_NAME="darya-${{ matrix.target }}"
           DIST_DIR="dist"
           mkdir -p "${DIST_DIR}"
-          tar -czf "${DIST_DIR}/${ARTIFACT_NAME}.tar.gz" -C "target/${{ matrix.target }}/release" dar
+          tar -czf "${DIST_DIR}/${ARTIFACT_NAME}.tar.gz" -C "target/${{ matrix.target }}/release" darya
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dar-${{ matrix.target }}
-          path: dist/dar-${{ matrix.target }}.tar.gz
+          name: darya-${{ matrix.target }}
+          path: dist/darya-${{ matrix.target }}.tar.gz
 
   release:
     runs-on: ubuntu-latest
