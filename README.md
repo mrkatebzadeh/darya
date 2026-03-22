@@ -9,7 +9,7 @@ The interface is straightforward and easy to navigate, letting you move through 
 ![dar](https://github.com/user-attachments/assets/548e252f-76e7-4ea5-acf6-e1ca764bbe37)
 
 ## Installation
-1. Visit the [dar releases page](https://github.com/yourorg/dar/releases) and download the latest archive for your platform.
+1. Visit the [dar releases page](https://github.com/mrkatebzadeh/dar/releases) and download the latest archive for your platform.
 2. Extract the archive and place the `dar` binary somewhere on your `PATH` (for example, `/usr/local/bin`).
 3. Optionally, verify the download by checking the accompanying checksum before you run it.
 
