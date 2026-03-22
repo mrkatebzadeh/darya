@@ -1,6 +1,6 @@
 [package]
 name = "darya"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2024"
 description = "A fast, keyboard-driven disk usage explorer built on ratatui."
 license = "MIT OR Apache-2.0"
