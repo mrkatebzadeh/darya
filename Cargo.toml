@@ -9,7 +9,7 @@ license = "MIT OR Apache-2.0"
 anyhow = "1.0"
 clap = { version = "4", features = ["derive"] }
 crossterm = "0.29"
-directories = "5.0"
+directories = "6.0"
 globset = "0.4"
 ratatui = { version = "0.24", default-features = false, features = ["crossterm"] }
 rayon = "1.8"
