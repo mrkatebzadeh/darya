@@ -1,15 +1,24 @@
 <div align="center">
   <h1>darya</h1>
+  <h3>A fast, keyboard-driven disk usage explorer built on ratatui.</h3>
   <p>
-    [![Build](https://github.com/mrkatebzadeh/darya/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/mrkatebzadeh/darya/actions/workflows/ci.yaml)
-    [![Coverage](https://codecov.io/gh/mrkatebzadeh/darya/branch/main/graph/badge.svg)](https://codecov.io/gh/mrkatebzadeh/darya)
-    [![Crates](https://img.shields.io/crates/v/darya.svg)](https://crates.io/crates/darya)
+    <a href="https://github.com/mrkatebzadeh/dar/actions/workflows/ci.yaml">
+      <img src="https://github.com/mrkatebzadeh/dar/actions/workflows/ci.yaml/badge.svg?branch=main" alt="Build badge" />
+    </a>
+    <a href="https://codecov.io/gh/mrkatebzadeh/dar">
+      <img src="https://codecov.io/gh/mrkatebzadeh/dar/branch/main/graph/badge.svg" alt="Coverage badge" />
+    </a>
+    <a href="https://crates.io/crates/darya">
+      <img src="https://img.shields.io/crates/v/darya.svg" alt="Crates badge" />
+    </a>
   </p>
 </div>
 
 ---
 
-A fast, keyboard-driven disk usage explorer built on ratatui.
+`darya` is a lightweight disk usage tool built for the terminal. It’s just as at home on a headless server as it is on your laptop, giving you a quick way to see what’s taking up space without needing a graphical environment.
+
+The interface is straightforward and easy to navigate, letting you move through directories, run scans when you want, and focus on the information that actually matters. It’s designed to stay fast and responsive, keeping things simple while working reliably across POSIX-like systems.
 
 <img width="1420" height="841" alt="Image" src="https://github.com/user-attachments/assets/a4ffa94c-aef4-4e30-bd12-2a3bcfc00cba" />
 
