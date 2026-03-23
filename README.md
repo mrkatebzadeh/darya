@@ -1,6 +1,7 @@
 <div align="center">
-  <h1>darya</h1>
-  <h3>A fast, keyboard-driven disk usage explorer built on ratatui.</h3>
+  <h1>DARYA</h1>
+  <h4>A fast and Keyboard-Driven Disk Usage Explorer</h4>
+  <h5> Built with Rust, Ratatui, and Crossterm</h5>
   <p>
     <a href="https://github.com/mrkatebzadeh/darya/actions/workflows/ci.yaml">
       <img src="https://github.com/mrkatebzadeh/darya/actions/workflows/ci.yaml/badge.svg?branch=main" alt="Build badge" />
