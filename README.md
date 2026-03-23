@@ -1,7 +1,5 @@
 <div align="center">
   <h1>darya</h1>
-  <p>`darya` is a lightweight disk usage tool built for the terminal. It stays at home on headless servers and laptops alike, giving you a quick way to see what is eating space without requiring a graphical environment.</p>
-  <p>The interface is straightforward and easy to navigate, letting you move through directories, scan on demand, and focus on the information that matters while keeping the experience fast and responsive across POSIX systems.</p>
   <p>
     [![Build](https://github.com/mrkatebzadeh/darya/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/mrkatebzadeh/darya/actions/workflows/ci.yaml)
     [![Coverage](https://codecov.io/gh/mrkatebzadeh/darya/branch/main/graph/badge.svg)](https://codecov.io/gh/mrkatebzadeh/darya)
@@ -10,6 +8,8 @@
 </div>
 
 ---
+
+A fast, keyboard-driven disk usage explorer built on ratatui.
 
 <img width="1420" height="841" alt="Image" src="https://github.com/user-attachments/assets/a4ffa94c-aef4-4e30-bd12-2a3bcfc00cba" />
 
