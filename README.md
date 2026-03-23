@@ -2,11 +2,11 @@
   <h1>darya</h1>
   <h3>A fast, keyboard-driven disk usage explorer built on ratatui.</h3>
   <p>
-    <a href="https://github.com/mrkatebzadeh/dar/actions/workflows/ci.yaml">
-      <img src="https://github.com/mrkatebzadeh/dar/actions/workflows/ci.yaml/badge.svg?branch=main" alt="Build badge" />
+    <a href="https://github.com/mrkatebzadeh/darya/actions/workflows/ci.yaml">
+      <img src="https://github.com/mrkatebzadeh/darya/actions/workflows/ci.yaml/badge.svg?branch=main" alt="Build badge" />
     </a>
-    <a href="https://codecov.io/gh/mrkatebzadeh/dar">
-      <img src="https://codecov.io/gh/mrkatebzadeh/dar/branch/main/graph/badge.svg" alt="Coverage badge" />
+    <a href="https://codecov.io/gh/mrkatebzadeh/darya">
+      <img src="https://codecov.io/gh/mrkatebzadeh/darya/branch/main/graph/badge.svg" alt="Coverage badge" />
     </a>
     <a href="https://crates.io/crates/darya">
       <img src="https://img.shields.io/crates/v/darya.svg" alt="Crates badge" />
