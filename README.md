@@ -39,10 +39,6 @@ The interface is straightforward and easy to navigate, letting you move through 
    tar -xzf darya-<platform>.tar.gz
    sudo mv darya /usr/local/bin/
    ```
-3. Optionally verify the release checksum before running the binary with the command below.
-   ```bash
-   sha256sum darya-<platform>.tar.gz
-   ```
 
 ### 3) Building from source
 1. Clone the repository and reset to the desired release tag (skip if you already have the source) by running the command below.
