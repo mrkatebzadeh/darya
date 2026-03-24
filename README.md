@@ -1,6 +1,6 @@
 <div align="center">
   <h1>DARYA</h1>
-  <h4>A fast and Keyboard-Driven Disk Usage Explorer</h4>
+  <h4>A Fast and Keyboard-Driven Disk Usage Explorer</h4>
   <h5> Built with Rust, Ratatui, and Crossterm</h5>
   <p>
     <a href="https://github.com/mrkatebzadeh/darya/actions/workflows/ci.yaml">
