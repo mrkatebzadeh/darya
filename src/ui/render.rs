@@ -57,13 +57,15 @@ impl Ui {
         let tree_rows = self.cached_tree_rows(state);
         let filesystem_vm = FilesystemViewModel::build(state, layout.tree, theme, tree_rows);
         components::draw_filesystem_panel(frame, layout.tree, filesystem_vm, theme);
-        components::draw_treemap_panel(
-            frame,
-            layout.treemap,
-            state,
-            theme,
-            &mut self.treemap_cache,
-        );
+        if state.treemap_visible && layout.treemap.width > 0 && layout.treemap.height > 0 {
+            components::draw_treemap_panel(
+                frame,
+                layout.treemap,
+                state,
+                theme,
+                &mut self.treemap_cache,
+            );
+        }
         let detail_vm = DetailViewModel::build(state);
         components::draw_detail_panel(frame, layout.details, &detail_vm, theme);
         let activity_vm = ActivityViewModel::build(state);
@@ -149,6 +151,7 @@ impl Ui {
             Line::from("  b: size mode, s: sort mode, r: rescan, R: start scan"),
             Line::from("  E/I: export/import snapshot"),
             Line::from("  H: toggle hidden files"),
+            Line::from("  t: toggle the treemap panel"),
             Line::from("  ?: toggle this help, q: quit"),
         ];
 

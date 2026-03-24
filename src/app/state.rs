@@ -157,6 +157,7 @@ pub struct AppState {
     pub filter_active: bool,
     pub filter_prompt_active: bool,
     pub show_help: bool,
+    pub treemap_visible: bool,
     pub treemap_nodes: Vec<TreemapNode>,
     pub treemap_revision: u64,
     pub ui_revision: u64,
@@ -183,6 +184,7 @@ impl AppState {
             filter_query: String::new(),
             filter_active: false,
             show_help: false,
+            treemap_visible: true,
             filter_prompt_active: false,
             treemap_nodes: Vec::new(),
             treemap_revision: 0,
@@ -262,6 +264,20 @@ impl AppState {
             SizeDisplayMode::Apparent => SizeDisplayMode::Disk,
             SizeDisplayMode::Disk => SizeDisplayMode::Apparent,
         };
+    }
+
+    pub fn toggle_treemap_visibility(&mut self) {
+        self.treemap_visible = !self.treemap_visible;
+        let message = if self.treemap_visible {
+            "treemap panel shown"
+        } else {
+            "treemap panel hidden"
+        };
+        self.update_status(StatusMessage::Custom(message.to_string()));
+    }
+
+    pub fn is_treemap_visible(&self) -> bool {
+        self.treemap_visible
     }
 
     pub fn clear_filter(&mut self) {

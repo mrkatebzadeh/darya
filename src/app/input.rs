@@ -32,6 +32,7 @@ pub enum InputAction {
     ImportScan,
     Rescan,
     StartScan,
+    ToggleTreemap,
     StartFilter,
     FilterChar(char),
     FilterBackspace,
@@ -92,6 +93,7 @@ impl InputState {
             KeyCode::Char('c') => InputAction::ClearFilter,
             KeyCode::Char('s') => InputAction::CycleSort,
             KeyCode::Char('H') => InputAction::ToggleHidden,
+            KeyCode::Char('t') => InputAction::ToggleTreemap,
             KeyCode::Char('?') => InputAction::ToggleHelp,
             KeyCode::Esc => InputAction::ToggleHelp,
             KeyCode::Char('q') if key_event.modifiers.is_empty() => InputAction::Quit,
@@ -230,6 +232,10 @@ mod tests {
         assert_eq!(
             state.process_key(event(KeyCode::Char('H'))),
             InputAction::ToggleHidden
+        );
+        assert_eq!(
+            state.process_key(event(KeyCode::Char('t'))),
+            InputAction::ToggleTreemap
         );
         assert_eq!(
             state.process_key(event(KeyCode::Enter)),
