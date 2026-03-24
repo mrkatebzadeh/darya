@@ -84,6 +84,7 @@ The interface is straightforward and easy to navigate, letting you move through 
 | `o` | Open the selected entry in your default viewer. |
 | `H` | Toggle showing hidden files and directories. |
 | `?` / `Esc` | Open or close the help overlay. |
+| `t` | Toggle the treemap panel. |
 | `q` | Quit the application. |
 
 ## Configuration and customization
