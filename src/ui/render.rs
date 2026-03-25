@@ -98,16 +98,12 @@ impl Ui {
     }
 
     fn draw_header(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
-        let root_label = state
-            .tree
-            .node(state.tree.root())
-            .map(|node| node.path.display().to_string())
-            .unwrap_or_else(|| "<unknown>".into());
-
         let header = Paragraph::new(Line::from(vec![
-            Span::styled("Root: ", Style::default().fg(theme.directory)),
-            Span::styled(root_label, Style::default().fg(theme.foreground)),
-            Span::raw(format!(" | Sort:{} ", sort_mode_label(state.sort_mode))),
+            Span::styled("Sort: ", Style::default().fg(theme.directory)),
+            Span::styled(
+                sort_mode_label(state.sort_mode),
+                Style::default().fg(theme.foreground),
+            ),
         ]))
         .block(Block::default().borders(Borders::ALL))
         .style(Style::default().bg(Color::Reset));
