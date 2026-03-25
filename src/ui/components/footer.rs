@@ -60,10 +60,10 @@ pub fn draw_footer_panel(frame: &mut Frame<'_>, area: Rect, state: &AppState, th
     let mut lines: Vec<Line<'static>> = Vec::with_capacity(2);
     let status_trimmed = trim_to_width(&progress_label, area.width as usize);
     let padded_status = center_text(&status_trimmed, area.width as usize);
-    lines.push(Line::from(Span::styled(
-        padded_status,
-        Style::default().fg(theme.foreground),
-    )));
+    let progress_style = Style::default()
+        .fg(theme.foreground)
+        .bg(theme.tile_color(0));
+    lines.push(Line::from(Span::styled(padded_status, progress_style)));
 
     if area.height > 1
         && let Some(key_line) = footer_binding_line(area.width as usize, theme)
@@ -152,11 +152,12 @@ fn center_text(text: &str, width: usize) -> String {
     if width <= text_len {
         return text.to_string();
     }
-    let padding = (width - text_len) / 2;
-    let mut result = String::with_capacity(padding + text.len());
-    for _ in 0..padding {
-        result.push(' ');
-    }
+    let total_padding = width - text_len;
+    let left_padding = total_padding / 2;
+    let right_padding = total_padding - left_padding;
+    let mut result = String::with_capacity(width);
+    result.extend(std::iter::repeat_n(' ', left_padding));
     result.push_str(text);
+    result.extend(std::iter::repeat_n(' ', right_padding));
     result
 }
