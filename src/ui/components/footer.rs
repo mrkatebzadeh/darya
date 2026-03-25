@@ -70,13 +70,23 @@ pub fn draw_footer_panel(frame: &mut Frame<'_>, area: Rect, state: &AppState, th
     };
     let progress_fg =
         contrast_color(theme.tile_color(0), &theme.tile_palette).unwrap_or(theme.foreground);
-    let progress_style = Style::default().fg(progress_fg).bg(theme.tile_color(0));
-    let progress_text = if inner_width == 0 {
-        format!("{cap_left}{cap_right}")
-    } else {
-        format!("{cap_left}{centered_inner}{cap_right}")
-    };
-    lines.push(Line::from(Span::styled(progress_text, progress_style)));
+    let progress_bg = theme.tile_color(0);
+    let mut spans = Vec::new();
+    spans.push(Span::styled(
+        cap_left,
+        Style::default().fg(progress_bg).bg(progress_bg),
+    ));
+    if inner_width > 0 {
+        spans.push(Span::styled(
+            centered_inner,
+            Style::default().fg(progress_fg).bg(progress_bg),
+        ));
+    }
+    spans.push(Span::styled(
+        cap_right,
+        Style::default().fg(progress_bg).bg(progress_bg),
+    ));
+    lines.push(Line::from(spans));
 
     if area.height > 1
         && let Some(key_line) = footer_binding_line(area.width as usize, theme)
