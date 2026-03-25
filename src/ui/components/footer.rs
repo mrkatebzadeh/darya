@@ -60,9 +60,9 @@ pub fn draw_footer_panel(frame: &mut Frame<'_>, area: Rect, state: &AppState, th
     let mut lines: Vec<Line<'static>> = Vec::with_capacity(2);
     let status_trimmed = trim_to_width(&progress_label, area.width as usize);
     let padded_status = center_text(&status_trimmed, area.width as usize);
-    let progress_style = Style::default()
-        .fg(theme.foreground)
-        .bg(theme.tile_color(0));
+    let progress_fg =
+        contrast_color(theme.tile_color(0), &theme.tile_palette).unwrap_or(theme.foreground);
+    let progress_style = Style::default().fg(progress_fg).bg(theme.tile_color(0));
     lines.push(Line::from(Span::styled(padded_status, progress_style)));
 
     if area.height > 1
@@ -160,4 +160,48 @@ fn center_text(text: &str, width: usize) -> String {
     result.push_str(text);
     result.extend(std::iter::repeat_n(' ', right_padding));
     result
+}
+
+fn contrast_color(bg: Color, palette: &[Color]) -> Option<Color> {
+    let bg_lum = color_luminance(bg)?;
+    let mut best_ratio = 0.0;
+    let mut best_color = None;
+    for &candidate in palette {
+        if candidate == bg {
+            continue;
+        }
+        if let Some(candidate_lum) = color_luminance(candidate) {
+            let ratio = contrast_ratio(bg_lum, candidate_lum);
+            if ratio > best_ratio {
+                best_ratio = ratio;
+                best_color = Some(candidate);
+            }
+        }
+    }
+    if best_ratio >= 4.5 { best_color } else { None }
+}
+
+fn color_luminance(color: Color) -> Option<f64> {
+    match color {
+        Color::Rgb(r, g, b) => Some(
+            0.2126 * relative_channel(r)
+                + 0.7152 * relative_channel(g)
+                + 0.0722 * relative_channel(b),
+        ),
+        _ => None,
+    }
+}
+
+fn relative_channel(value: u8) -> f64 {
+    let c = value as f64 / 255.0;
+    if c <= 0.03928 {
+        c / 12.92
+    } else {
+        ((c + 0.055) / 1.055).powf(2.4)
+    }
+}
+
+fn contrast_ratio(a: f64, b: f64) -> f64 {
+    let (l1, l2) = if a >= b { (a, b) } else { (b, a) };
+    (l1 + 0.05) / (l2 + 0.05)
 }
