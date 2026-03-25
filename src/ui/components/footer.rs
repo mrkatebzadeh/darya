@@ -74,7 +74,7 @@ pub fn draw_footer_panel(frame: &mut Frame<'_>, area: Rect, state: &AppState, th
     let mut spans = Vec::new();
     spans.push(Span::styled(
         cap_left,
-        Style::default().fg(progress_bg).bg(progress_bg),
+        Style::default().fg(progress_bg).bg(Color::Reset),
     ));
     if inner_width > 0 {
         spans.push(Span::styled(
@@ -84,7 +84,7 @@ pub fn draw_footer_panel(frame: &mut Frame<'_>, area: Rect, state: &AppState, th
     }
     spans.push(Span::styled(
         cap_right,
-        Style::default().fg(progress_bg).bg(progress_bg),
+        Style::default().fg(progress_bg).bg(Color::Reset),
     ));
     lines.push(Line::from(spans));
 
