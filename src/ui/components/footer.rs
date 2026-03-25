@@ -58,12 +58,25 @@ pub fn draw_footer_panel(frame: &mut Frame<'_>, area: Rect, state: &AppState, th
     }
 
     let mut lines: Vec<Line<'static>> = Vec::with_capacity(2);
-    let status_trimmed = trim_to_width(&progress_label, area.width as usize);
-    let padded_status = center_text(&status_trimmed, area.width as usize);
+    let cap_left = "";
+    let cap_right = "";
+    let cap_width = cap_left.chars().count() + cap_right.chars().count();
+    let inner_width = (area.width as usize).saturating_sub(cap_width);
+    let centered_inner = if inner_width == 0 {
+        String::new()
+    } else {
+        let trimmed = trim_to_width(&progress_label, inner_width);
+        center_text(&trimmed, inner_width)
+    };
     let progress_fg =
         contrast_color(theme.tile_color(0), &theme.tile_palette).unwrap_or(theme.foreground);
     let progress_style = Style::default().fg(progress_fg).bg(theme.tile_color(0));
-    lines.push(Line::from(Span::styled(padded_status, progress_style)));
+    let progress_text = if inner_width == 0 {
+        format!("{cap_left}{cap_right}")
+    } else {
+        format!("{cap_left}{centered_inner}{cap_right}")
+    };
+    lines.push(Line::from(Span::styled(progress_text, progress_style)));
 
     if area.height > 1
         && let Some(key_line) = footer_binding_line(area.width as usize, theme)
