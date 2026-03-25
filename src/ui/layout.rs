@@ -33,7 +33,7 @@ pub fn split_layout(area: Rect, show_treemap: bool) -> LayoutRegions {
         .constraints([
             Constraint::Length(3),
             Constraint::Min(0),
-            Constraint::Length(1),
+            Constraint::Length(2),
         ])
         .split(area);
 
@@ -93,7 +93,7 @@ mod tests {
         let area = Rect::new(0, 0, 80, 24);
         let regions = split_layout(area, true);
         assert_eq!(regions.header.height, 3);
-        assert_eq!(regions.footer.height, 1);
+        assert_eq!(regions.footer.height, 2);
         assert_eq!(regions.tree.height, 15);
         assert_eq!(regions.tree.width, 60);
         assert_eq!(regions.treemap.width, 20);

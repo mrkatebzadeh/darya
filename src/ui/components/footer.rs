@@ -19,7 +19,22 @@ use crate::ui::helpers::{spinner_symbol, trim_to_width};
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::terminal::Frame;
+use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
+
+const FOOTER_KEYBINDINGS: [(&str, &str); 11] = [
+    ("?", "help"),
+    ("j/k", "move"),
+    ("h/l", "collapse/expand"),
+    ("enter/tab", "open"),
+    ("/", "filter"),
+    ("c", "clear"),
+    ("b", "size"),
+    ("s", "sort"),
+    ("t", "treemap"),
+    ("r/R", "scan"),
+    ("q", "quit"),
+];
 
 pub fn draw_footer_panel(frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
     let base_status = state.status_text();
@@ -36,15 +51,11 @@ pub fn draw_footer_panel(frame: &mut Frame<'_>, area: Rect, state: &AppState, th
                 progress.scanned, progress.errors
             )
         }
-        ScanState::Error(message) => format!("error: {message}"),
+        ScanState::Error(message) => format!("Error: {message}"),
         ScanState::Completed => StatusMessage::ScanComplete.to_string(),
-        _ => "scan idle".into(),
+        _ => "Scan idle".into(),
     };
 
-    frame.render_widget(
-        Paragraph::new(" ").style(Style::default().bg(Color::Reset)),
-        area,
-    );
     if area.height == 0 {
         return;
     }
@@ -54,30 +65,59 @@ pub fn draw_footer_panel(frame: &mut Frame<'_>, area: Rect, state: &AppState, th
     } else {
         format!("{status_text} | {progress_label}")
     };
-    let hint = "Press ? for keybindings";
-    let hint_width = hint.len() as u16;
-    let status_width = area.width.saturating_sub(hint_width + 1);
-    let status_trimmed = trim_to_width(&status, status_width as usize);
 
-    let buf = frame.buffer_mut();
-    if status_width > 0 {
-        buf.set_stringn(
-            area.x,
-            area.y,
-            &status_trimmed,
-            status_width as usize,
-            Style::default().fg(theme.foreground).bg(Color::Reset),
-        );
+    let mut lines: Vec<Line<'static>> = Vec::with_capacity(2);
+    let status_trimmed = trim_to_width(&status, area.width as usize);
+    lines.push(Line::from(Span::styled(
+        status_trimmed,
+        Style::default().fg(theme.foreground),
+    )));
+
+    if area.height > 1
+        && let Some(key_line) = footer_binding_line(area.width as usize, theme)
+    {
+        lines.push(key_line);
     }
 
-    if area.width > hint_width {
-        let hint_x = area.x + area.width.saturating_sub(hint_width);
-        buf.set_stringn(
-            hint_x,
-            area.y,
-            hint,
-            hint_width as usize,
-            Style::default().fg(theme.directory).bg(Color::Reset),
-        );
+    let paragraph = Paragraph::new(lines).style(Style::default().bg(Color::Reset));
+    frame.render_widget(paragraph, area);
+}
+
+fn footer_binding_line(width: usize, theme: Theme) -> Option<Line<'static>> {
+    if width == 0 {
+        return None;
+    }
+
+    let mut remaining = width;
+    let mut spans = Vec::new();
+    let mut first_entry = true;
+
+    for (idx, &(key, action)) in FOOTER_KEYBINDINGS.iter().enumerate() {
+        let entry_len = key.len() + 1 + action.len();
+        let required = entry_len + if first_entry { 0 } else { 1 };
+        if remaining < required {
+            break;
+        }
+
+        if !first_entry {
+            spans.push(Span::raw(" "));
+            remaining -= 1;
+        }
+
+        spans.push(Span::styled(
+            key,
+            Style::default().fg(theme.tile_color(idx)),
+        ));
+        spans.push(Span::styled(":", Style::default().fg(theme.foreground)));
+        spans.push(Span::styled(action, Style::default().fg(theme.foreground)));
+
+        remaining -= entry_len;
+        first_entry = false;
+    }
+
+    if spans.is_empty() {
+        None
+    } else {
+        Some(Line::from(spans))
     }
 }
