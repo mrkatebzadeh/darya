@@ -105,9 +105,9 @@ impl Ui {
             .unwrap_or_else(|| "<unknown>".into());
 
         let header = Paragraph::new(Line::from(vec![
-            Span::styled("root: ", Style::default().fg(theme.directory)),
+            Span::styled("Root: ", Style::default().fg(theme.directory)),
             Span::styled(root_label, Style::default().fg(theme.foreground)),
-            Span::raw(format!(" | sort:{} ", sort_mode_label(state.sort_mode))),
+            Span::raw(format!(" | Sort:{} ", sort_mode_label(state.sort_mode))),
         ]))
         .block(Block::default().borders(Borders::ALL))
         .style(Style::default().bg(Color::Reset));
@@ -156,7 +156,7 @@ impl Ui {
         ];
 
         let popup = Paragraph::new(lines)
-            .block(Block::default().title("Help").borders(Borders::ALL))
+            .block(Block::default().title("").borders(Borders::ALL))
             .style(Style::default().fg(theme.foreground).bg(Color::Reset));
 
         frame.render_widget(Clear, area);

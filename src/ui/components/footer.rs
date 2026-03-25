@@ -32,7 +32,7 @@ pub fn draw_footer_panel(frame: &mut Frame<'_>, area: Rect, state: &AppState, th
         ScanState::Running(progress) => {
             let spinner = spinner_symbol(state.spinner_phase);
             format!(
-                "{spinner} scanning... {} entries, {} errors",
+                "{spinner} Scanning... {} entries, {} errors",
                 progress.scanned, progress.errors
             )
         }
