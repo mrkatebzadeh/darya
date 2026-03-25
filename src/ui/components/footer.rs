@@ -51,14 +51,17 @@ pub fn draw_footer_panel(frame: &mut Frame<'_>, area: Rect, state: &AppState, th
         _ => "Scan idle".into(),
     };
 
+    let progress_label = capitalize_first_alpha(&progress_label);
+
     if area.height == 0 {
         return;
     }
 
     let mut lines: Vec<Line<'static>> = Vec::with_capacity(2);
     let status_trimmed = trim_to_width(&progress_label, area.width as usize);
+    let padded_status = center_text(&status_trimmed, area.width as usize);
     lines.push(Line::from(Span::styled(
-        status_trimmed,
+        padded_status,
         Style::default().fg(theme.foreground),
     )));
 
@@ -128,4 +131,32 @@ fn footer_binding_line(width: usize, theme: Theme) -> Option<Line<'static>> {
     }
 
     Some(Line::from(spans))
+}
+
+fn capitalize_first_alpha(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut capitalized = false;
+    for ch in text.chars() {
+        if !capitalized && ch.is_alphabetic() {
+            result.extend(ch.to_uppercase());
+            capitalized = true;
+        } else {
+            result.push(ch);
+        }
+    }
+    result
+}
+
+fn center_text(text: &str, width: usize) -> String {
+    let text_len = text.chars().count();
+    if width <= text_len {
+        return text.to_string();
+    }
+    let padding = (width - text_len) / 2;
+    let mut result = String::with_capacity(padding + text.len());
+    for _ in 0..padding {
+        result.push(' ');
+    }
+    result.push_str(text);
+    result
 }
