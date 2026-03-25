@@ -88,36 +88,55 @@ fn footer_binding_line(width: usize, theme: Theme) -> Option<Line<'static>> {
         return None;
     }
 
-    let mut remaining = width;
-    let mut spans = Vec::new();
-    let mut first_entry = true;
-
-    for (idx, &(key, action)) in FOOTER_KEYBINDINGS.iter().enumerate() {
-        let entry_len = key.len() + 1 + action.len();
-        let required = entry_len + if first_entry { 0 } else { 1 };
-        if remaining < required {
+    let mut selected_count = 0;
+    let mut chunk_width = 0;
+    for candidate in (1..=FOOTER_KEYBINDINGS.len()).rev() {
+        let chunk = width / candidate;
+        if chunk == 0 {
+            continue;
+        }
+        let max_len = FOOTER_KEYBINDINGS[..candidate]
+            .iter()
+            .map(|(key, action)| key.len() + 1 + action.len())
+            .max()
+            .unwrap_or(0);
+        if max_len <= chunk {
+            selected_count = candidate;
+            chunk_width = chunk;
             break;
         }
+    }
 
-        if !first_entry {
-            spans.push(Span::raw(" "));
-            remaining -= 1;
+    if selected_count == 0 {
+        return None;
+    }
+
+    let remainder = width - (chunk_width * selected_count);
+    let mut spans = Vec::new();
+    for (idx, &(key, action)) in FOOTER_KEYBINDINGS.iter().take(selected_count).enumerate() {
+        let chunk = if idx == selected_count - 1 {
+            chunk_width + remainder
+        } else {
+            chunk_width
+        };
+        let entry_len = key.len() + 1 + action.len();
+        let pad_total = chunk.saturating_sub(entry_len);
+        let pad_left = pad_total / 2;
+        let pad_right = pad_total - pad_left;
+
+        if pad_left > 0 {
+            spans.push(Span::raw(" ".repeat(pad_left)));
         }
-
         spans.push(Span::styled(
             key,
             Style::default().fg(theme.tile_color(idx)),
         ));
         spans.push(Span::styled(":", Style::default().fg(theme.foreground)));
         spans.push(Span::styled(action, Style::default().fg(theme.foreground)));
-
-        remaining -= entry_len;
-        first_entry = false;
+        if pad_right > 0 {
+            spans.push(Span::raw(" ".repeat(pad_right)));
+        }
     }
 
-    if spans.is_empty() {
-        None
-    } else {
-        Some(Line::from(spans))
-    }
+    Some(Line::from(spans))
 }
