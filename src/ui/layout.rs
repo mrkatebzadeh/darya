@@ -27,13 +27,13 @@ pub struct LayoutRegions {
 }
 
 /// Split the available `area` into header, body panels, and footer regions.
-pub fn split_layout(area: Rect) -> LayoutRegions {
+pub fn split_layout(area: Rect, show_treemap: bool) -> LayoutRegions {
     let vertical = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
             Constraint::Min(0),
-            Constraint::Length(1),
+            Constraint::Length(2),
         ])
         .split(area);
 
@@ -53,7 +53,11 @@ pub fn split_layout(area: Rect) -> LayoutRegions {
 
     let main_row = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(75), Constraint::Percentage(25)])
+        .constraints(if show_treemap {
+            [Constraint::Percentage(75), Constraint::Percentage(25)]
+        } else {
+            [Constraint::Percentage(100), Constraint::Percentage(0)]
+        })
         .split(top);
 
     let bottom_split = Layout::default()
@@ -64,7 +68,16 @@ pub fn split_layout(area: Rect) -> LayoutRegions {
     LayoutRegions {
         header: vertical[0],
         tree: main_row[0],
-        treemap: main_row[1],
+        treemap: if show_treemap {
+            main_row[1]
+        } else {
+            Rect::new(
+                main_row[0].x.saturating_add(main_row[0].width),
+                main_row[0].y,
+                0,
+                main_row[0].height,
+            )
+        },
         details: bottom_split[0],
         activity: bottom_split[1],
         footer: vertical[2],
@@ -78,10 +91,10 @@ mod tests {
     #[test]
     fn layout_splits_evenly() {
         let area = Rect::new(0, 0, 80, 24);
-        let regions = split_layout(area);
+        let regions = split_layout(area, true);
         assert_eq!(regions.header.height, 3);
-        assert_eq!(regions.footer.height, 1);
-        assert_eq!(regions.tree.height, 15);
+        assert_eq!(regions.footer.height, 2);
+        assert_eq!(regions.tree.height, 14);
         assert_eq!(regions.tree.width, 60);
         assert_eq!(regions.treemap.width, 20);
         assert_eq!(regions.details.width, 40);
@@ -90,5 +103,14 @@ mod tests {
         assert_eq!(regions.activity.height, 5);
         assert_eq!(regions.tree.y, regions.header.height);
         assert_eq!(regions.footer.y, area.height - regions.footer.height);
+    }
+
+    #[test]
+    fn layout_hides_treemap_when_disabled() {
+        let area = Rect::new(0, 0, 80, 24);
+        let regions = split_layout(area, false);
+        assert_eq!(regions.tree.width, 80);
+        assert_eq!(regions.treemap.width, 0);
+        assert_eq!(regions.treemap.height, regions.tree.height);
     }
 }

@@ -149,16 +149,16 @@ pub fn load(ignore_config: bool) -> ConfigLoad {
         error: None,
     };
 
-    if ignore_config {
-        return load;
-    }
-
     if let Some(path) = config_file_path()
         && !path.exists()
         && let Err(err) = create_default_config(&path)
     {
         load.error = Some(err);
         load.config_path = Some(path);
+        return load;
+    }
+
+    if ignore_config {
         return load;
     }
 
@@ -182,7 +182,15 @@ pub fn load(ignore_config: bool) -> ConfigLoad {
 }
 
 fn config_file_path() -> Option<PathBuf> {
-    ProjectDirs::from("org", "darya", "darya").map(|dirs| dirs.config_dir().join("config.toml"))
+    config_dir().map(|dir| dir.join("config.toml"))
+}
+
+fn config_dir() -> Option<PathBuf> {
+    ProjectDirs::from("org", "darya", "darya").and_then(|dirs| {
+        dirs.config_dir()
+            .parent()
+            .map(|parent| parent.join("darya"))
+    })
 }
 
 fn parse_config_file(path: &Path) -> Result<Config, ConfigError> {

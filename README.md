@@ -84,8 +84,9 @@ The interface is straightforward and easy to navigate, letting you move through 
 | `o` | Open the selected entry in your default viewer. |
 | `H` | Toggle showing hidden files and directories. |
 | `?` / `Esc` | Open or close the help overlay. |
+| `t` | Toggle the treemap panel. |
 | `q` | Quit the application. |
 
-## Configuration and customization
-- Settings come from `~/.config/darya/config.toml` and provide defaults for sorting, UI tweaks, and scan filters. Pass `--ignore-config` to skip it.
+-## Configuration and customization
+- Settings come from a `config.toml` in your system config directory. On Linux this is `~/.config/darya/config.toml`, while on macOS it lives at `~/Library/Application Support/darya/config.toml`. Pass `--ignore-config` to skip loading it.
 - Overrides on the command line always win, so you can keep a mild default configuration and still tweak behavior at runtime.

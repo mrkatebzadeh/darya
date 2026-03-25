@@ -301,11 +301,11 @@ fn format_node_metadata(node: &TreeNode) -> Option<String> {
 pub(crate) fn detail_panel_lines(state: &AppState) -> Vec<String> {
     let empty = || {
         vec![
-            detail_line("•", "path", ""),
-            detail_line("•", "type", ""),
-            detail_line("•", "apparent", ""),
-            detail_line("•", "disk", ""),
-            detail_line("•", "items", ""),
+            detail_line("•", "Path", ""),
+            detail_line("•", "Type", ""),
+            detail_line("•", "Apparent", ""),
+            detail_line("•", "Disk", ""),
+            detail_line("•", "Items", ""),
         ]
     };
 
@@ -332,14 +332,14 @@ pub(crate) fn detail_panel_lines(state: &AppState) -> Vec<String> {
     };
 
     vec![
-        detail_line("📂", "path", &node.path.display().to_string()),
-        detail_line("⬤", "type", kind_label),
-        detail_line("⚖", "apparent", &apparent),
-        detail_line("💾", "disk", &format!("{disk} ({ratio:.1}%)")),
+        detail_line("📂", "Path", &node.path.display().to_string()),
+        detail_line("⬤", "Type", kind_label),
+        detail_line("⚖", "Apparent", &apparent),
+        detail_line("💾", "Disk", &format!("{disk} ({ratio:.1}%)")),
         if node.file_type == NodeType::Directory {
-            detail_line("📦", "items", &node.children.len().to_string())
+            detail_line("📦", "Items", &node.children.len().to_string())
         } else {
-            detail_line("📦", "items", "")
+            detail_line("📦", "Items", "")
         },
     ]
 }

@@ -40,6 +40,7 @@ pub fn handle_input_action(
         InputAction::Delete => delete_selection(state),
         InputAction::Open => open_selection(state),
         InputAction::ToggleSizeMode => state.toggle_size_mode(),
+        InputAction::ToggleTreemap => state.toggle_treemap_visibility(),
         InputAction::ExportScan => export_scan(state),
         InputAction::ImportScan => import_scan(state),
         InputAction::Rescan => rescan_selection(state),
@@ -590,6 +591,23 @@ mod tests {
             "xdg-open"
         };
         assert_eq!(command.get_program().to_string_lossy(), expected);
+    }
+
+    #[test]
+    fn toggle_treemap_updates_visibility() {
+        let mut state = sample_state();
+        let trigger = dummy_trigger();
+        let initial = state.treemap_visible;
+
+        handle_input_action(InputAction::ToggleTreemap, &mut state, &trigger);
+
+        assert_ne!(state.treemap_visible, initial);
+        let expected = if state.treemap_visible {
+            "treemap panel shown"
+        } else {
+            "treemap panel hidden"
+        };
+        assert_eq!(state.status_message.unwrap().to_string(), expected);
     }
 
     #[test]

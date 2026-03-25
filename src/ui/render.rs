@@ -57,13 +57,15 @@ impl Ui {
         let tree_rows = self.cached_tree_rows(state);
         let filesystem_vm = FilesystemViewModel::build(state, layout.tree, theme, tree_rows);
         components::draw_filesystem_panel(frame, layout.tree, filesystem_vm, theme);
-        components::draw_treemap_panel(
-            frame,
-            layout.treemap,
-            state,
-            theme,
-            &mut self.treemap_cache,
-        );
+        if state.treemap_visible && layout.treemap.width > 0 && layout.treemap.height > 0 {
+            components::draw_treemap_panel(
+                frame,
+                layout.treemap,
+                state,
+                theme,
+                &mut self.treemap_cache,
+            );
+        }
         let detail_vm = DetailViewModel::build(state);
         components::draw_detail_panel(frame, layout.details, &detail_vm, theme);
         let activity_vm = ActivityViewModel::build(state);
@@ -96,16 +98,12 @@ impl Ui {
     }
 
     fn draw_header(&self, frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
-        let root_label = state
-            .tree
-            .node(state.tree.root())
-            .map(|node| node.path.display().to_string())
-            .unwrap_or_else(|| "<unknown>".into());
-
         let header = Paragraph::new(Line::from(vec![
-            Span::styled("root: ", Style::default().fg(theme.directory)),
-            Span::styled(root_label, Style::default().fg(theme.foreground)),
-            Span::raw(format!(" | sort:{} ", sort_mode_label(state.sort_mode))),
+            Span::styled("Sort: ", Style::default().fg(theme.directory)),
+            Span::styled(
+                sort_mode_label(state.sort_mode),
+                Style::default().fg(theme.foreground),
+            ),
         ]))
         .block(Block::default().borders(Borders::ALL))
         .style(Style::default().bg(Color::Reset));
@@ -149,11 +147,12 @@ impl Ui {
             Line::from("  b: size mode, s: sort mode, r: rescan, R: start scan"),
             Line::from("  E/I: export/import snapshot"),
             Line::from("  H: toggle hidden files"),
+            Line::from("  t: toggle the treemap panel"),
             Line::from("  ?: toggle this help, q: quit"),
         ];
 
         let popup = Paragraph::new(lines)
-            .block(Block::default().title("Help").borders(Borders::ALL))
+            .block(Block::default().title("").borders(Borders::ALL))
             .style(Style::default().fg(theme.foreground).bg(Color::Reset));
 
         frame.render_widget(Clear, area);
