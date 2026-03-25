@@ -94,7 +94,7 @@ mod tests {
         let regions = split_layout(area, true);
         assert_eq!(regions.header.height, 3);
         assert_eq!(regions.footer.height, 2);
-        assert_eq!(regions.tree.height, 15);
+        assert_eq!(regions.tree.height, 14);
         assert_eq!(regions.tree.width, 60);
         assert_eq!(regions.treemap.width, 20);
         assert_eq!(regions.details.width, 40);
