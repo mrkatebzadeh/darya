@@ -38,12 +38,6 @@ const FOOTER_KEYBINDINGS: [(&str, &str); 12] = [
 ];
 
 pub fn draw_footer_panel(frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
-    let base_status = state.status_text();
-    let status_text = if matches!(state.scan_state, ScanState::Running(_)) {
-        ""
-    } else {
-        base_status.as_str()
-    };
     let progress_label = match &state.scan_state {
         ScanState::Running(progress) => {
             let spinner = spinner_symbol(state.spinner_phase);
@@ -61,14 +55,8 @@ pub fn draw_footer_panel(frame: &mut Frame<'_>, area: Rect, state: &AppState, th
         return;
     }
 
-    let status = if status_text.is_empty() || status_text == progress_label {
-        progress_label.clone()
-    } else {
-        format!("{status_text} | {progress_label}")
-    };
-
     let mut lines: Vec<Line<'static>> = Vec::with_capacity(2);
-    let status_trimmed = trim_to_width(&status, area.width as usize);
+    let status_trimmed = trim_to_width(&progress_label, area.width as usize);
     lines.push(Line::from(Span::styled(
         status_trimmed,
         Style::default().fg(theme.foreground),
