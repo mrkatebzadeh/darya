@@ -22,7 +22,8 @@ use ratatui::terminal::Frame;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
-const FOOTER_KEYBINDINGS: [(&str, &str); 11] = [
+const FOOTER_KEYBINDINGS: [(&str, &str); 12] = [
+    ("R", "scan"),
     ("?", "help"),
     ("j/k", "move"),
     ("h/l", "collapse/expand"),
@@ -32,7 +33,7 @@ const FOOTER_KEYBINDINGS: [(&str, &str); 11] = [
     ("b", "size"),
     ("s", "sort"),
     ("t", "treemap"),
-    ("r/R", "scan"),
+    ("r", "scan"),
     ("q", "quit"),
 ];
 
