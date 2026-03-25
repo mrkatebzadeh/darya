@@ -149,16 +149,16 @@ pub fn load(ignore_config: bool) -> ConfigLoad {
         error: None,
     };
 
-    if ignore_config {
-        return load;
-    }
-
     if let Some(path) = config_file_path()
         && !path.exists()
         && let Err(err) = create_default_config(&path)
     {
         load.error = Some(err);
         load.config_path = Some(path);
+        return load;
+    }
+
+    if ignore_config {
         return load;
     }
 
