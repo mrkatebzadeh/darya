@@ -182,7 +182,15 @@ pub fn load(ignore_config: bool) -> ConfigLoad {
 }
 
 fn config_file_path() -> Option<PathBuf> {
-    ProjectDirs::from("org", "darya", "darya").map(|dirs| dirs.config_dir().join("config.toml"))
+    config_dir().map(|dir| dir.join("config.toml"))
+}
+
+fn config_dir() -> Option<PathBuf> {
+    ProjectDirs::from("org", "darya", "darya").and_then(|dirs| {
+        dirs.config_dir()
+            .parent()
+            .map(|parent| parent.join("darya"))
+    })
 }
 
 fn parse_config_file(path: &Path) -> Result<Config, ConfigError> {
