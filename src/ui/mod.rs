@@ -15,6 +15,7 @@
 
 pub mod components;
 pub mod display;
+pub mod format;
 pub mod layout;
 pub mod theme;
 pub mod treemap;

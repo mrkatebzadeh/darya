@@ -18,6 +18,7 @@ use crate::state::{AppState, SizeDisplayMode};
 use crate::theme::Theme;
 use crate::tree::{FileTree, NodeType, TreeNode};
 use crate::treemap::{TreemapNode, TreemapTile};
+use crate::ui::format::{format_size_custom, percent_bar, trim_to_width};
 use ratatui::layout::Rect;
 #[cfg(test)]
 use ratatui::layout::{Constraint, Layout};
@@ -183,43 +184,6 @@ pub(crate) fn chosen_size(row: &TreeRow, mode: SizeDisplayMode, options: Display
             SizeDisplayMode::Apparent => row.size,
             SizeDisplayMode::Disk => row.disk_size,
         }
-    }
-}
-
-fn percent_bar(percent: f64, width: usize) -> String {
-    let ratio = (percent.clamp(0.0, 100.0) / 100.0).min(1.0);
-    let filled = ((ratio * width as f64).round() as usize).min(width);
-    let empty = width.saturating_sub(filled);
-    format!("{}{}", "█".repeat(filled), "-".repeat(empty))
-}
-
-pub(crate) fn trim_to_width(value: &str, width: usize) -> String {
-    if width == 0 {
-        return String::new();
-    }
-    if value.len() <= width {
-        value.to_string()
-    } else {
-        value.chars().take(width).collect()
-    }
-}
-
-fn format_size_custom(bytes: u64, use_si: bool) -> String {
-    let div = if use_si { 1000.0 } else { 1024.0 };
-    let (kib, mib, gib) = if use_si {
-        ("kB", "MB", "GB")
-    } else {
-        ("KiB", "MiB", "GiB")
-    };
-    let value = bytes as f64;
-    if value >= div * div * div {
-        format!("{:.1} {}", value / (div * div * div), gib)
-    } else if value >= div * div {
-        format!("{:.1} {}", value / (div * div), mib)
-    } else if value >= div {
-        format!("{:.1} {}", value / div, kib)
-    } else {
-        format!("{bytes} B")
     }
 }
 
