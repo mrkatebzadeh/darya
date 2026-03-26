@@ -25,10 +25,27 @@ pub(crate) fn trim_to_width(value: &str, width: usize) -> String {
 }
 
 pub(crate) fn percent_bar(percent: f64, width: usize) -> String {
+    if width == 0 {
+        return String::new();
+    }
+
     let ratio = (percent.clamp(0.0, 100.0) / 100.0).min(1.0);
-    let filled = ((ratio * width as f64).round() as usize).min(width);
-    let empty = width.saturating_sub(filled);
-    format!("{}{}", "█".repeat(filled), "-".repeat(empty))
+    let total_units = (ratio * width as f64 * 8.0).round() as usize;
+    let mut remaining = total_units.min(width * 8);
+    let mut output = String::with_capacity(width * 3);
+    let partials = ['▏', '▎', '▍', '▌', '▋', '▊', '▉'];
+
+    for _ in 0..width {
+        let units = remaining.min(8);
+        match units {
+            0 => output.push('-'),
+            8 => output.push('█'),
+            value => output.push(partials[value - 1]),
+        }
+        remaining = remaining.saturating_sub(units);
+    }
+
+    output
 }
 
 pub(crate) fn format_size_custom(bytes: u64, use_si: bool) -> String {
