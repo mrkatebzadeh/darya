@@ -420,7 +420,6 @@ impl AppState {
     }
 
     pub fn refresh_ui(&mut self) {
-        self.refresh_treemap_nodes();
         self.mark_ui_dirty();
     }
 

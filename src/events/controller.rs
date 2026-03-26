@@ -120,7 +120,6 @@ pub fn handle_input_action(
                 state.display_options.show_hidden,
             ));
             state.mark_tree_dirty();
-            state.mark_treemap_dirty();
             state.mark_selection_dirty();
         }
         InputAction::ToggleHelp => {
