@@ -27,7 +27,6 @@ pub type NodeId = usize;
 #[derive(Debug)]
 pub struct FileTree {
     nodes: Vec<TreeNode>,
-    pub navigation: NavigationState,
     path_index: HashMap<PathBuf, NodeId>,
 }
 
@@ -43,7 +42,6 @@ impl FileTree {
 
         Self {
             nodes: vec![root],
-            navigation: NavigationState::default(),
             path_index,
         }
     }
@@ -250,27 +248,6 @@ impl FileTree {
     }
 }
 
-/// Metadata that tracks the user's current selection and scroll offset.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct NavigationState {
-    pub selected: Option<NodeId>,
-    pub scroll_offset: usize,
-}
-
-impl NavigationState {
-    pub fn select(&mut self, id: NodeId) {
-        self.selected = Some(id);
-    }
-
-    pub fn clear(&mut self) {
-        self.selected = None;
-    }
-
-    pub fn set_scroll_offset(&mut self, offset: usize) {
-        self.scroll_offset = offset;
-    }
-}
-
 /// Represents a single entry in the filesystem tree.
 #[derive(Debug, Clone)]
 pub struct TreeNode {
@@ -418,16 +395,6 @@ mod tests {
 
         tree.sort_children(0, SortMode::ModifiedTime);
         assert_eq!(tree.node(0).unwrap().children, vec![recent_id, older_id]);
-    }
-
-    #[test]
-    fn navigation_state_tracks_selection() {
-        let mut nav = NavigationState::default();
-        assert_eq!(nav.selected, None);
-        nav.select(5);
-        assert_eq!(nav.selected, Some(5));
-        nav.clear();
-        assert!(nav.selected.is_none());
     }
 
     #[test]
