@@ -29,7 +29,7 @@ async fn scan_aggregates_sizes_from_children() {
 
     while let Some(event) = rx.recv().await {
         process_scan_event(&mut state, event);
-        if matches!(state.scan_state, ScanState::Completed) {
+        if matches!(state.scan.state, ScanState::Completed) {
             break;
         }
     }

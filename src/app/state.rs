@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use super::scan_accumulator::ScanAccumulator;
 use crate::{
     config::SortMode,
     display::DisplayOptions,
@@ -21,8 +22,6 @@ use crate::{
     tree::{FileTree, NodeId, NodeType},
     treemap::TreemapNode,
 };
-
-use crate::fs_scan::ScanNode;
 use std::fmt;
 use std::path::PathBuf;
 
@@ -94,7 +93,7 @@ impl fmt::Display for StatusMessage {
             StatusMessage::FilterPrompt => write!(f, "filter: type name substring and press Enter"),
             StatusMessage::FilterActive(query) => write!(f, "filter active: {query}"),
             StatusMessage::FilterCleared => write!(f, "filter cleared"),
-            StatusMessage::SortMode(mode) => write!(f, "sort mode: {}", sort_mode_label(*mode)),
+            StatusMessage::SortMode(mode) => write!(f, "sort mode: {}", mode.as_label()),
             StatusMessage::HiddenFilesVisible(true) => write!(f, "hidden files shown"),
             StatusMessage::HiddenFilesVisible(false) => write!(f, "hidden files hidden"),
             StatusMessage::HelpOpened => write!(f, "help opened"),
@@ -140,32 +139,93 @@ pub enum SizeDisplayMode {
     Disk,
 }
 
-/// Central application state shared across the UI and scanner.
-#[derive(Debug)]
-pub struct AppState {
-    pub tree: FileTree,
-    pub sort_mode: SortMode,
+#[derive(Debug, Clone, Default)]
+pub struct FilterState {
+    pub query: String,
+    pub active: bool,
+    pub prompt_active: bool,
+}
+
+impl FilterState {
+    pub fn clear(&mut self) {
+        self.query.clear();
+        self.active = false;
+        self.prompt_active = false;
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct NavigationState {
     pub selection: Option<NodeId>,
     pub scroll_offset: usize,
-    pub scan_state: ScanState,
-    pub scan_activity: ScanActivity,
-    pub status_message: Option<StatusMessage>,
+}
+
+impl NavigationState {
+    pub fn clear_selection(&mut self) {
+        self.selection = None;
+    }
+
+    pub fn set_scroll_offset(&mut self, offset: usize) {
+        self.scroll_offset = offset;
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct UiState {
     pub spinner_phase: usize,
-    pub pending_delete: Option<NodeId>,
-    pub size_mode: SizeDisplayMode,
-    pub filter_query: String,
-    pub filter_active: bool,
-    pub filter_prompt_active: bool,
     pub show_help: bool,
     pub treemap_visible: bool,
     pub treemap_nodes: Vec<TreemapNode>,
     pub treemap_revision: u64,
     pub ui_revision: u64,
+}
+
+impl Default for UiState {
+    fn default() -> Self {
+        Self {
+            spinner_phase: 0,
+            show_help: false,
+            treemap_visible: true,
+            treemap_nodes: Vec::new(),
+            treemap_revision: 0,
+            ui_revision: 0,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct ScanStateData {
+    pub state: ScanState,
+    pub activity: ScanActivity,
+    pub accumulator: ScanAccumulator,
+}
+
+impl Default for ScanStateData {
+    fn default() -> Self {
+        Self {
+            state: ScanState::Idle,
+            activity: ScanActivity::default(),
+            accumulator: ScanAccumulator::default(),
+        }
+    }
+}
+
+/// Central application state shared across the UI and scanner.
+#[derive(Debug)]
+pub struct AppState {
+    pub tree: FileTree,
+    pub sort_mode: SortMode,
+    pub navigation: NavigationState,
+    pub scan: ScanStateData,
+    pub ui: UiState,
+    pub status_message: Option<StatusMessage>,
+    pub pending_delete: Option<NodeId>,
+    pub size_mode: SizeDisplayMode,
+    pub filter: FilterState,
     pub allow_modifications: bool,
     pub extended_mode: bool,
     pub display_options: DisplayOptions,
     pub export_options: ExportOptions,
-    pub pending_scan_nodes: Vec<ScanNode>,
 }
 
 impl AppState {
@@ -173,27 +233,17 @@ impl AppState {
         Self {
             tree: FileTree::new(root),
             sort_mode,
-            selection: None,
-            scroll_offset: 0,
-            scan_state: ScanState::Idle,
-            scan_activity: ScanActivity::default(),
+            navigation: NavigationState::default(),
+            scan: ScanStateData::default(),
+            ui: UiState::default(),
             status_message: None,
-            spinner_phase: 0,
             pending_delete: None,
             size_mode: SizeDisplayMode::Apparent,
-            filter_query: String::new(),
-            filter_active: false,
-            show_help: false,
-            treemap_visible: true,
-            filter_prompt_active: false,
-            treemap_nodes: Vec::new(),
-            treemap_revision: 0,
-            ui_revision: 0,
+            filter: FilterState::default(),
             allow_modifications: true,
             extended_mode: false,
             display_options: DisplayOptions::default(),
             export_options: ExportOptions::default(),
-            pending_scan_nodes: Vec::new(),
         }
     }
 
@@ -210,15 +260,15 @@ impl AppState {
     }
 
     pub fn select_node(&mut self, node: NodeId) {
-        self.selection = Some(node);
+        self.navigation.selection = Some(node);
     }
 
     pub fn clear_selection(&mut self) {
-        self.selection = None;
+        self.navigation.clear_selection();
     }
 
     pub fn set_scroll_offset(&mut self, offset: usize) {
-        self.scroll_offset = offset;
+        self.navigation.set_scroll_offset(offset);
     }
 
     pub fn update_status(&mut self, message: StatusMessage) {
@@ -242,21 +292,21 @@ impl AppState {
     }
 
     pub fn mark_scan_progress(&mut self, progress: ScanProgress) {
-        self.scan_state = ScanState::Running(progress);
+        self.scan.state = ScanState::Running(progress);
     }
 
     pub fn advance_spinner(&mut self, modulo: usize) {
         if modulo > 0 {
-            self.spinner_phase = (self.spinner_phase + 1) % modulo;
+            self.ui.spinner_phase = (self.ui.spinner_phase + 1) % modulo;
         }
     }
 
     pub fn mark_scan_complete(&mut self) {
-        self.scan_state = ScanState::Completed;
+        self.scan.state = ScanState::Completed;
     }
 
     pub fn mark_scan_error(&mut self, message: impl Into<String>) {
-        self.scan_state = ScanState::Error(message.into());
+        self.scan.state = ScanState::Error(message.into());
     }
 
     pub fn toggle_size_mode(&mut self) {
@@ -267,8 +317,8 @@ impl AppState {
     }
 
     pub fn toggle_treemap_visibility(&mut self) {
-        self.treemap_visible = !self.treemap_visible;
-        let message = if self.treemap_visible {
+        self.ui.treemap_visible = !self.ui.treemap_visible;
+        let message = if self.ui.treemap_visible {
             "treemap panel shown"
         } else {
             "treemap panel hidden"
@@ -277,25 +327,23 @@ impl AppState {
     }
 
     pub fn is_treemap_visible(&self) -> bool {
-        self.treemap_visible
+        self.ui.treemap_visible
     }
 
     pub fn clear_filter(&mut self) {
-        self.filter_prompt_active = false;
-        self.filter_query.clear();
-        self.filter_active = false;
+        self.filter.clear();
     }
 
     pub fn scan_activity_snapshot(&self) -> ScanActivity {
-        self.scan_activity.clone()
+        self.scan.activity.clone()
     }
 
     pub fn refresh_treemap_nodes(&mut self) {
         let source_id = self.tree.root();
 
         let Some(source) = self.tree.node(source_id) else {
-            self.treemap_nodes.clear();
-            self.treemap_revision = self.treemap_revision.wrapping_add(1);
+            self.ui.treemap_nodes.clear();
+            self.ui.treemap_revision = self.ui.treemap_revision.wrapping_add(1);
             return;
         };
 
@@ -320,58 +368,43 @@ impl AppState {
             .collect();
 
         nodes.sort_unstable_by(|a, b| b.size.cmp(&a.size).then_with(|| a.name.cmp(&b.name)));
-        self.treemap_nodes = nodes;
-        self.treemap_revision = self.treemap_revision.wrapping_add(1);
+        self.ui.treemap_nodes = nodes;
+        self.ui.treemap_revision = self.ui.treemap_revision.wrapping_add(1);
         self.ensure_selection_visible();
     }
 
     pub fn ensure_selection_visible(&mut self) {
         let ids = self.visible_node_ids();
         if ids.is_empty() {
-            self.selection = Some(self.tree.root());
+            self.navigation.selection = Some(self.tree.root());
             return;
         }
         if self
+            .navigation
             .selection
             .is_some_and(|selection| ids.contains(&selection))
         {
             return;
         }
-        self.selection = Some(ids[0]);
+        self.navigation.selection = Some(ids[0]);
     }
 
     pub fn mark_ui_dirty(&mut self) {
-        self.ui_revision = self.ui_revision.wrapping_add(1);
+        self.ui.ui_revision = self.ui.ui_revision.wrapping_add(1);
+    }
+
+    pub fn refresh_ui(&mut self) {
+        self.refresh_treemap_nodes();
+        self.mark_ui_dirty();
     }
 
     pub fn ui_revision(&self) -> u64 {
-        self.ui_revision
+        self.ui.ui_revision
     }
 
     pub fn visible_node_ids(&self) -> Vec<NodeId> {
         self.tree
-            .visible_ids()
-            .into_iter()
-            .filter(|id| {
-                if self.display_options.show_hidden {
-                    return true;
-                }
-                if let Some(node) = self.tree.node(*id) {
-                    !node.name.starts_with('.')
-                } else {
-                    true
-                }
-            })
-            .collect()
-    }
-}
-
-fn sort_mode_label(mode: SortMode) -> &'static str {
-    match mode {
-        SortMode::SizeDesc => "size_desc",
-        SortMode::SizeAsc => "size_asc",
-        SortMode::Name => "name",
-        SortMode::ModifiedTime => "modified_time",
+            .visible_ids_filtered(self.display_options.show_hidden)
     }
 }
 
@@ -387,10 +420,10 @@ mod tests {
     #[test]
     fn new_state_is_idle() {
         let state = state();
-        assert_eq!(state.scan_state, ScanState::Idle);
-        assert!(state.selection.is_none());
+        assert_eq!(state.scan.state, ScanState::Idle);
+        assert!(state.navigation.selection.is_none());
         assert_eq!(state.sort_mode, SortMode::SizeDesc);
-        assert!(state.treemap_nodes.is_empty());
+        assert!(state.ui.treemap_nodes.is_empty());
         assert!(state.allow_modifications);
         assert!(!state.extended_mode);
         assert_eq!(state.export_options, ExportOptions::default());
@@ -401,11 +434,11 @@ mod tests {
     fn selection_and_scroll_updated() {
         let mut state = state();
         state.select_node(2);
-        assert_eq!(state.selection, Some(2));
+        assert_eq!(state.navigation.selection, Some(2));
         state.set_scroll_offset(10);
-        assert_eq!(state.scroll_offset, 10);
+        assert_eq!(state.navigation.scroll_offset, 10);
         state.clear_selection();
-        assert!(state.selection.is_none());
+        assert!(state.navigation.selection.is_none());
     }
 
     #[test]
@@ -415,11 +448,11 @@ mod tests {
             scanned: 1,
             errors: 0,
         });
-        assert!(matches!(state.scan_state, ScanState::Running(_)));
+        assert!(matches!(state.scan.state, ScanState::Running(_)));
         state.mark_scan_complete();
-        assert_eq!(state.scan_state, ScanState::Completed);
+        assert_eq!(state.scan.state, ScanState::Completed);
         state.mark_scan_error("oops");
-        assert!(matches!(state.scan_state, ScanState::Error(_)));
+        assert!(matches!(state.scan.state, ScanState::Error(_)));
     }
 
     #[test]

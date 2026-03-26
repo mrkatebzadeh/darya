@@ -28,6 +28,19 @@ pub(crate) struct ExportDestinations {
     pub binary: Option<SnapshotEndpoint>,
 }
 
+async fn run_scan_loop<F>(
+    scanner_rx: &mut tokio::sync::mpsc::UnboundedReceiver<ScanEvent>,
+    mut on_event: F,
+) where
+    F: FnMut(ScanEvent) -> bool,
+{
+    while let Some(event) = scanner_rx.recv().await {
+        if on_event(event) {
+            break;
+        }
+    }
+}
+
 pub(crate) async fn run_import_mode(
     root: PathBuf,
     sort_mode: crate::config::SortMode,
@@ -43,7 +56,7 @@ pub(crate) async fn run_import_mode(
         .map(|node| node.path.clone())
         .unwrap_or(root.clone());
     state.tree = snapshot::import_from_destination(endpoint, &default_root, SnapshotFormat::Json)?;
-    state.selection = Some(state.tree.root());
+    state.navigation.selection = Some(state.tree.root());
     state.allow_modifications = false;
     let (_scanner_handle, scanner_rx) = dummy_scanner();
     let (scan_trigger_tx, _scan_trigger_rx) =
@@ -69,12 +82,11 @@ pub(crate) async fn run_export_mode(
         scanned: 0,
         errors: 0,
     });
-    while let Some(event) = scanner_rx.recv().await {
+    run_scan_loop(&mut scanner_rx, |event| {
         process_scan_event(&mut state, event);
-        if matches!(state.scan_state, ScanState::Completed) {
-            break;
-        }
-    }
+        matches!(state.scan.state, ScanState::Completed)
+    })
+    .await;
     let json_options = ExportOptions {
         format: SnapshotFormat::Json,
         ..export_options
@@ -101,7 +113,7 @@ pub(crate) async fn run_progress_mode(
 ) -> Result<()> {
     let (scanner_handle, mut scanner_rx) =
         fs_scan::start_scan(root.clone(), scan_options, exclude_patterns);
-    while let Some(event) = scanner_rx.recv().await {
+    run_scan_loop(&mut scanner_rx, |event| {
         match event {
             ScanEvent::Progress(progress) => {
                 println!(
@@ -112,10 +124,12 @@ pub(crate) async fn run_progress_mode(
             ScanEvent::Error(err) => {
                 eprintln!("scan error for {}: {}", err.path.display(), err.source);
             }
-            ScanEvent::Completed => break,
+            ScanEvent::Completed => return true,
             _ => {}
         }
-    }
+        false
+    })
+    .await;
     scanner_handle.cancel();
     Ok(())
 }
@@ -131,7 +145,7 @@ pub(crate) async fn run_summary_mode(
         scanned: 0,
         errors: 0,
     };
-    while let Some(event) = scanner_rx.recv().await {
+    run_scan_loop(&mut scanner_rx, |event| {
         match event {
             ScanEvent::Progress(progress) => {
                 last = progress;
@@ -139,10 +153,12 @@ pub(crate) async fn run_summary_mode(
             ScanEvent::Error(err) => {
                 eprintln!("scan error for {}: {}", err.path.display(), err.source);
             }
-            ScanEvent::Completed => break,
+            ScanEvent::Completed => return true,
             _ => {}
         }
-    }
+        false
+    })
+    .await;
     println!("summary: scanned {} errors {}", last.scanned, last.errors);
     scanner_handle.cancel();
     Ok(())

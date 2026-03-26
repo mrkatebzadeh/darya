@@ -14,7 +14,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::theme::Theme;
-use crate::ui::helpers::trim_to_width;
+use crate::ui::format::trim_to_width;
 use crate::ui::view_model::ActivityViewModel;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};

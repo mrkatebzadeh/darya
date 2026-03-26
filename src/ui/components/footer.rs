@@ -15,7 +15,8 @@
 
 use crate::state::{AppState, ScanState, StatusMessage};
 use crate::theme::Theme;
-use crate::ui::helpers::{spinner_symbol, trim_to_width};
+use crate::ui::format::trim_to_width;
+use crate::ui::helpers::spinner_symbol;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::terminal::Frame;
@@ -38,9 +39,9 @@ const FOOTER_KEYBINDINGS: [(&str, &str); 12] = [
 ];
 
 pub fn draw_footer_panel(frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
-    let progress_label = match &state.scan_state {
+    let progress_label = match &state.scan.state {
         ScanState::Running(progress) => {
-            let spinner = spinner_symbol(state.spinner_phase);
+            let spinner = spinner_symbol(state.ui.spinner_phase);
             format!(
                 "{spinner} Scanning... {} entries, {} errors",
                 progress.scanned, progress.errors

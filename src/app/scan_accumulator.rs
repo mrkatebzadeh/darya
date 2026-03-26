@@ -13,9 +13,23 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-mod actions;
-pub mod controller;
-pub mod event_loop;
+use crate::fs_scan::ScanNode;
 
-pub use controller::{handle_input_action, process_scan_event};
-pub use event_loop::run_event_loop;
+#[derive(Debug, Default)]
+pub struct ScanAccumulator {
+    nodes: Vec<ScanNode>,
+}
+
+impl ScanAccumulator {
+    pub fn push_batch(&mut self, nodes: Vec<ScanNode>) {
+        self.nodes.extend(nodes);
+    }
+
+    pub fn push_node(&mut self, node: ScanNode) {
+        self.nodes.push(node);
+    }
+
+    pub fn drain(&mut self) -> Vec<ScanNode> {
+        self.nodes.drain(..).collect()
+    }
+}

@@ -129,11 +129,11 @@ impl FilesystemViewModel {
             state.set_scroll_offset(0);
         }
 
-        let mut offset = state.scroll_offset;
+        let mut offset = state.navigation.scroll_offset;
         if !tree_rows.is_empty() && visible_height > 0 {
             let selected_index = tree_rows
                 .iter()
-                .position(|row| Some(row.id()) == state.selection)
+                .position(|row| Some(row.id()) == state.navigation.selection)
                 .unwrap_or(0);
             if selected_index < offset {
                 offset = selected_index;
@@ -161,7 +161,7 @@ impl FilesystemViewModel {
                 .map(|row| {
                     build_row(
                         row,
-                        state.selection,
+                        state.navigation.selection,
                         theme,
                         state.size_mode,
                         max_size,
@@ -176,11 +176,11 @@ impl FilesystemViewModel {
         };
 
         let filter_prompt =
-            if state.filter_prompt_active && area.height > OVERLAY_HEIGHT && area.width >= 4 {
-                Some(if state.filter_query.is_empty() {
+            if state.filter.prompt_active && area.height > OVERLAY_HEIGHT && area.width >= 4 {
+                Some(if state.filter.query.is_empty() {
                     " ".into()
                 } else {
-                    state.filter_query.clone()
+                    state.filter.query.clone()
                 })
             } else {
                 None

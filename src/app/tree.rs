@@ -27,7 +27,6 @@ pub type NodeId = usize;
 #[derive(Debug)]
 pub struct FileTree {
     nodes: Vec<TreeNode>,
-    pub navigation: NavigationState,
     path_index: HashMap<PathBuf, NodeId>,
 }
 
@@ -43,7 +42,6 @@ impl FileTree {
 
         Self {
             nodes: vec![root],
-            navigation: NavigationState::default(),
             path_index,
         }
     }
@@ -77,23 +75,31 @@ impl FileTree {
     }
 
     pub fn sort_children(&mut self, parent: NodeId, mode: SortMode) {
-        if let Some(children) = self.nodes.get(parent).map(|node| node.children.clone()) {
-            let mut sorted = children;
-            sorted.sort_unstable_by(|left, right| {
-                let left_node = &self.nodes[*left];
-                let right_node = &self.nodes[*right];
-                compare_nodes(left_node, right_node, mode)
-            });
+        let mut children = match self.nodes.get_mut(parent) {
+            Some(parent_node) => std::mem::take(&mut parent_node.children),
+            None => return,
+        };
 
-            if let Some(parent_node) = self.nodes.get_mut(parent) {
-                parent_node.children = sorted;
-            }
+        children.sort_unstable_by(|left, right| {
+            let left_node = &self.nodes[*left];
+            let right_node = &self.nodes[*right];
+            compare_nodes(left_node, right_node, mode)
+        });
+
+        if let Some(parent_node) = self.nodes.get_mut(parent) {
+            parent_node.children = children;
         }
     }
 
     pub fn visible_ids(&self) -> Vec<NodeId> {
         let mut ids = Vec::new();
         self.collect_visible(self.root(), &mut ids);
+        ids
+    }
+
+    pub fn visible_ids_filtered(&self, show_hidden: bool) -> Vec<NodeId> {
+        let mut ids = Vec::new();
+        self.collect_visible_filtered(self.root(), &mut ids, show_hidden);
         ids
     }
 
@@ -162,18 +168,23 @@ impl FileTree {
         }
 
         for id in (0..self.nodes.len()).rev() {
-            let children = self.nodes[id].children.clone();
-            if children.is_empty() {
+            if self.nodes[id].children.is_empty() {
                 continue;
             }
-            let mut total_size = 0u64;
-            let mut total_disk = 0u64;
-            for child_id in children {
-                if let Some(child) = self.nodes.get(child_id) {
-                    total_size = total_size.saturating_add(child.size);
-                    total_disk = total_disk.saturating_add(child.disk_size);
+
+            let (total_size, total_disk) = {
+                let children = self.nodes[id].children.as_slice();
+                let mut total_size = 0u64;
+                let mut total_disk = 0u64;
+                for &child_id in children {
+                    if let Some(child) = self.nodes.get(child_id) {
+                        total_size = total_size.saturating_add(child.size);
+                        total_disk = total_disk.saturating_add(child.disk_size);
+                    }
                 }
-            }
+                (total_size, total_disk)
+            };
+
             if let Some(node) = self.nodes.get_mut(id) {
                 node.size = total_size;
                 node.disk_size = total_disk;
@@ -222,26 +233,18 @@ impl FileTree {
             }
         }
     }
-}
 
-/// Metadata that tracks the user's current selection and scroll offset.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct NavigationState {
-    pub selected: Option<NodeId>,
-    pub scroll_offset: usize,
-}
-
-impl NavigationState {
-    pub fn select(&mut self, id: NodeId) {
-        self.selected = Some(id);
-    }
-
-    pub fn clear(&mut self) {
-        self.selected = None;
-    }
-
-    pub fn set_scroll_offset(&mut self, offset: usize) {
-        self.scroll_offset = offset;
+    fn collect_visible_filtered(&self, node_id: NodeId, ids: &mut Vec<NodeId>, show_hidden: bool) {
+        if let Some(node) = self.nodes.get(node_id) {
+            if show_hidden || !node.name.starts_with('.') {
+                ids.push(node_id);
+            }
+            if node.expanded {
+                for &child in &node.children {
+                    self.collect_visible_filtered(child, ids, show_hidden);
+                }
+            }
+        }
     }
 }
 
@@ -392,16 +395,6 @@ mod tests {
 
         tree.sort_children(0, SortMode::ModifiedTime);
         assert_eq!(tree.node(0).unwrap().children, vec![recent_id, older_id]);
-    }
-
-    #[test]
-    fn navigation_state_tracks_selection() {
-        let mut nav = NavigationState::default();
-        assert_eq!(nav.selected, None);
-        nav.select(5);
-        assert_eq!(nav.selected, Some(5));
-        nav.clear();
-        assert!(nav.selected.is_none());
     }
 
     #[test]

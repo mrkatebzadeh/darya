@@ -46,8 +46,8 @@ pub fn run_event_loop(
     let mut force_redraw = false;
     let mut should_quit = false;
 
-    if state.selection.is_none() {
-        state.selection = Some(state.tree.root());
+    if state.navigation.selection.is_none() {
+        state.navigation.selection = Some(state.tree.root());
     }
     state.refresh_treemap_nodes();
     state.mark_ui_dirty();
@@ -84,7 +84,7 @@ pub fn run_event_loop(
 
         if force_redraw {
             terminal.draw(|frame| {
-                let regions = layout::split_layout(frame.size(), state.treemap_visible);
+                let regions = layout::split_layout(frame.size(), state.ui.treemap_visible);
                 ui.draw(frame, regions, state, theme);
             })?;
             force_redraw = false;
@@ -94,14 +94,14 @@ pub fn run_event_loop(
         }
 
         if last_tick.elapsed() >= TICK_RATE {
-            let running = matches!(state.scan_state, ScanState::Running(_));
+            let running = matches!(state.scan.state, ScanState::Running(_));
             if running {
                 state.advance_spinner(BRAILLE_EIGHT.symbols.len());
             }
             let should_draw = pending_draw || running;
             if should_draw {
                 terminal.draw(|frame| {
-                    let regions = layout::split_layout(frame.size(), state.treemap_visible);
+                    let regions = layout::split_layout(frame.size(), state.ui.treemap_visible);
                     ui.draw(frame, regions, state, theme);
                 })?;
                 pending_draw = false;

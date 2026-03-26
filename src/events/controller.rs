@@ -14,16 +14,11 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::config::SortMode;
-use crate::fs_scan::{ScanEvent, ScanNode, ScanProgress};
+use crate::events::actions::{files, filter, navigation, scan};
+use crate::fs_scan::{ScanEvent, ScanProgress};
 use crate::input::InputAction;
 use crate::scan_control::{ScanTrigger, ScanTriggerSender};
-use crate::size::total_size;
-use crate::snapshot::{self, SnapshotEndpoint, SnapshotFormat};
-use crate::state::{AppState, ScanState, StatusMessage, StatusOutcome};
-use crate::tree::{FileTree, NodeMetadata, NodeType};
-use std::fs;
-use std::path::PathBuf;
-use std::process::Command;
+use crate::state::{AppState, ScanState, StatusMessage};
 
 pub fn handle_input_action(
     action: InputAction,
@@ -31,46 +26,26 @@ pub fn handle_input_action(
     scan_trigger: &ScanTriggerSender,
 ) {
     match action {
-        InputAction::MoveUp => select_previous(state),
-        InputAction::MoveDown => select_next(state),
-        InputAction::JumpTop => select_first(state),
-        InputAction::JumpBottom => select_last(state),
-        InputAction::Expand => expand_selection(state),
-        InputAction::Select => toggle_selection(state),
-        InputAction::Delete => delete_selection(state),
-        InputAction::Open => open_selection(state),
+        InputAction::MoveUp => navigation::select_previous(state),
+        InputAction::MoveDown => navigation::select_next(state),
+        InputAction::JumpTop => navigation::select_first(state),
+        InputAction::JumpBottom => navigation::select_last(state),
+        InputAction::Expand => navigation::expand_selection(state),
+        InputAction::Select => navigation::toggle_selection(state),
+        InputAction::Delete => files::delete_selection(state),
+        InputAction::Open => files::open_selection(state),
         InputAction::ToggleSizeMode => state.toggle_size_mode(),
         InputAction::ToggleTreemap => state.toggle_treemap_visibility(),
-        InputAction::ExportScan => export_scan(state),
-        InputAction::ImportScan => import_scan(state),
-        InputAction::Rescan => rescan_selection(state),
+        InputAction::ExportScan => files::export_scan(state),
+        InputAction::ImportScan => files::import_scan(state),
+        InputAction::Rescan => scan::rescan_selection(state),
         InputAction::StartFilter => {
-            state.filter_active = true;
-            state.filter_prompt_active = true;
-            state.update_status(StatusMessage::FilterPrompt);
+            filter::start_filter(state);
         }
-        InputAction::FilterChar(ch) => {
-            state.filter_query.push(ch);
-            state.filter_active = true;
-        }
-        InputAction::FilterBackspace => {
-            state.filter_query.pop();
-        }
-        InputAction::ApplyFilter => {
-            state.filter_prompt_active = false;
-            if state.filter_query.is_empty() {
-                state.filter_active = false;
-                state.update_status(StatusMessage::FilterCleared);
-            } else {
-                state.filter_active = true;
-                state.update_status(StatusMessage::FilterActive(state.filter_query.clone()));
-            }
-        }
-        InputAction::ClearFilter => {
-            state.filter_prompt_active = false;
-            state.clear_filter();
-            state.update_status(StatusMessage::FilterCleared);
-        }
+        InputAction::FilterChar(ch) => filter::filter_char(state, ch),
+        InputAction::FilterBackspace => filter::filter_backspace(state),
+        InputAction::ApplyFilter => filter::apply_filter(state),
+        InputAction::ClearFilter => filter::clear_filter(state),
         InputAction::CycleSort => {
             let next = next_sort_mode(state.sort_mode);
             state.set_sort_mode(next);
@@ -85,16 +60,16 @@ pub fn handle_input_action(
             ));
         }
         InputAction::ToggleHelp => {
-            state.show_help = !state.show_help;
-            if state.show_help {
+            state.ui.show_help = !state.ui.show_help;
+            if state.ui.show_help {
                 state.update_status(StatusMessage::HelpOpened);
             } else {
                 state.update_status(StatusMessage::HelpClosed);
             }
         }
-        InputAction::Collapse => collapse_selection(state),
+        InputAction::Collapse => navigation::collapse_selection(state),
         InputAction::StartScan => {
-            if !matches!(state.scan_state, ScanState::Running(_)) {
+            if !matches!(state.scan.state, ScanState::Running(_)) {
                 let _ = scan_trigger.send(ScanTrigger::Start);
                 state.mark_scan_progress(ScanProgress {
                     scanned: 0,
@@ -105,8 +80,7 @@ pub fn handle_input_action(
         _ => {}
     }
 
-    state.refresh_treemap_nodes();
-    state.mark_ui_dirty();
+    state.refresh_ui();
 }
 
 fn next_sort_mode(current: SortMode) -> SortMode {
@@ -118,397 +92,8 @@ fn next_sort_mode(current: SortMode) -> SortMode {
     }
 }
 
-fn insert_scan_node(state: &mut AppState, node: &ScanNode) -> Option<(PathBuf, Option<usize>)> {
-    // Keep scanner paths stable as emitted by walkdir.
-    // Canonicalizing each node can split parent/child chains when some entries
-    // cannot be canonicalized (permissions/symlinks), which breaks aggregation.
-    let path = node.path.clone();
-    let node_id = state.tree.ensure_node(path.clone(), node.kind);
-    if node.kind == NodeType::File {
-        state.tree.add_size(node_id, node.size);
-        state.tree.add_disk_size(node_id, node.disk_size);
-    }
-    if state.extended_mode {
-        state.tree.set_node_metadata(
-            node_id,
-            NodeMetadata {
-                modified: node.modified,
-                permissions: node.permissions,
-                uid: node.uid,
-                gid: node.gid,
-            },
-        );
-    }
-    let parent = state.tree.node(node_id).and_then(|node| node.parent);
-    Some((path, parent))
-}
-
-fn rebuild_tree_from_pending(state: &mut AppState) {
-    let selected_path = state
-        .selection
-        .and_then(|id| state.tree.node(id).map(|node| node.path.clone()));
-    let root_path = selected_path.clone().unwrap_or_else(|| {
-        state
-            .tree
-            .node(state.tree.root())
-            .map(|node| node.path.clone())
-            .unwrap_or_else(|| PathBuf::from("/"))
-    });
-    state.tree = FileTree::new(root_path);
-    let mut parents = Vec::new();
-    let drained_nodes: Vec<ScanNode> = state.pending_scan_nodes.drain(..).collect();
-    for node in drained_nodes {
-        if let Some((_path, Some(parent_id))) = insert_scan_node(state, &node) {
-            parents.push(parent_id);
-        }
-    }
-    parents.sort_unstable();
-    parents.dedup();
-    for parent in parents {
-        state.tree.sort_children(parent, state.sort_mode);
-    }
-    state.tree.recompute_sizes();
-    debug_assert!(
-        state.tree.verify_size_invariants(),
-        "tree size invariant violated after rebuilding"
-    );
-    restore_selection(state, selected_path);
-}
-
-fn restore_selection(state: &mut AppState, path: Option<PathBuf>) {
-    if let Some(path) = path
-        && let Some(id) = state.tree.node_id_for_path(&path)
-    {
-        state.selection = Some(id);
-        return;
-    }
-    state.selection = Some(state.tree.root());
-}
-
-fn select_previous(state: &mut AppState) {
-    let ids = state.visible_node_ids();
-    if ids.is_empty() {
-        state.selection = None;
-        return;
-    }
-    let index = ids
-        .iter()
-        .position(|&id| Some(id) == state.selection)
-        .unwrap_or(0);
-    let next = ids.get(index.saturating_sub(1)).copied().unwrap_or(ids[0]);
-    state.selection = Some(next);
-}
-
-fn select_next(state: &mut AppState) {
-    let ids = state.visible_node_ids();
-    if ids.is_empty() {
-        state.selection = None;
-        return;
-    }
-    let index = ids
-        .iter()
-        .position(|&id| Some(id) == state.selection)
-        .unwrap_or(usize::MAX);
-    let next = if index + 1 >= ids.len() {
-        ids[ids.len() - 1]
-    } else {
-        ids[index + 1]
-    };
-    state.selection = Some(next);
-}
-
-fn select_first(state: &mut AppState) {
-    let ids = state.visible_node_ids();
-    if let Some(&first) = ids.first() {
-        state.selection = Some(first);
-    }
-}
-
-fn select_last(state: &mut AppState) {
-    let ids = state.visible_node_ids();
-    if let Some(&last) = ids.last() {
-        state.selection = Some(last);
-    }
-}
-
-fn expand_selection(state: &mut AppState) {
-    if let Some(id) = state.selection
-        && let Some(node) = state.tree.node_mut(id)
-        && node.file_type == NodeType::Directory
-    {
-        node.expanded = true;
-    }
-}
-
-fn collapse_selection(state: &mut AppState) {
-    if let Some(id) = state.selection
-        && let Some(node) = state.tree.node_mut(id)
-    {
-        if node.file_type == NodeType::Directory {
-            node.expanded = false;
-            return;
-        }
-        if let Some(parent) = node.parent
-            && let Some(parent_node) = state.tree.node_mut(parent)
-        {
-            parent_node.expanded = false;
-            state.selection = Some(parent);
-        }
-    }
-}
-
-fn toggle_selection(state: &mut AppState) {
-    if let Some(id) = state.selection
-        && let Some(node) = state.tree.node_mut(id)
-        && node.file_type == NodeType::Directory
-    {
-        node.expanded = !node.expanded;
-    }
-}
-
-fn delete_selection(state: &mut AppState) {
-    if !state.allow_modifications {
-        state.update_status(StatusMessage::ImportReadOnly);
-        return;
-    }
-    let Some(selected_id) = state.selection else {
-        return;
-    };
-
-    if state.pending_delete != Some(selected_id) {
-        state.pending_delete = Some(selected_id);
-        if let Some(node) = state.tree.node(selected_id) {
-            state.update_status(StatusMessage::DeleteConfirmation(node.path.clone()));
-        }
-        return;
-    }
-
-    let Some(target) = state.tree.node(selected_id).map(|n| n.path.clone()) else {
-        state.pending_delete = None;
-        return;
-    };
-
-    let result = if target.is_dir() {
-        fs::remove_dir_all(&target)
-    } else {
-        fs::remove_file(&target)
-    };
-
-    match result {
-        Ok(()) => {
-            if let Some(node) = state.tree.node_mut(selected_id) {
-                if !node.name.starts_with("✖ ") {
-                    node.name = format!("✖ {}", node.name);
-                }
-                node.size = 0;
-                node.children.clear();
-                node.expanded = false;
-            }
-            state.update_status(StatusMessage::DeleteSuccess(target.clone()));
-        }
-        Err(err) => {
-            state.mark_scan_error(format!("delete failed for {}: {err}", target.display()));
-            state.update_status(StatusMessage::DeleteFailure(target.clone()));
-        }
-    }
-    state.pending_delete = None;
-}
-
-fn open_selection(state: &mut AppState) {
-    if !state.allow_modifications {
-        state.update_status(StatusMessage::ImportReadOnly);
-        return;
-    }
-    let Some(selected_id) = state.selection else {
-        return;
-    };
-    let Some(path) = state.tree.node(selected_id).map(|n| n.path.clone()) else {
-        return;
-    };
-
-    let mut command = open_command_for_platform();
-    command.arg(&path);
-
-    match command.spawn() {
-        Ok(_) => state.update_status(StatusMessage::OpenResult {
-            path: path.clone(),
-            outcome: StatusOutcome::Success,
-        }),
-        Err(err) => state.update_status(StatusMessage::OpenResult {
-            path: path.clone(),
-            outcome: StatusOutcome::failure(err),
-        }),
-    }
-}
-
-fn export_scan(state: &mut AppState) {
-    let snapshot_path = std::path::Path::new("/tmp/darya-scan.json");
-    match snapshot::export_tree(&state.tree, snapshot_path, state.export_options) {
-        Ok(()) => state.update_status(StatusMessage::ExportResult {
-            path: snapshot_path.to_path_buf(),
-            outcome: StatusOutcome::Success,
-        }),
-        Err(err) => state.update_status(StatusMessage::ExportResult {
-            path: snapshot_path.to_path_buf(),
-            outcome: StatusOutcome::failure(err),
-        }),
-    }
-}
-
-fn import_scan(state: &mut AppState) {
-    let snapshot_path = std::path::Path::new("/tmp/darya-scan.json");
-    let default_root = state
-        .tree
-        .node(state.tree.root())
-        .map(|node| node.path.clone())
-        .unwrap_or_else(|| std::path::PathBuf::from("."));
-
-    match snapshot::import_from_destination(
-        SnapshotEndpoint::File(snapshot_path.to_path_buf()),
-        &default_root,
-        SnapshotFormat::Json,
-    ) {
-        Ok(tree) => {
-            state.tree = tree;
-            state.selection = Some(state.tree.root());
-            state.update_status(StatusMessage::ImportResult {
-                path: snapshot_path.to_path_buf(),
-                outcome: StatusOutcome::Success,
-            });
-        }
-        Err(err) => state.update_status(StatusMessage::ImportResult {
-            path: snapshot_path.to_path_buf(),
-            outcome: StatusOutcome::failure(err),
-        }),
-    }
-}
-
-fn rescan_selection(state: &mut AppState) {
-    if !state.allow_modifications {
-        state.update_status(StatusMessage::ImportReadOnly);
-        return;
-    }
-    let Some(selected_id) = state.selection else {
-        return;
-    };
-    let Some(node) = state.tree.node(selected_id).cloned() else {
-        return;
-    };
-
-    let previous_size = node.size;
-    let node_path = node.path.clone();
-    let refreshed_size = if node.file_type == NodeType::Directory {
-        match total_size(&node.path, false) {
-            Ok(size) => size,
-            Err(err) => {
-                state.update_status(StatusMessage::RescanResult {
-                    path: node_path.clone(),
-                    outcome: StatusOutcome::failure(err),
-                });
-                return;
-            }
-        }
-    } else {
-        match std::fs::metadata(&node.path) {
-            Ok(meta) => meta.len(),
-            Err(err) => {
-                state.update_status(StatusMessage::RescanResult {
-                    path: node_path.clone(),
-                    outcome: StatusOutcome::failure(err),
-                });
-                return;
-            }
-        }
-    };
-
-    if let Some(current) = state.tree.node_mut(selected_id) {
-        current.size = refreshed_size;
-    }
-    adjust_ancestors_after_rescan(state, node.parent, previous_size, refreshed_size);
-    state.update_status(StatusMessage::RescanResult {
-        path: node_path,
-        outcome: StatusOutcome::Success,
-    });
-}
-
-fn adjust_ancestors_after_rescan(
-    state: &mut AppState,
-    mut parent: Option<usize>,
-    previous_size: u64,
-    refreshed_size: u64,
-) {
-    while let Some(parent_id) = parent {
-        if let Some(parent_node) = state.tree.node_mut(parent_id) {
-            if refreshed_size >= previous_size {
-                parent_node.size = parent_node
-                    .size
-                    .saturating_add(refreshed_size.saturating_sub(previous_size));
-            } else {
-                parent_node.size = parent_node
-                    .size
-                    .saturating_sub(previous_size.saturating_sub(refreshed_size));
-            }
-            parent = parent_node.parent;
-        } else {
-            break;
-        }
-    }
-}
-
-fn open_command_for_platform() -> Command {
-    if cfg!(target_os = "macos") {
-        Command::new("open")
-    } else {
-        Command::new("xdg-open")
-    }
-}
-
 pub fn process_scan_event(state: &mut AppState, event: ScanEvent) {
-    match event {
-        ScanEvent::Batch(batch) => {
-            let last_path = batch.nodes.last().map(|n| n.path.clone());
-            state.pending_scan_nodes.extend(batch.nodes);
-            if let Some(path) = last_path {
-                state.update_status(StatusMessage::ScanPath(path));
-            }
-            if let Some(progress) = batch.progress {
-                state.mark_scan_progress(progress.clone());
-                state.update_status(StatusMessage::ScanProgress {
-                    scanned: progress.scanned,
-                    errors: progress.errors,
-                });
-            } else {
-                state.mark_scan_complete();
-            }
-            if let Some(activity) = batch.activity {
-                state.scan_activity = activity;
-            }
-        }
-        ScanEvent::Node(node) => {
-            state.pending_scan_nodes.push(node);
-        }
-        ScanEvent::Activity(activity) => {
-            state.scan_activity = activity;
-        }
-        ScanEvent::Progress(progress) => {
-            state.mark_scan_progress(progress.clone());
-            state.update_status(StatusMessage::ScanProgress {
-                scanned: progress.scanned,
-                errors: progress.errors,
-            });
-        }
-        ScanEvent::Error(error) => {
-            state.mark_scan_error(format!("{}: {}", error.path.display(), error.source));
-        }
-        ScanEvent::Completed => {
-            state.mark_scan_complete();
-            state.update_status(StatusMessage::ScanComplete);
-            rebuild_tree_from_pending(state);
-        }
-    }
-
-    state.refresh_treemap_nodes();
-    state.mark_ui_dirty();
+    scan::process_scan_event(state, event);
 }
 
 #[cfg(test)]
@@ -516,6 +101,7 @@ mod tests {
     use super::*;
     use crate::fs_scan::ScanActivity;
     use crate::fs_scan::ScanBatch;
+    use crate::fs_scan::ScanNode;
     use crate::scan_control::ScanTriggerSender;
     use crate::state::AppState;
     use crate::tree::{NodeType, TreeNode};
@@ -526,7 +112,7 @@ mod tests {
         let mut state = AppState::new(PathBuf::from("/"), default_sort_mode());
         let child = TreeNode::new(PathBuf::from("/child"), NodeType::File);
         state.tree.add_child(0, child);
-        state.selection = Some(0);
+        state.navigation.selection = Some(0);
         state
     }
 
@@ -544,16 +130,16 @@ mod tests {
         let mut state = sample_state();
         let trigger = dummy_trigger();
         handle_input_action(InputAction::MoveDown, &mut state, &trigger);
-        assert_eq!(state.selection, Some(1));
+        assert_eq!(state.navigation.selection, Some(1));
     }
 
     #[test]
     fn move_up_wraps_to_root() {
         let mut state = sample_state();
-        state.selection = Some(1);
+        state.navigation.selection = Some(1);
         let trigger = dummy_trigger();
         handle_input_action(InputAction::MoveUp, &mut state, &trigger);
-        assert_eq!(state.selection, Some(0));
+        assert_eq!(state.navigation.selection, Some(0));
     }
 
     #[test]
@@ -563,7 +149,7 @@ mod tests {
             0,
             TreeNode::new(PathBuf::from("/dir"), NodeType::Directory).collapsed(),
         );
-        state.selection = Some(dir_id);
+        state.navigation.selection = Some(dir_id);
         let trigger = dummy_trigger();
 
         handle_input_action(InputAction::Select, &mut state, &trigger);
@@ -576,7 +162,7 @@ mod tests {
     #[test]
     fn delete_action_first_press_requests_confirmation() {
         let mut state = sample_state();
-        state.selection = Some(1);
+        state.navigation.selection = Some(1);
         let trigger = dummy_trigger();
         handle_input_action(InputAction::Delete, &mut state, &trigger);
         assert_eq!(state.pending_delete, Some(1));
@@ -584,7 +170,7 @@ mod tests {
 
     #[test]
     fn open_command_matches_platform() {
-        let command = open_command_for_platform();
+        let command = crate::events::actions::files::open_command_for_platform();
         let expected = if cfg!(target_os = "macos") {
             "open"
         } else {
@@ -597,12 +183,12 @@ mod tests {
     fn toggle_treemap_updates_visibility() {
         let mut state = sample_state();
         let trigger = dummy_trigger();
-        let initial = state.treemap_visible;
+        let initial = state.ui.treemap_visible;
 
         handle_input_action(InputAction::ToggleTreemap, &mut state, &trigger);
 
-        assert_ne!(state.treemap_visible, initial);
-        let expected = if state.treemap_visible {
+        assert_ne!(state.ui.treemap_visible, initial);
+        let expected = if state.ui.treemap_visible {
             "treemap panel shown"
         } else {
             "treemap panel hidden"
@@ -620,7 +206,7 @@ mod tests {
         if let Some(root) = state.tree.node_mut(0) {
             root.size = 10;
         }
-        adjust_ancestors_after_rescan(&mut state, Some(0), 10, 25);
+        crate::events::actions::scan::adjust_ancestors_after_rescan(&mut state, Some(0), 10, 25);
         assert_eq!(state.tree.node(0).unwrap().size, 25);
         assert_eq!(dir_id, 1);
     }
@@ -664,7 +250,7 @@ mod tests {
             activity: Some(ScanActivity::default()),
         };
         process_scan_event(&mut state, ScanEvent::Batch(batch));
-        if matches!(state.scan_state, ScanState::Completed) {
+        if matches!(state.scan.state, ScanState::Completed) {
             process_scan_event(&mut state, ScanEvent::Completed);
         }
         let root = state.tree.node(0).unwrap();

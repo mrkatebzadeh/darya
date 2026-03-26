@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::config::SortMode;
 use crate::display::DisplayOptions;
 use crate::state::{AppState, SizeDisplayMode};
 use crate::theme::Theme;
 use crate::tree::{FileTree, NodeType, TreeNode};
 use crate::treemap::{TreemapNode, TreemapTile};
+use crate::ui::format::{format_size_custom, percent_bar, trim_to_width};
 use ratatui::layout::Rect;
 #[cfg(test)]
 use ratatui::layout::{Constraint, Layout};
@@ -37,11 +37,12 @@ pub(crate) fn collect_tree_rows(
     options: DisplayOptions,
 ) -> Vec<TreeRow> {
     let mut rows = Vec::new();
-    traverse(tree, tree.root(), 0, &mut rows, options);
-    if filter_active && !filter_query.is_empty() {
-        let filter = filter_query.to_lowercase();
-        rows.retain(|row| row.name.to_lowercase().contains(&filter));
-    }
+    let filter = if filter_active && !filter_query.is_empty() {
+        Some(filter_query.to_lowercase())
+    } else {
+        None
+    };
+    traverse(tree, tree.root(), 0, &mut rows, options, filter.as_deref());
     rows
 }
 
@@ -57,24 +58,32 @@ fn traverse(
     depth: usize,
     rows: &mut Vec<TreeRow>,
     options: DisplayOptions,
+    filter: Option<&str>,
 ) {
     if let Some(node) = tree.node(id) {
         if depth > 0 && !options.show_hidden && node.name.starts_with('.') {
             return;
         }
 
-        rows.push(TreeRow {
+        let row = TreeRow {
             id: node.id,
             depth,
             name: node.name.clone(),
             size: node.size,
             disk_size: node.disk_size,
             kind: node.file_type,
-        });
+        };
+
+        if filter
+            .map(|value| row.name.to_lowercase().contains(value))
+            .unwrap_or(true)
+        {
+            rows.push(row);
+        }
 
         if node.expanded {
             for &child in &node.children {
-                traverse(tree, child, depth + 1, rows, options);
+                traverse(tree, child, depth + 1, rows, options, filter);
             }
         }
     }
@@ -178,43 +187,6 @@ pub(crate) fn chosen_size(row: &TreeRow, mode: SizeDisplayMode, options: Display
     }
 }
 
-fn percent_bar(percent: f64, width: usize) -> String {
-    let ratio = (percent.clamp(0.0, 100.0) / 100.0).min(1.0);
-    let filled = ((ratio * width as f64).round() as usize).min(width);
-    let empty = width.saturating_sub(filled);
-    format!("{}{}", "█".repeat(filled), "-".repeat(empty))
-}
-
-pub(crate) fn trim_to_width(value: &str, width: usize) -> String {
-    if width == 0 {
-        return String::new();
-    }
-    if value.len() <= width {
-        value.to_string()
-    } else {
-        value.chars().take(width).collect()
-    }
-}
-
-fn format_size_custom(bytes: u64, use_si: bool) -> String {
-    let div = if use_si { 1000.0 } else { 1024.0 };
-    let (kib, mib, gib) = if use_si {
-        ("kB", "MB", "GB")
-    } else {
-        ("KiB", "MiB", "GiB")
-    };
-    let value = bytes as f64;
-    if value >= div * div * div {
-        format!("{:.1} {}", value / (div * div * div), gib)
-    } else if value >= div * div {
-        format!("{:.1} {}", value / (div * div), mib)
-    } else if value >= div {
-        format!("{:.1} {}", value / div, kib)
-    } else {
-        format!("{bytes} B")
-    }
-}
-
 pub(crate) fn spinner_symbol(phase: usize) -> &'static str {
     let symbols = BRAILLE_EIGHT.symbols;
     symbols[phase % symbols.len()]
@@ -222,7 +194,7 @@ pub(crate) fn spinner_symbol(phase: usize) -> &'static str {
 
 #[cfg(test)]
 pub(crate) fn selected_info_line(state: &AppState) -> String {
-    let Some(selected) = state.selection else {
+    let Some(selected) = state.navigation.selection else {
         return "info: no selection".to_string();
     };
 
@@ -309,7 +281,7 @@ pub(crate) fn detail_panel_lines(state: &AppState) -> Vec<String> {
         ]
     };
 
-    let Some(selected) = state.selection else {
+    let Some(selected) = state.navigation.selection else {
         return empty();
     };
 
@@ -348,15 +320,6 @@ fn detail_line(glyph: &str, key: &str, value: &str) -> String {
     format!("{glyph}\t{key}:\t{value}")
 }
 
-pub(crate) fn sort_mode_label(mode: SortMode) -> &'static str {
-    match mode {
-        SortMode::SizeDesc => "size_desc",
-        SortMode::SizeAsc => "size_asc",
-        SortMode::Name => "name",
-        SortMode::ModifiedTime => "modified_time",
-    }
-}
-
 pub(crate) fn fill_rect(frame: &mut Frame<'_>, rect: Rect, fg: Color, bg: Color) {
     let buf = frame.buffer_mut();
     let x_end = rect.x.saturating_add(rect.width);
@@ -381,15 +344,15 @@ pub(crate) fn draw_treemap_tile(frame: &mut Frame<'_>, tile: &TreemapTile, theme
     fill_rect(frame, tile.rect, color, theme.background);
 }
 
-pub(crate) fn selection_path(state: &AppState) -> Vec<usize> {
-    let Some(mut current) = state.selection else {
-        return Vec::new();
+pub(crate) fn selection_path(state: &AppState) -> SelectionPath {
+    let mut path = SelectionPath::default();
+    let Some(mut current) = state.navigation.selection else {
+        return path;
     };
     let root = state.tree.root();
-    let mut stack = Vec::new();
 
     while current != root {
-        stack.push(current);
+        path.ids.push(current);
         let parent = state.tree.node(current).and_then(|node| node.parent);
         if let Some(parent) = parent {
             current = parent;
@@ -398,8 +361,19 @@ pub(crate) fn selection_path(state: &AppState) -> Vec<usize> {
         }
     }
 
-    stack.reverse();
-    stack
+    path.ids.reverse();
+    path
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct SelectionPath {
+    ids: Vec<usize>,
+}
+
+impl SelectionPath {
+    pub(crate) fn as_slice(&self) -> &[usize] {
+        &self.ids
+    }
 }
 
 pub(crate) fn gather_child_nodes(
@@ -515,7 +489,14 @@ mod tests {
 
     fn flatten_rows(tree: &FileTree) -> Vec<TreeRow> {
         let mut rows = Vec::new();
-        traverse(tree, tree.root(), 0, &mut rows, DisplayOptions::default());
+        traverse(
+            tree,
+            tree.root(),
+            0,
+            &mut rows,
+            DisplayOptions::default(),
+            None,
+        );
         rows
     }
 
@@ -533,7 +514,7 @@ mod tests {
         let file_id = state
             .tree
             .add_child(0, TreeNode::new(temp.clone(), NodeType::File));
-        state.selection = Some(file_id);
+        state.navigation.selection = Some(file_id);
 
         let info = selected_info_line(&state);
         assert!(info.contains("mtime="));
