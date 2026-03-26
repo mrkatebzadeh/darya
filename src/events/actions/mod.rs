@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-mod actions;
-pub mod controller;
-pub mod event_loop;
-
-pub use controller::{handle_input_action, process_scan_event};
-pub use event_loop::run_event_loop;
+pub(crate) mod files;
+pub(crate) mod filter;
+pub(crate) mod navigation;
+pub(crate) mod scan;
