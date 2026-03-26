@@ -29,13 +29,18 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 
 /// Renderer responsible for drawing the main UI panels.
 struct TreeRowsCache {
-    revision: u64,
+    tree_revision: u64,
+    filter_revision: u64,
     rows: Vec<TreeRow>,
 }
 
 impl TreeRowsCache {
-    fn new(revision: u64, rows: Vec<TreeRow>) -> Self {
-        Self { revision, rows }
+    fn new(tree_revision: u64, filter_revision: u64, rows: Vec<TreeRow>) -> Self {
+        Self {
+            tree_revision,
+            filter_revision,
+            rows,
+        }
     }
 }
 
@@ -77,11 +82,14 @@ impl Ui {
     }
 
     fn cached_tree_rows(&mut self, state: &AppState) -> &[TreeRow] {
-        let revision = state.ui_revision();
+        let tree_revision = state.tree_revision;
+        let filter_revision = state.filter_revision;
         let needs_refresh = self
             .tree_rows_cache
             .as_ref()
-            .map(|cache| cache.revision != revision)
+            .map(|cache| {
+                cache.tree_revision != tree_revision || cache.filter_revision != filter_revision
+            })
             .unwrap_or(true);
 
         if needs_refresh {
@@ -91,7 +99,7 @@ impl Ui {
                 state.filter.active,
                 state.display_options,
             );
-            self.tree_rows_cache = Some(TreeRowsCache::new(revision, rows));
+            self.tree_rows_cache = Some(TreeRowsCache::new(tree_revision, filter_revision, rows));
         }
 
         &self.tree_rows_cache.as_ref().unwrap().rows
