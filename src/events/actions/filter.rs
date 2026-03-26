@@ -16,33 +16,33 @@
 use crate::state::{AppState, StatusMessage};
 
 pub(crate) fn start_filter(state: &mut AppState) {
-    state.filter_active = true;
-    state.filter_prompt_active = true;
+    state.filter.active = true;
+    state.filter.prompt_active = true;
     state.update_status(StatusMessage::FilterPrompt);
 }
 
 pub(crate) fn filter_char(state: &mut AppState, ch: char) {
-    state.filter_query.push(ch);
-    state.filter_active = true;
+    state.filter.query.push(ch);
+    state.filter.active = true;
 }
 
 pub(crate) fn filter_backspace(state: &mut AppState) {
-    state.filter_query.pop();
+    state.filter.query.pop();
 }
 
 pub(crate) fn apply_filter(state: &mut AppState) {
-    state.filter_prompt_active = false;
-    if state.filter_query.is_empty() {
-        state.filter_active = false;
+    state.filter.prompt_active = false;
+    if state.filter.query.is_empty() {
+        state.filter.active = false;
         state.update_status(StatusMessage::FilterCleared);
     } else {
-        state.filter_active = true;
-        state.update_status(StatusMessage::FilterActive(state.filter_query.clone()));
+        state.filter.active = true;
+        state.update_status(StatusMessage::FilterActive(state.filter.query.clone()));
     }
 }
 
 pub(crate) fn clear_filter(state: &mut AppState) {
-    state.filter_prompt_active = false;
+    state.filter.prompt_active = false;
     state.clear_filter();
     state.update_status(StatusMessage::FilterCleared);
 }

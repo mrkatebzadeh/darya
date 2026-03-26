@@ -176,11 +176,11 @@ impl FilesystemViewModel {
         };
 
         let filter_prompt =
-            if state.filter_prompt_active && area.height > OVERLAY_HEIGHT && area.width >= 4 {
-                Some(if state.filter_query.is_empty() {
+            if state.filter.prompt_active && area.height > OVERLAY_HEIGHT && area.width >= 4 {
+                Some(if state.filter.query.is_empty() {
                     " ".into()
                 } else {
-                    state.filter_query.clone()
+                    state.filter.query.clone()
                 })
             } else {
                 None

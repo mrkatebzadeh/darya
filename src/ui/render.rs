@@ -87,8 +87,8 @@ impl Ui {
         if needs_refresh {
             let rows = collect_tree_rows(
                 &state.tree,
-                &state.filter_query,
-                state.filter_active,
+                &state.filter.query,
+                state.filter.active,
                 state.display_options,
             );
             self.tree_rows_cache = Some(TreeRowsCache::new(revision, rows));

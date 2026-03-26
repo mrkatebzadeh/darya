@@ -140,6 +140,21 @@ pub enum SizeDisplayMode {
     Disk,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct FilterState {
+    pub query: String,
+    pub active: bool,
+    pub prompt_active: bool,
+}
+
+impl FilterState {
+    pub fn clear(&mut self) {
+        self.query.clear();
+        self.active = false;
+        self.prompt_active = false;
+    }
+}
+
 /// Central application state shared across the UI and scanner.
 #[derive(Debug)]
 pub struct AppState {
@@ -153,9 +168,7 @@ pub struct AppState {
     pub spinner_phase: usize,
     pub pending_delete: Option<NodeId>,
     pub size_mode: SizeDisplayMode,
-    pub filter_query: String,
-    pub filter_active: bool,
-    pub filter_prompt_active: bool,
+    pub filter: FilterState,
     pub show_help: bool,
     pub treemap_visible: bool,
     pub treemap_nodes: Vec<TreemapNode>,
@@ -181,11 +194,9 @@ impl AppState {
             spinner_phase: 0,
             pending_delete: None,
             size_mode: SizeDisplayMode::Apparent,
-            filter_query: String::new(),
-            filter_active: false,
+            filter: FilterState::default(),
             show_help: false,
             treemap_visible: true,
-            filter_prompt_active: false,
             treemap_nodes: Vec::new(),
             treemap_revision: 0,
             ui_revision: 0,
@@ -281,9 +292,7 @@ impl AppState {
     }
 
     pub fn clear_filter(&mut self) {
-        self.filter_prompt_active = false;
-        self.filter_query.clear();
-        self.filter_active = false;
+        self.filter.clear();
     }
 
     pub fn scan_activity_snapshot(&self) -> ScanActivity {
