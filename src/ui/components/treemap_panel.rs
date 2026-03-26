@@ -86,10 +86,10 @@ impl TreemapLayoutCache {
         }
     }
 
-    pub fn layout_for<F>(
+    pub(crate) fn layout_for<F>(
         &mut self,
         bounds: Rect,
-        selection_path: &[usize],
+        selection_path: &crate::ui::helpers::SelectionPath,
         revision: u64,
         root_nodes: &[TreemapNode],
         max_nodes: usize,
@@ -102,13 +102,18 @@ impl TreemapLayoutCache {
         let key = TreemapLayoutKey {
             bounds,
             revision,
-            selection_path: selection_path.to_vec(),
+            selection_path: selection_path.clone(),
         };
         if self.key.as_ref() == Some(&key) {
             return self.layout.as_ref().unwrap();
         }
-        let layout =
-            contextual_treemap_layout(root_nodes, bounds, selection_path, max_nodes, provider);
+        let layout = contextual_treemap_layout(
+            root_nodes,
+            bounds,
+            selection_path.as_slice(),
+            max_nodes,
+            provider,
+        );
         self.key = Some(key);
         self.layout = Some(layout);
         self.layout.as_ref().unwrap()
@@ -125,5 +130,5 @@ impl Default for TreemapLayoutCache {
 struct TreemapLayoutKey {
     bounds: Rect,
     revision: u64,
-    selection_path: Vec<usize>,
+    selection_path: crate::ui::helpers::SelectionPath,
 }

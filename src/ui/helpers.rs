@@ -344,15 +344,15 @@ pub(crate) fn draw_treemap_tile(frame: &mut Frame<'_>, tile: &TreemapTile, theme
     fill_rect(frame, tile.rect, color, theme.background);
 }
 
-pub(crate) fn selection_path(state: &AppState) -> Vec<usize> {
+pub(crate) fn selection_path(state: &AppState) -> SelectionPath {
+    let mut path = SelectionPath::default();
     let Some(mut current) = state.selection else {
-        return Vec::new();
+        return path;
     };
     let root = state.tree.root();
-    let mut stack = Vec::new();
 
     while current != root {
-        stack.push(current);
+        path.ids.push(current);
         let parent = state.tree.node(current).and_then(|node| node.parent);
         if let Some(parent) = parent {
             current = parent;
@@ -361,8 +361,19 @@ pub(crate) fn selection_path(state: &AppState) -> Vec<usize> {
         }
     }
 
-    stack.reverse();
-    stack
+    path.ids.reverse();
+    path
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct SelectionPath {
+    ids: Vec<usize>,
+}
+
+impl SelectionPath {
+    pub(crate) fn as_slice(&self) -> &[usize] {
+        &self.ids
+    }
 }
 
 pub(crate) fn gather_child_nodes(
