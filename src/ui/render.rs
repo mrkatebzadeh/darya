@@ -57,7 +57,7 @@ impl Ui {
         let tree_rows = self.cached_tree_rows(state);
         let filesystem_vm = FilesystemViewModel::build(state, layout.tree, theme, tree_rows);
         components::draw_filesystem_panel(frame, layout.tree, filesystem_vm, theme);
-        if state.treemap_visible && layout.treemap.width > 0 && layout.treemap.height > 0 {
+        if state.ui.treemap_visible && layout.treemap.width > 0 && layout.treemap.height > 0 {
             components::draw_treemap_panel(
                 frame,
                 layout.treemap,
@@ -71,7 +71,7 @@ impl Ui {
         let activity_vm = ActivityViewModel::build(state);
         components::draw_activity_panel(frame, layout.activity, &activity_vm, theme);
         components::draw_footer_panel(frame, layout.footer, state, theme);
-        if state.show_help {
+        if state.ui.show_help {
             self.draw_help_modal(frame, state, theme);
         }
     }

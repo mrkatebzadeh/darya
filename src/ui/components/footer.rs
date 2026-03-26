@@ -41,7 +41,7 @@ const FOOTER_KEYBINDINGS: [(&str, &str); 12] = [
 pub fn draw_footer_panel(frame: &mut Frame<'_>, area: Rect, state: &AppState, theme: Theme) {
     let progress_label = match &state.scan.state {
         ScanState::Running(progress) => {
-            let spinner = spinner_symbol(state.spinner_phase);
+            let spinner = spinner_symbol(state.ui.spinner_phase);
             format!(
                 "{spinner} Scanning... {} entries, {} errors",
                 progress.scanned, progress.errors

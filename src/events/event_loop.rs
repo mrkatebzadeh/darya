@@ -84,7 +84,7 @@ pub fn run_event_loop(
 
         if force_redraw {
             terminal.draw(|frame| {
-                let regions = layout::split_layout(frame.size(), state.treemap_visible);
+                let regions = layout::split_layout(frame.size(), state.ui.treemap_visible);
                 ui.draw(frame, regions, state, theme);
             })?;
             force_redraw = false;
@@ -101,7 +101,7 @@ pub fn run_event_loop(
             let should_draw = pending_draw || running;
             if should_draw {
                 terminal.draw(|frame| {
-                    let regions = layout::split_layout(frame.size(), state.treemap_visible);
+                    let regions = layout::split_layout(frame.size(), state.ui.treemap_visible);
                     ui.draw(frame, regions, state, theme);
                 })?;
                 pending_draw = false;

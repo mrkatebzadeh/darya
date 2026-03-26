@@ -60,8 +60,8 @@ pub fn handle_input_action(
             ));
         }
         InputAction::ToggleHelp => {
-            state.show_help = !state.show_help;
-            if state.show_help {
+            state.ui.show_help = !state.ui.show_help;
+            if state.ui.show_help {
                 state.update_status(StatusMessage::HelpOpened);
             } else {
                 state.update_status(StatusMessage::HelpClosed);
@@ -183,12 +183,12 @@ mod tests {
     fn toggle_treemap_updates_visibility() {
         let mut state = sample_state();
         let trigger = dummy_trigger();
-        let initial = state.treemap_visible;
+        let initial = state.ui.treemap_visible;
 
         handle_input_action(InputAction::ToggleTreemap, &mut state, &trigger);
 
-        assert_ne!(state.treemap_visible, initial);
-        let expected = if state.treemap_visible {
+        assert_ne!(state.ui.treemap_visible, initial);
+        let expected = if state.ui.treemap_visible {
             "treemap panel shown"
         } else {
             "treemap panel hidden"

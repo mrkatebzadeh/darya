@@ -170,6 +170,29 @@ impl NavigationState {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct UiState {
+    pub spinner_phase: usize,
+    pub show_help: bool,
+    pub treemap_visible: bool,
+    pub treemap_nodes: Vec<TreemapNode>,
+    pub treemap_revision: u64,
+    pub ui_revision: u64,
+}
+
+impl Default for UiState {
+    fn default() -> Self {
+        Self {
+            spinner_phase: 0,
+            show_help: false,
+            treemap_visible: true,
+            treemap_nodes: Vec::new(),
+            treemap_revision: 0,
+            ui_revision: 0,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct ScanStateData {
     pub state: ScanState,
@@ -194,16 +217,11 @@ pub struct AppState {
     pub sort_mode: SortMode,
     pub navigation: NavigationState,
     pub scan: ScanStateData,
+    pub ui: UiState,
     pub status_message: Option<StatusMessage>,
-    pub spinner_phase: usize,
     pub pending_delete: Option<NodeId>,
     pub size_mode: SizeDisplayMode,
     pub filter: FilterState,
-    pub show_help: bool,
-    pub treemap_visible: bool,
-    pub treemap_nodes: Vec<TreemapNode>,
-    pub treemap_revision: u64,
-    pub ui_revision: u64,
     pub allow_modifications: bool,
     pub extended_mode: bool,
     pub display_options: DisplayOptions,
@@ -217,16 +235,11 @@ impl AppState {
             sort_mode,
             navigation: NavigationState::default(),
             scan: ScanStateData::default(),
+            ui: UiState::default(),
             status_message: None,
-            spinner_phase: 0,
             pending_delete: None,
             size_mode: SizeDisplayMode::Apparent,
             filter: FilterState::default(),
-            show_help: false,
-            treemap_visible: true,
-            treemap_nodes: Vec::new(),
-            treemap_revision: 0,
-            ui_revision: 0,
             allow_modifications: true,
             extended_mode: false,
             display_options: DisplayOptions::default(),
@@ -284,7 +297,7 @@ impl AppState {
 
     pub fn advance_spinner(&mut self, modulo: usize) {
         if modulo > 0 {
-            self.spinner_phase = (self.spinner_phase + 1) % modulo;
+            self.ui.spinner_phase = (self.ui.spinner_phase + 1) % modulo;
         }
     }
 
@@ -304,8 +317,8 @@ impl AppState {
     }
 
     pub fn toggle_treemap_visibility(&mut self) {
-        self.treemap_visible = !self.treemap_visible;
-        let message = if self.treemap_visible {
+        self.ui.treemap_visible = !self.ui.treemap_visible;
+        let message = if self.ui.treemap_visible {
             "treemap panel shown"
         } else {
             "treemap panel hidden"
@@ -314,7 +327,7 @@ impl AppState {
     }
 
     pub fn is_treemap_visible(&self) -> bool {
-        self.treemap_visible
+        self.ui.treemap_visible
     }
 
     pub fn clear_filter(&mut self) {
@@ -329,8 +342,8 @@ impl AppState {
         let source_id = self.tree.root();
 
         let Some(source) = self.tree.node(source_id) else {
-            self.treemap_nodes.clear();
-            self.treemap_revision = self.treemap_revision.wrapping_add(1);
+            self.ui.treemap_nodes.clear();
+            self.ui.treemap_revision = self.ui.treemap_revision.wrapping_add(1);
             return;
         };
 
@@ -355,8 +368,8 @@ impl AppState {
             .collect();
 
         nodes.sort_unstable_by(|a, b| b.size.cmp(&a.size).then_with(|| a.name.cmp(&b.name)));
-        self.treemap_nodes = nodes;
-        self.treemap_revision = self.treemap_revision.wrapping_add(1);
+        self.ui.treemap_nodes = nodes;
+        self.ui.treemap_revision = self.ui.treemap_revision.wrapping_add(1);
         self.ensure_selection_visible();
     }
 
@@ -377,7 +390,7 @@ impl AppState {
     }
 
     pub fn mark_ui_dirty(&mut self) {
-        self.ui_revision = self.ui_revision.wrapping_add(1);
+        self.ui.ui_revision = self.ui.ui_revision.wrapping_add(1);
     }
 
     pub fn refresh_ui(&mut self) {
@@ -386,7 +399,7 @@ impl AppState {
     }
 
     pub fn ui_revision(&self) -> u64 {
-        self.ui_revision
+        self.ui.ui_revision
     }
 
     pub fn visible_node_ids(&self) -> Vec<NodeId> {
@@ -410,7 +423,7 @@ mod tests {
         assert_eq!(state.scan.state, ScanState::Idle);
         assert!(state.navigation.selection.is_none());
         assert_eq!(state.sort_mode, SortMode::SizeDesc);
-        assert!(state.treemap_nodes.is_empty());
+        assert!(state.ui.treemap_nodes.is_empty());
         assert!(state.allow_modifications);
         assert!(!state.extended_mode);
         assert_eq!(state.export_options, ExportOptions::default());
