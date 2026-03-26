@@ -344,6 +344,11 @@ impl AppState {
         self.ui_revision = self.ui_revision.wrapping_add(1);
     }
 
+    pub fn refresh_ui(&mut self) {
+        self.refresh_treemap_nodes();
+        self.mark_ui_dirty();
+    }
+
     pub fn ui_revision(&self) -> u64 {
         self.ui_revision
     }
