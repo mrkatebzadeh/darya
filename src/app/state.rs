@@ -13,11 +13,11 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use super::scan_accumulator::ScanAccumulator;
+use super::scan::accumulator::ScanAccumulator;
 use crate::{
     config::SortMode,
     display::DisplayOptions,
-    fs_scan::{ScanActivity, ScanProgress},
+    scan::scanner::{ScanActivity, ScanProgress},
     snapshot::ExportOptions,
     tree::{FileTree, NodeId, NodeType},
     treemap::TreemapNode,

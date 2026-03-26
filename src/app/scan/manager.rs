@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::fs_scan;
-use crate::fs_scan::ScanOptions;
-use crate::scan_control::{ScanEventSender, ScanTrigger, ScanTriggerReceiver};
+use crate::scan::scanner;
+use crate::scan::scanner::ScanOptions;
+use crate::scan::control::{ScanEventSender, ScanTrigger, ScanTriggerReceiver};
 use std::path::PathBuf;
 
 pub(crate) async fn scan_manager(
@@ -25,7 +25,7 @@ pub(crate) async fn scan_manager(
     exclude_patterns: Vec<String>,
     scan_options: ScanOptions,
 ) {
-    let mut running_handle: Option<fs_scan::ScannerHandle> = None;
+    let mut running_handle: Option<scanner::ScannerHandle> = None;
     while let Some(command) = commands.recv().await {
         match command {
             ScanTrigger::Start => {
@@ -35,7 +35,7 @@ pub(crate) async fn scan_manager(
                 let root_clone = root.clone();
                 let patterns = exclude_patterns.clone();
                 let (handle, mut scanner_rx) =
-                    fs_scan::start_scan(root_clone, scan_options, patterns);
+                    scanner::start_scan(root_clone, scan_options, patterns);
                 let sender = event_tx.clone();
                 running_handle = Some(handle);
                 tokio::spawn(async move {

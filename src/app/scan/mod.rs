@@ -13,23 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::fs_scan::ScanNode;
-
-#[derive(Debug, Default)]
-pub struct ScanAccumulator {
-    nodes: Vec<ScanNode>,
-}
-
-impl ScanAccumulator {
-    pub fn push_batch(&mut self, nodes: Vec<ScanNode>) {
-        self.nodes.extend(nodes);
-    }
-
-    pub fn push_node(&mut self, node: ScanNode) {
-        self.nodes.push(node);
-    }
-
-    pub fn drain(&mut self) -> Vec<ScanNode> {
-        self.nodes.drain(..).collect()
-    }
-}
+pub mod accumulator;
+pub mod control;
+pub mod manager;
+pub mod scanner;

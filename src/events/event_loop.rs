@@ -14,9 +14,9 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::events::controller::{handle_input_action, process_scan_event};
-use crate::fs_scan::ScanEvent;
+use crate::scan::scanner::ScanEvent;
 use crate::input::{InputAction, InputState};
-use crate::scan_control::ScanTriggerSender;
+use crate::scan::control::ScanTriggerSender;
 use crate::state::{AppState, ScanState};
 use crate::theme::Theme;
 use crate::ui::{Ui, layout};
@@ -60,7 +60,7 @@ pub fn run_event_loop(
                     let action = input_state.process_key(key_event);
                     if matches!(action, InputAction::Quit) {
                         should_quit = true;
-                        let _ = scan_trigger.send(crate::scan_control::ScanTrigger::Cancel);
+                        let _ = scan_trigger.send(crate::scan::control::ScanTrigger::Cancel);
                     }
                     handle_input_action(action, state, scan_trigger);
                     pending_draw = state.ui.ui_revision != last_ui_revision;

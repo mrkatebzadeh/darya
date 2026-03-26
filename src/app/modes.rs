@@ -16,7 +16,7 @@
 use super::ui_thread::run_ui_thread;
 use crate::config::Config;
 use crate::events::process_scan_event;
-use crate::fs_scan::{self, ScanEvent, ScanOptions, ScanProgress, dummy_scanner};
+use crate::scan::scanner::{self, ScanEvent, ScanOptions, ScanProgress, dummy_scanner};
 use crate::snapshot::{self, ExportOptions, SnapshotEndpoint, SnapshotFormat};
 use crate::state::{AppState, ScanState};
 use crate::theme::Theme;
@@ -60,7 +60,7 @@ pub(crate) async fn run_import_mode(
     state.allow_modifications = false;
     let (_scanner_handle, scanner_rx) = dummy_scanner();
     let (scan_trigger_tx, _scan_trigger_rx) =
-        tokio::sync::mpsc::unbounded_channel::<crate::scan_control::ScanTrigger>();
+        tokio::sync::mpsc::unbounded_channel::<crate::scan::control::ScanTrigger>();
     run_ui_thread(state, scanner_rx, scan_trigger_tx, theme).await
 }
 
@@ -74,7 +74,7 @@ pub(crate) async fn run_export_mode(
     export_options: ExportOptions,
 ) -> Result<()> {
     let (scanner_handle, mut scanner_rx) =
-        fs_scan::start_scan(root.clone(), scan_options, exclude_patterns);
+        scanner::start_scan(root.clone(), scan_options, exclude_patterns);
     let mut state = AppState::new(root, config.sorting.mode);
     state.set_extended_mode(extended);
     state.set_export_options(export_options);
@@ -112,7 +112,7 @@ pub(crate) async fn run_progress_mode(
     scan_options: ScanOptions,
 ) -> Result<()> {
     let (scanner_handle, mut scanner_rx) =
-        fs_scan::start_scan(root.clone(), scan_options, exclude_patterns);
+        scanner::start_scan(root.clone(), scan_options, exclude_patterns);
     run_scan_loop(&mut scanner_rx, |event| {
         match event {
             ScanEvent::Progress(progress) => {
@@ -140,7 +140,7 @@ pub(crate) async fn run_summary_mode(
     scan_options: ScanOptions,
 ) -> Result<()> {
     let (scanner_handle, mut scanner_rx) =
-        fs_scan::start_scan(root.clone(), scan_options, exclude_patterns);
+        scanner::start_scan(root.clone(), scan_options, exclude_patterns);
     let mut last = ScanProgress {
         scanned: 0,
         errors: 0,
