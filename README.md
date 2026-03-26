@@ -90,3 +90,22 @@ The interface is straightforward and easy to navigate, letting you move through 
 ## Configuration and customization
 - Settings come from a `config.toml` in your system config directory. On Linux this is `~/.config/darya/config.toml`, while on macOS it lives at `~/Library/Application Support/darya/config.toml`. Pass `--ignore-config` to skip loading it.
 - Overrides on the command line always win, so you can keep a mild default configuration and still tweak behavior at runtime.
+
+## Config file options
+| Section | Key | Type | Description |
+| --- | --- | --- | --- |
+| `sorting` | `mode` | string | Default sort mode (`size_desc`, `size_asc`, `name`, `modified_time`). |
+| `scan` | `exclude_patterns` | array of strings | Glob patterns to skip during scans. |
+| `scan` | `follow_symlinks` | bool | Follow symlink targets during scans. |
+| `scan` | `one_file_system` | bool | Stay on the same filesystem as the root path. |
+| `scan` | `exclude_caches` | bool | Skip cache directories when scanning. |
+| `scan` | `exclude_kernfs` | bool | Skip kernel filesystem paths when scanning. |
+| `scan` | `count_hard_links_once` | bool | Count hard-linked files only once. |
+| `scan` | `thread_count` | integer | Worker threads for scanning (0 uses a single thread). |
+| `theme` | `background` | string | Base background color name. |
+| `theme` | `foreground` | string | Base foreground color name. |
+| `theme` | `directory` | string | Color for directory entries. |
+| `theme` | `file` | string | Color for file entries. |
+| `theme` | `symlink` | string | Color for symlink entries. |
+| `theme` | `other` | string | Color for other entry types. |
+| `theme` | `tile_palette` | array of strings | Treemap tile palette colors. |
