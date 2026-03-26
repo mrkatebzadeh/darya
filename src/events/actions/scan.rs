@@ -39,12 +39,15 @@ pub(crate) fn process_scan_event(state: &mut AppState, event: ScanEvent) {
             if let Some(activity) = batch.activity {
                 state.scan.activity = activity;
             }
+            state.mark_ui_dirty();
         }
         ScanEvent::Node(node) => {
             state.scan.accumulator.push_node(node);
+            state.mark_ui_dirty();
         }
         ScanEvent::Activity(activity) => {
             state.scan.activity = activity;
+            state.mark_ui_dirty();
         }
         ScanEvent::Progress(progress) => {
             state.mark_scan_progress(progress.clone());
@@ -52,18 +55,21 @@ pub(crate) fn process_scan_event(state: &mut AppState, event: ScanEvent) {
                 scanned: progress.scanned,
                 errors: progress.errors,
             });
+            state.mark_ui_dirty();
         }
         ScanEvent::Error(error) => {
             state.mark_scan_error(format!("{}: {}", error.path.display(), error.source));
+            state.mark_ui_dirty();
         }
         ScanEvent::Completed => {
             state.mark_scan_complete();
             state.update_status(StatusMessage::ScanComplete);
             rebuild_tree_from_pending(state);
+            state.refresh_treemap_nodes();
+            state.mark_tree_dirty();
+            state.mark_selection_dirty();
         }
     }
-
-    state.refresh_ui();
 }
 
 pub(crate) fn rescan_selection(state: &mut AppState) {

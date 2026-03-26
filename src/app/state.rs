@@ -176,7 +176,6 @@ pub struct UiState {
     pub show_help: bool,
     pub treemap_visible: bool,
     pub treemap_nodes: Vec<TreemapNode>,
-    pub treemap_revision: u64,
     pub ui_revision: u64,
 }
 
@@ -187,7 +186,6 @@ impl Default for UiState {
             show_help: false,
             treemap_visible: true,
             treemap_nodes: Vec::new(),
-            treemap_revision: 0,
             ui_revision: 0,
         }
     }
@@ -226,6 +224,10 @@ pub struct AppState {
     pub extended_mode: bool,
     pub display_options: DisplayOptions,
     pub export_options: ExportOptions,
+    pub tree_revision: u64,
+    pub filter_revision: u64,
+    pub selection_revision: u64,
+    pub treemap_revision: u64,
 }
 
 impl AppState {
@@ -244,6 +246,10 @@ impl AppState {
             extended_mode: false,
             display_options: DisplayOptions::default(),
             export_options: ExportOptions::default(),
+            tree_revision: 0,
+            filter_revision: 0,
+            selection_revision: 0,
+            treemap_revision: 0,
         }
     }
 
@@ -343,7 +349,7 @@ impl AppState {
 
         let Some(source) = self.tree.node(source_id) else {
             self.ui.treemap_nodes.clear();
-            self.ui.treemap_revision = self.ui.treemap_revision.wrapping_add(1);
+            self.treemap_revision = self.treemap_revision.wrapping_add(1);
             return;
         };
 
@@ -369,7 +375,7 @@ impl AppState {
 
         nodes.sort_unstable_by(|a, b| b.size.cmp(&a.size).then_with(|| a.name.cmp(&b.name)));
         self.ui.treemap_nodes = nodes;
-        self.ui.treemap_revision = self.ui.treemap_revision.wrapping_add(1);
+        self.treemap_revision = self.treemap_revision.wrapping_add(1);
         self.ensure_selection_visible();
     }
 
@@ -393,8 +399,27 @@ impl AppState {
         self.ui.ui_revision = self.ui.ui_revision.wrapping_add(1);
     }
 
+    pub fn mark_tree_dirty(&mut self) {
+        self.tree_revision = self.tree_revision.wrapping_add(1);
+        self.mark_ui_dirty();
+    }
+
+    pub fn mark_filter_dirty(&mut self) {
+        self.filter_revision = self.filter_revision.wrapping_add(1);
+        self.mark_ui_dirty();
+    }
+
+    pub fn mark_selection_dirty(&mut self) {
+        self.selection_revision = self.selection_revision.wrapping_add(1);
+        self.mark_ui_dirty();
+    }
+
+    pub fn mark_treemap_dirty(&mut self) {
+        self.treemap_revision = self.treemap_revision.wrapping_add(1);
+        self.mark_ui_dirty();
+    }
+
     pub fn refresh_ui(&mut self) {
-        self.refresh_treemap_nodes();
         self.mark_ui_dirty();
     }
 

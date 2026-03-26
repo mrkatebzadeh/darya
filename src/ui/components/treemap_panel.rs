@@ -46,7 +46,7 @@ pub fn draw_treemap_panel(
     let layout = cache.layout_for(
         inner,
         &path,
-        state.ui.treemap_revision,
+        state.treemap_revision,
         &state.ui.treemap_nodes,
         max_tiles,
         |parent, limit| gather_child_nodes(parent, state, limit),

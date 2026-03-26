@@ -51,6 +51,7 @@ pub fn run_event_loop(
     }
     state.refresh_treemap_nodes();
     state.mark_ui_dirty();
+    let mut last_ui_revision = state.ui.ui_revision;
 
     while !should_quit {
         if event::poll(Duration::from_millis(50))? {
@@ -62,9 +63,29 @@ pub fn run_event_loop(
                         let _ = scan_trigger.send(crate::scan_control::ScanTrigger::Cancel);
                     }
                     handle_input_action(action, state, scan_trigger);
-                    pending_draw = true;
+                    pending_draw = state.ui.ui_revision != last_ui_revision;
+                    if pending_draw {
+                        terminal.draw(|frame| {
+                            let regions =
+                                layout::split_layout(frame.size(), state.ui.treemap_visible);
+                            ui.draw(frame, regions, state, theme);
+                        })?;
+                        pending_draw = false;
+                        last_ui_revision = state.ui.ui_revision;
+                        last_tick = Instant::now();
+                        continue;
+                    }
                 }
-                Event::Resize(_, _) => pending_draw = true,
+                Event::Resize(_, _) => {
+                    terminal.draw(|frame| {
+                        let regions = layout::split_layout(frame.size(), state.ui.treemap_visible);
+                        ui.draw(frame, regions, state, theme);
+                    })?;
+                    pending_draw = false;
+                    last_ui_revision = state.ui.ui_revision;
+                    last_tick = Instant::now();
+                    continue;
+                }
                 _ => {}
             }
         }
@@ -76,7 +97,7 @@ pub fn run_event_loop(
                         force_redraw = true;
                     }
                     process_scan_event(state, scan_event);
-                    pending_draw = true;
+                    pending_draw = state.ui.ui_revision != last_ui_revision;
                 }
                 Err(_) => break,
             }
@@ -89,6 +110,7 @@ pub fn run_event_loop(
             })?;
             force_redraw = false;
             pending_draw = false;
+            last_ui_revision = state.ui.ui_revision;
             last_tick = Instant::now();
             continue;
         }
@@ -105,6 +127,7 @@ pub fn run_event_loop(
                     ui.draw(frame, regions, state, theme);
                 })?;
                 pending_draw = false;
+                last_ui_revision = state.ui.ui_revision;
             }
             last_tick = Instant::now();
         }
