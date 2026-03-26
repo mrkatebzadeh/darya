@@ -112,7 +112,7 @@ mod tests {
         let mut state = AppState::new(PathBuf::from("/"), default_sort_mode());
         let child = TreeNode::new(PathBuf::from("/child"), NodeType::File);
         state.tree.add_child(0, child);
-        state.selection = Some(0);
+        state.navigation.selection = Some(0);
         state
     }
 
@@ -130,16 +130,16 @@ mod tests {
         let mut state = sample_state();
         let trigger = dummy_trigger();
         handle_input_action(InputAction::MoveDown, &mut state, &trigger);
-        assert_eq!(state.selection, Some(1));
+        assert_eq!(state.navigation.selection, Some(1));
     }
 
     #[test]
     fn move_up_wraps_to_root() {
         let mut state = sample_state();
-        state.selection = Some(1);
+        state.navigation.selection = Some(1);
         let trigger = dummy_trigger();
         handle_input_action(InputAction::MoveUp, &mut state, &trigger);
-        assert_eq!(state.selection, Some(0));
+        assert_eq!(state.navigation.selection, Some(0));
     }
 
     #[test]
@@ -149,7 +149,7 @@ mod tests {
             0,
             TreeNode::new(PathBuf::from("/dir"), NodeType::Directory).collapsed(),
         );
-        state.selection = Some(dir_id);
+        state.navigation.selection = Some(dir_id);
         let trigger = dummy_trigger();
 
         handle_input_action(InputAction::Select, &mut state, &trigger);
@@ -162,7 +162,7 @@ mod tests {
     #[test]
     fn delete_action_first_press_requests_confirmation() {
         let mut state = sample_state();
-        state.selection = Some(1);
+        state.navigation.selection = Some(1);
         let trigger = dummy_trigger();
         handle_input_action(InputAction::Delete, &mut state, &trigger);
         assert_eq!(state.pending_delete, Some(1));

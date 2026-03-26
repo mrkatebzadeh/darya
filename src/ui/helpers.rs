@@ -194,7 +194,7 @@ pub(crate) fn spinner_symbol(phase: usize) -> &'static str {
 
 #[cfg(test)]
 pub(crate) fn selected_info_line(state: &AppState) -> String {
-    let Some(selected) = state.selection else {
+    let Some(selected) = state.navigation.selection else {
         return "info: no selection".to_string();
     };
 
@@ -281,7 +281,7 @@ pub(crate) fn detail_panel_lines(state: &AppState) -> Vec<String> {
         ]
     };
 
-    let Some(selected) = state.selection else {
+    let Some(selected) = state.navigation.selection else {
         return empty();
     };
 
@@ -346,7 +346,7 @@ pub(crate) fn draw_treemap_tile(frame: &mut Frame<'_>, tile: &TreemapTile, theme
 
 pub(crate) fn selection_path(state: &AppState) -> SelectionPath {
     let mut path = SelectionPath::default();
-    let Some(mut current) = state.selection else {
+    let Some(mut current) = state.navigation.selection else {
         return path;
     };
     let root = state.tree.root();
@@ -514,7 +514,7 @@ mod tests {
         let file_id = state
             .tree
             .add_child(0, TreeNode::new(temp.clone(), NodeType::File));
-        state.selection = Some(file_id);
+        state.navigation.selection = Some(file_id);
 
         let info = selected_info_line(&state);
         assert!(info.contains("mtime="));

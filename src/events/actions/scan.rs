@@ -71,7 +71,7 @@ pub(crate) fn rescan_selection(state: &mut AppState) {
         state.update_status(StatusMessage::ImportReadOnly);
         return;
     }
-    let Some(selected_id) = state.selection else {
+    let Some(selected_id) = state.navigation.selection else {
         return;
     };
     let Some(node) = state.tree.node(selected_id).cloned() else {
@@ -162,6 +162,7 @@ fn insert_scan_node(state: &mut AppState, node: &ScanNode) -> Option<(PathBuf, O
 
 fn rebuild_tree_from_pending(state: &mut AppState) {
     let selected_path = state
+        .navigation
         .selection
         .and_then(|id| state.tree.node(id).map(|node| node.path.clone()));
     let root_path = selected_path.clone().unwrap_or_else(|| {
@@ -196,8 +197,8 @@ fn restore_selection(state: &mut AppState, path: Option<PathBuf>) {
     if let Some(path) = path
         && let Some(id) = state.tree.node_id_for_path(&path)
     {
-        state.selection = Some(id);
+        state.navigation.selection = Some(id);
         return;
     }
-    state.selection = Some(state.tree.root());
+    state.navigation.selection = Some(state.tree.root());
 }

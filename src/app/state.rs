@@ -154,13 +154,28 @@ impl FilterState {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct NavigationState {
+    pub selection: Option<NodeId>,
+    pub scroll_offset: usize,
+}
+
+impl NavigationState {
+    pub fn clear_selection(&mut self) {
+        self.selection = None;
+    }
+
+    pub fn set_scroll_offset(&mut self, offset: usize) {
+        self.scroll_offset = offset;
+    }
+}
+
 /// Central application state shared across the UI and scanner.
 #[derive(Debug)]
 pub struct AppState {
     pub tree: FileTree,
     pub sort_mode: SortMode,
-    pub selection: Option<NodeId>,
-    pub scroll_offset: usize,
+    pub navigation: NavigationState,
     pub scan_state: ScanState,
     pub scan_activity: ScanActivity,
     pub status_message: Option<StatusMessage>,
@@ -185,8 +200,7 @@ impl AppState {
         Self {
             tree: FileTree::new(root),
             sort_mode,
-            selection: None,
-            scroll_offset: 0,
+            navigation: NavigationState::default(),
             scan_state: ScanState::Idle,
             scan_activity: ScanActivity::default(),
             status_message: None,
@@ -220,15 +234,15 @@ impl AppState {
     }
 
     pub fn select_node(&mut self, node: NodeId) {
-        self.selection = Some(node);
+        self.navigation.selection = Some(node);
     }
 
     pub fn clear_selection(&mut self) {
-        self.selection = None;
+        self.navigation.clear_selection();
     }
 
     pub fn set_scroll_offset(&mut self, offset: usize) {
-        self.scroll_offset = offset;
+        self.navigation.set_scroll_offset(offset);
     }
 
     pub fn update_status(&mut self, message: StatusMessage) {
@@ -336,16 +350,17 @@ impl AppState {
     pub fn ensure_selection_visible(&mut self) {
         let ids = self.visible_node_ids();
         if ids.is_empty() {
-            self.selection = Some(self.tree.root());
+            self.navigation.selection = Some(self.tree.root());
             return;
         }
         if self
+            .navigation
             .selection
             .is_some_and(|selection| ids.contains(&selection))
         {
             return;
         }
-        self.selection = Some(ids[0]);
+        self.navigation.selection = Some(ids[0]);
     }
 
     pub fn mark_ui_dirty(&mut self) {
@@ -380,7 +395,7 @@ mod tests {
     fn new_state_is_idle() {
         let state = state();
         assert_eq!(state.scan_state, ScanState::Idle);
-        assert!(state.selection.is_none());
+        assert!(state.navigation.selection.is_none());
         assert_eq!(state.sort_mode, SortMode::SizeDesc);
         assert!(state.treemap_nodes.is_empty());
         assert!(state.allow_modifications);
@@ -393,11 +408,11 @@ mod tests {
     fn selection_and_scroll_updated() {
         let mut state = state();
         state.select_node(2);
-        assert_eq!(state.selection, Some(2));
+        assert_eq!(state.navigation.selection, Some(2));
         state.set_scroll_offset(10);
-        assert_eq!(state.scroll_offset, 10);
+        assert_eq!(state.navigation.scroll_offset, 10);
         state.clear_selection();
-        assert!(state.selection.is_none());
+        assert!(state.navigation.selection.is_none());
     }
 
     #[test]

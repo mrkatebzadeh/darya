@@ -56,7 +56,7 @@ pub(crate) async fn run_import_mode(
         .map(|node| node.path.clone())
         .unwrap_or(root.clone());
     state.tree = snapshot::import_from_destination(endpoint, &default_root, SnapshotFormat::Json)?;
-    state.selection = Some(state.tree.root());
+    state.navigation.selection = Some(state.tree.root());
     state.allow_modifications = false;
     let (_scanner_handle, scanner_rx) = dummy_scanner();
     let (scan_trigger_tx, _scan_trigger_rx) =

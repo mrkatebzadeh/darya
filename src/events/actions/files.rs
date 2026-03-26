@@ -23,7 +23,7 @@ pub(crate) fn delete_selection(state: &mut AppState) {
         state.update_status(StatusMessage::ImportReadOnly);
         return;
     }
-    let Some(selected_id) = state.selection else {
+    let Some(selected_id) = state.navigation.selection else {
         return;
     };
 
@@ -71,7 +71,7 @@ pub(crate) fn open_selection(state: &mut AppState) {
         state.update_status(StatusMessage::ImportReadOnly);
         return;
     }
-    let Some(selected_id) = state.selection else {
+    let Some(selected_id) = state.navigation.selection else {
         return;
     };
     let Some(path) = state.tree.node(selected_id).map(|n| n.path.clone()) else {
@@ -122,7 +122,7 @@ pub(crate) fn import_scan(state: &mut AppState) {
     ) {
         Ok(tree) => {
             state.tree = tree;
-            state.selection = Some(state.tree.root());
+            state.navigation.selection = Some(state.tree.root());
             state.update_status(StatusMessage::ImportResult {
                 path: snapshot_path.to_path_buf(),
                 outcome: StatusOutcome::Success,

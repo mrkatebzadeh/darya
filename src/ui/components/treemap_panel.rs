@@ -66,6 +66,7 @@ pub fn draw_treemap_panel(
     }
 
     if let Some(selection_rect) = state
+        .navigation
         .selection
         .and_then(|selection| layout.node_rects.get(&selection).copied())
     {

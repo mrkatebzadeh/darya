@@ -19,51 +19,51 @@ use crate::tree::NodeType;
 pub(crate) fn select_previous(state: &mut AppState) {
     let ids = state.visible_node_ids();
     if ids.is_empty() {
-        state.selection = None;
+        state.navigation.selection = None;
         return;
     }
     let index = ids
         .iter()
-        .position(|&id| Some(id) == state.selection)
+        .position(|&id| Some(id) == state.navigation.selection)
         .unwrap_or(0);
     let next = ids.get(index.saturating_sub(1)).copied().unwrap_or(ids[0]);
-    state.selection = Some(next);
+    state.navigation.selection = Some(next);
 }
 
 pub(crate) fn select_next(state: &mut AppState) {
     let ids = state.visible_node_ids();
     if ids.is_empty() {
-        state.selection = None;
+        state.navigation.selection = None;
         return;
     }
     let index = ids
         .iter()
-        .position(|&id| Some(id) == state.selection)
+        .position(|&id| Some(id) == state.navigation.selection)
         .unwrap_or(usize::MAX);
     let next = if index + 1 >= ids.len() {
         ids[ids.len() - 1]
     } else {
         ids[index + 1]
     };
-    state.selection = Some(next);
+    state.navigation.selection = Some(next);
 }
 
 pub(crate) fn select_first(state: &mut AppState) {
     let ids = state.visible_node_ids();
     if let Some(&first) = ids.first() {
-        state.selection = Some(first);
+        state.navigation.selection = Some(first);
     }
 }
 
 pub(crate) fn select_last(state: &mut AppState) {
     let ids = state.visible_node_ids();
     if let Some(&last) = ids.last() {
-        state.selection = Some(last);
+        state.navigation.selection = Some(last);
     }
 }
 
 pub(crate) fn expand_selection(state: &mut AppState) {
-    if let Some(id) = state.selection
+    if let Some(id) = state.navigation.selection
         && let Some(node) = state.tree.node_mut(id)
         && node.file_type == NodeType::Directory
     {
@@ -72,7 +72,7 @@ pub(crate) fn expand_selection(state: &mut AppState) {
 }
 
 pub(crate) fn collapse_selection(state: &mut AppState) {
-    if let Some(id) = state.selection
+    if let Some(id) = state.navigation.selection
         && let Some(node) = state.tree.node_mut(id)
     {
         if node.file_type == NodeType::Directory {
@@ -83,13 +83,13 @@ pub(crate) fn collapse_selection(state: &mut AppState) {
             && let Some(parent_node) = state.tree.node_mut(parent)
         {
             parent_node.expanded = false;
-            state.selection = Some(parent);
+            state.navigation.selection = Some(parent);
         }
     }
 }
 
 pub(crate) fn toggle_selection(state: &mut AppState) {
-    if let Some(id) = state.selection
+    if let Some(id) = state.navigation.selection
         && let Some(node) = state.tree.node_mut(id)
         && node.file_type == NodeType::Directory
     {
