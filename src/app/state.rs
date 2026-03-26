@@ -226,6 +226,10 @@ pub struct AppState {
     pub extended_mode: bool,
     pub display_options: DisplayOptions,
     pub export_options: ExportOptions,
+    pub tree_revision: u64,
+    pub filter_revision: u64,
+    pub selection_revision: u64,
+    pub treemap_revision: u64,
 }
 
 impl AppState {
@@ -244,6 +248,10 @@ impl AppState {
             extended_mode: false,
             display_options: DisplayOptions::default(),
             export_options: ExportOptions::default(),
+            tree_revision: 0,
+            filter_revision: 0,
+            selection_revision: 0,
+            treemap_revision: 0,
         }
     }
 
@@ -391,6 +399,26 @@ impl AppState {
 
     pub fn mark_ui_dirty(&mut self) {
         self.ui.ui_revision = self.ui.ui_revision.wrapping_add(1);
+    }
+
+    pub fn mark_tree_dirty(&mut self) {
+        self.tree_revision = self.tree_revision.wrapping_add(1);
+        self.mark_ui_dirty();
+    }
+
+    pub fn mark_filter_dirty(&mut self) {
+        self.filter_revision = self.filter_revision.wrapping_add(1);
+        self.mark_ui_dirty();
+    }
+
+    pub fn mark_selection_dirty(&mut self) {
+        self.selection_revision = self.selection_revision.wrapping_add(1);
+        self.mark_ui_dirty();
+    }
+
+    pub fn mark_treemap_dirty(&mut self) {
+        self.treemap_revision = self.treemap_revision.wrapping_add(1);
+        self.mark_ui_dirty();
     }
 
     pub fn refresh_ui(&mut self) {
