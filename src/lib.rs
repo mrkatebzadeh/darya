@@ -19,12 +19,12 @@ pub mod ui;
 
 pub use app::cli;
 pub use app::config;
-pub use app::scan;
-pub use app::scan::scanner as fs_scan;
-pub use app::scan::control as scan_control;
-pub use app::scan::accumulator as scan_accumulator;
-pub use app::scan::manager as scan_manager;
 pub use app::input;
+pub use app::scan;
+pub use app::scan::accumulator as scan_accumulator;
+pub use app::scan::control as scan_control;
+pub use app::scan::manager as scan_manager;
+pub use app::scan::scanner as fs_scan;
 pub use app::size;
 pub use app::snapshot;
 pub use app::state;

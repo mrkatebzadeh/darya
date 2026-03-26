@@ -14,9 +14,9 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::events::controller::{handle_input_action, process_scan_event};
-use crate::scan::scanner::ScanEvent;
 use crate::input::{InputAction, InputState};
 use crate::scan::control::ScanTriggerSender;
+use crate::scan::scanner::ScanEvent;
 use crate::state::{AppState, ScanState};
 use crate::theme::Theme;
 use crate::ui::{Ui, layout};

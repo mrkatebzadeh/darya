@@ -13,9 +13,9 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::scan::control::{ScanEventSender, ScanTrigger, ScanTriggerReceiver};
 use crate::scan::scanner;
 use crate::scan::scanner::ScanOptions;
-use crate::scan::control::{ScanEventSender, ScanTrigger, ScanTriggerReceiver};
 use std::path::PathBuf;
 
 pub(crate) async fn scan_manager(

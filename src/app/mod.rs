@@ -15,10 +15,10 @@
 
 use self::cli::{CliArgs, InterfaceMode};
 use self::config::{Config, ConfigLoad};
-use self::scan::scanner::ScanOptions;
 use self::scan::control::{
     ScanEventReceiver, ScanEventSender, ScanTriggerReceiver, ScanTriggerSender,
 };
+use self::scan::scanner::ScanOptions;
 use self::size::normalize_path;
 use self::snapshot::ExportOptions;
 use self::state::{AppState, StatusMessage};
@@ -31,10 +31,10 @@ pub mod cli;
 pub mod config;
 pub mod input;
 pub mod scan;
-pub use scan::scanner as fs_scan;
-pub use scan::control as scan_control;
 pub use scan::accumulator as scan_accumulator;
+pub use scan::control as scan_control;
 pub use scan::manager as scan_manager;
+pub use scan::scanner as fs_scan;
 pub mod size;
 pub mod snapshot;
 pub mod state;

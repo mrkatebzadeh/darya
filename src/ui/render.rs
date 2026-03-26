@@ -142,11 +142,7 @@ impl Ui {
             Line::from("  ?: toggle this help, q: quit"),
         ];
 
-        let content_width = lines
-            .iter()
-            .map(|line| line.width())
-            .max()
-            .unwrap_or(0) as u16;
+        let content_width = lines.iter().map(|line| line.width()).max().unwrap_or(0) as u16;
         let width = content_width.saturating_add(4).min(frame_area.width);
         let height = (lines.len() as u16 + 2).min(frame_area.height);
         if width == 0 || height == 0 {
