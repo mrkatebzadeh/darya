@@ -15,9 +15,9 @@
 
 use crate::config::SortMode;
 use crate::events::actions::{files, filter, navigation, scan};
-use crate::fs_scan::{ScanEvent, ScanProgress};
+use crate::scan::scanner::{ScanEvent, ScanProgress};
 use crate::input::InputAction;
-use crate::scan_control::{ScanTrigger, ScanTriggerSender};
+use crate::scan::control::{ScanTrigger, ScanTriggerSender};
 use crate::state::{AppState, ScanState, StatusMessage};
 
 pub fn handle_input_action(
@@ -166,10 +166,10 @@ pub fn process_scan_event(state: &mut AppState, event: ScanEvent) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fs_scan::ScanActivity;
-    use crate::fs_scan::ScanBatch;
-    use crate::fs_scan::ScanNode;
-    use crate::scan_control::ScanTriggerSender;
+    use crate::scan::scanner::ScanActivity;
+    use crate::scan::scanner::ScanBatch;
+    use crate::scan::scanner::ScanNode;
+    use crate::scan::control::ScanTriggerSender;
     use crate::state::AppState;
     use crate::tree::{NodeType, TreeNode};
     use std::path::{Path, PathBuf};

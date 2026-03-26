@@ -14,7 +14,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::events::run_event_loop;
-use crate::scan_control::{ScanEventReceiver, ScanTriggerSender};
+use crate::scan::control::{ScanEventReceiver, ScanTriggerSender};
 use crate::state::AppState;
 use anyhow::{Result, anyhow};
 use crossterm::execute;

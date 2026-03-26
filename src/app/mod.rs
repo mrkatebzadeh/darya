@@ -15,8 +15,8 @@
 
 use self::cli::{CliArgs, InterfaceMode};
 use self::config::{Config, ConfigLoad};
-use self::fs_scan::ScanOptions;
-use self::scan_control::{
+use self::scan::scanner::ScanOptions;
+use self::scan::control::{
     ScanEventReceiver, ScanEventSender, ScanTriggerReceiver, ScanTriggerSender,
 };
 use self::size::normalize_path;
@@ -29,24 +29,25 @@ use tokio::runtime::Builder;
 
 pub mod cli;
 pub mod config;
-pub mod fs_scan;
 pub mod input;
-pub mod scan_accumulator;
-pub mod scan_control;
+pub mod scan;
+pub use scan::scanner as fs_scan;
+pub use scan::control as scan_control;
+pub use scan::accumulator as scan_accumulator;
+pub use scan::manager as scan_manager;
 pub mod size;
 pub mod snapshot;
 pub mod state;
 pub mod tree;
 
 mod modes;
-mod scan_manager;
 mod ui_thread;
 
 use modes::{
     ExportDestinations, export_options_from_cli, run_export_mode, run_import_mode,
     run_progress_mode, run_summary_mode,
 };
-use scan_manager::scan_manager;
+use scan::manager::scan_manager;
 use ui_thread::run_ui_thread;
 
 pub fn run(cli_args: CliArgs, config_load: ConfigLoad) -> Result<()> {

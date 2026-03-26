@@ -13,23 +13,23 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use crate::scan::scanner::ScanNode;
 
-#[derive(Debug)]
-pub enum ScanTrigger {
-    /// Start or restart the configured scan.
-    Start,
-    /// Pause the running scanner (if any) without canceling.
-    Pause,
-    /// Resume a paused scanner.
-    Resume,
-    /// Stop the running scanner and abandon the current run.
-    Stop,
-    /// Cancel any running scan and signal termination (used during shutdown).
-    Cancel,
+#[derive(Debug, Default)]
+pub struct ScanAccumulator {
+    nodes: Vec<ScanNode>,
 }
 
-pub type ScanTriggerSender = UnboundedSender<ScanTrigger>;
-pub type ScanTriggerReceiver = UnboundedReceiver<ScanTrigger>;
-pub type ScanEventSender = UnboundedSender<crate::fs_scan::ScanEvent>;
-pub type ScanEventReceiver = UnboundedReceiver<crate::fs_scan::ScanEvent>;
+impl ScanAccumulator {
+    pub fn push_batch(&mut self, nodes: Vec<ScanNode>) {
+        self.nodes.extend(nodes);
+    }
+
+    pub fn push_node(&mut self, node: ScanNode) {
+        self.nodes.push(node);
+    }
+
+    pub fn drain(&mut self) -> Vec<ScanNode> {
+        self.nodes.drain(..).collect()
+    }
+}
