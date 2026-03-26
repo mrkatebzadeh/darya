@@ -176,7 +176,6 @@ pub struct UiState {
     pub show_help: bool,
     pub treemap_visible: bool,
     pub treemap_nodes: Vec<TreemapNode>,
-    pub treemap_revision: u64,
     pub ui_revision: u64,
 }
 
@@ -187,7 +186,6 @@ impl Default for UiState {
             show_help: false,
             treemap_visible: true,
             treemap_nodes: Vec::new(),
-            treemap_revision: 0,
             ui_revision: 0,
         }
     }
@@ -351,7 +349,7 @@ impl AppState {
 
         let Some(source) = self.tree.node(source_id) else {
             self.ui.treemap_nodes.clear();
-            self.ui.treemap_revision = self.ui.treemap_revision.wrapping_add(1);
+            self.treemap_revision = self.treemap_revision.wrapping_add(1);
             return;
         };
 
@@ -377,7 +375,7 @@ impl AppState {
 
         nodes.sort_unstable_by(|a, b| b.size.cmp(&a.size).then_with(|| a.name.cmp(&b.name)));
         self.ui.treemap_nodes = nodes;
-        self.ui.treemap_revision = self.ui.treemap_revision.wrapping_add(1);
+        self.treemap_revision = self.treemap_revision.wrapping_add(1);
         self.ensure_selection_visible();
     }
 
