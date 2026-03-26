@@ -514,7 +514,14 @@ mod tests {
 
     fn flatten_rows(tree: &FileTree) -> Vec<TreeRow> {
         let mut rows = Vec::new();
-        traverse(tree, tree.root(), 0, &mut rows, DisplayOptions::default(), None);
+        traverse(
+            tree,
+            tree.root(),
+            0,
+            &mut rows,
+            DisplayOptions::default(),
+            None,
+        );
         rows
     }
 

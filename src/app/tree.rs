@@ -99,6 +99,12 @@ impl FileTree {
         ids
     }
 
+    pub fn visible_ids_filtered(&self, show_hidden: bool) -> Vec<NodeId> {
+        let mut ids = Vec::new();
+        self.collect_visible_filtered(self.root(), &mut ids, show_hidden);
+        ids
+    }
+
     pub fn ensure_node(&mut self, path: PathBuf, kind: NodeType) -> NodeId {
         if let Some(&id) = self.path_index.get(&path) {
             return id;
@@ -226,6 +232,19 @@ impl FileTree {
         {
             for &child in &node.children {
                 self.collect_visible(child, ids);
+            }
+        }
+    }
+
+    fn collect_visible_filtered(&self, node_id: NodeId, ids: &mut Vec<NodeId>, show_hidden: bool) {
+        if let Some(node) = self.nodes.get(node_id) {
+            if show_hidden || !node.name.starts_with('.') {
+                ids.push(node_id);
+            }
+            if node.expanded {
+                for &child in &node.children {
+                    self.collect_visible_filtered(child, ids, show_hidden);
+                }
             }
         }
     }

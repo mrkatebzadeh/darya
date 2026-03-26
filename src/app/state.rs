@@ -355,19 +355,7 @@ impl AppState {
 
     pub fn visible_node_ids(&self) -> Vec<NodeId> {
         self.tree
-            .visible_ids()
-            .into_iter()
-            .filter(|id| {
-                if self.display_options.show_hidden {
-                    return true;
-                }
-                if let Some(node) = self.tree.node(*id) {
-                    !node.name.starts_with('.')
-                } else {
-                    true
-                }
-            })
-            .collect()
+            .visible_ids_filtered(self.display_options.show_hidden)
     }
 }
 
