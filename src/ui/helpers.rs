@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::config::SortMode;
 use crate::display::DisplayOptions;
 use crate::state::{AppState, SizeDisplayMode};
 use crate::theme::Theme;
@@ -346,15 +345,6 @@ pub(crate) fn detail_panel_lines(state: &AppState) -> Vec<String> {
 
 fn detail_line(glyph: &str, key: &str, value: &str) -> String {
     format!("{glyph}\t{key}:\t{value}")
-}
-
-pub(crate) fn sort_mode_label(mode: SortMode) -> &'static str {
-    match mode {
-        SortMode::SizeDesc => "size_desc",
-        SortMode::SizeAsc => "size_asc",
-        SortMode::Name => "name",
-        SortMode::ModifiedTime => "modified_time",
-    }
 }
 
 pub(crate) fn fill_rect(frame: &mut Frame<'_>, rect: Rect, fg: Color, bg: Color) {

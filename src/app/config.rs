@@ -67,6 +67,17 @@ pub enum SortMode {
     ModifiedTime,
 }
 
+impl SortMode {
+    pub fn as_label(self) -> &'static str {
+        match self {
+            SortMode::SizeDesc => "size_desc",
+            SortMode::SizeAsc => "size_asc",
+            SortMode::Name => "name",
+            SortMode::ModifiedTime => "modified_time",
+        }
+    }
+}
+
 /// Result of loading the configuration file.
 #[derive(Debug)]
 pub struct ConfigLoad {

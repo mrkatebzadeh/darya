@@ -101,7 +101,7 @@ impl Ui {
         let header = Paragraph::new(Line::from(vec![
             Span::styled("Sort: ", Style::default().fg(theme.directory)),
             Span::styled(
-                sort_mode_label(state.sort_mode),
+                state.sort_mode.as_label(),
                 Style::default().fg(theme.foreground),
             ),
         ]))

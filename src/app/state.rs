@@ -94,7 +94,7 @@ impl fmt::Display for StatusMessage {
             StatusMessage::FilterPrompt => write!(f, "filter: type name substring and press Enter"),
             StatusMessage::FilterActive(query) => write!(f, "filter active: {query}"),
             StatusMessage::FilterCleared => write!(f, "filter cleared"),
-            StatusMessage::SortMode(mode) => write!(f, "sort mode: {}", sort_mode_label(*mode)),
+            StatusMessage::SortMode(mode) => write!(f, "sort mode: {}", mode.as_label()),
             StatusMessage::HiddenFilesVisible(true) => write!(f, "hidden files shown"),
             StatusMessage::HiddenFilesVisible(false) => write!(f, "hidden files hidden"),
             StatusMessage::HelpOpened => write!(f, "help opened"),
@@ -363,15 +363,6 @@ impl AppState {
                 }
             })
             .collect()
-    }
-}
-
-fn sort_mode_label(mode: SortMode) -> &'static str {
-    match mode {
-        SortMode::SizeDesc => "size_desc",
-        SortMode::SizeAsc => "size_asc",
-        SortMode::Name => "name",
-        SortMode::ModifiedTime => "modified_time",
     }
 }
 
