@@ -36,11 +36,12 @@ pub(crate) fn collect_tree_rows(
     options: DisplayOptions,
 ) -> Vec<TreeRow> {
     let mut rows = Vec::new();
-    traverse(tree, tree.root(), 0, &mut rows, options);
-    if filter_active && !filter_query.is_empty() {
-        let filter = filter_query.to_lowercase();
-        rows.retain(|row| row.name.to_lowercase().contains(&filter));
-    }
+    let filter = if filter_active && !filter_query.is_empty() {
+        Some(filter_query.to_lowercase())
+    } else {
+        None
+    };
+    traverse(tree, tree.root(), 0, &mut rows, options, filter.as_deref());
     rows
 }
 
@@ -56,24 +57,32 @@ fn traverse(
     depth: usize,
     rows: &mut Vec<TreeRow>,
     options: DisplayOptions,
+    filter: Option<&str>,
 ) {
     if let Some(node) = tree.node(id) {
         if depth > 0 && !options.show_hidden && node.name.starts_with('.') {
             return;
         }
 
-        rows.push(TreeRow {
+        let row = TreeRow {
             id: node.id,
             depth,
             name: node.name.clone(),
             size: node.size,
             disk_size: node.disk_size,
             kind: node.file_type,
-        });
+        };
+
+        if filter
+            .map(|value| row.name.to_lowercase().contains(value))
+            .unwrap_or(true)
+        {
+            rows.push(row);
+        }
 
         if node.expanded {
             for &child in &node.children {
-                traverse(tree, child, depth + 1, rows, options);
+                traverse(tree, child, depth + 1, rows, options, filter);
             }
         }
     }
@@ -505,7 +514,7 @@ mod tests {
 
     fn flatten_rows(tree: &FileTree) -> Vec<TreeRow> {
         let mut rows = Vec::new();
-        traverse(tree, tree.root(), 0, &mut rows, DisplayOptions::default());
+        traverse(tree, tree.root(), 0, &mut rows, DisplayOptions::default(), None);
         rows
     }
 
