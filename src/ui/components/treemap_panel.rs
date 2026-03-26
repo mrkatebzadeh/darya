@@ -100,11 +100,7 @@ impl TreemapLayoutCache {
         F: FnMut(usize, usize) -> Vec<TreemapNode>,
     {
         let provider = child_provider;
-        let key = TreemapLayoutKey {
-            bounds,
-            revision,
-            selection_path: selection_path.clone(),
-        };
+        let key = TreemapLayoutKey { bounds, revision };
         if self.key.as_ref() == Some(&key) {
             return self.layout.as_ref().unwrap();
         }
@@ -131,5 +127,4 @@ impl Default for TreemapLayoutCache {
 struct TreemapLayoutKey {
     bounds: Rect,
     revision: u64,
-    selection_path: crate::ui::helpers::SelectionPath,
 }
