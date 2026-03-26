@@ -21,7 +21,7 @@
 
 The interface is straightforward and easy to navigate, letting you move through directories, run scans when you want, and focus on the information that actually matters. It’s designed to stay fast and responsive, keeping things simple while working reliably across POSIX-like systems.
 
-<img width="1420" height="841" alt="Image" src="https://github.com/user-attachments/assets/a4ffa94c-aef4-4e30-bd12-2a3bcfc00cba" />
+<img src="https://github.com/user-attachments/assets/9977c103-7b4b-4734-8ff4-4781b65be9c9" />
 
 ## Installation
 ### 1) Cargo install

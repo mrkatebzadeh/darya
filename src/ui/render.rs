@@ -121,23 +121,6 @@ impl Ui {
 
     fn draw_help_modal(&self, frame: &mut Frame<'_>, _state: &AppState, theme: Theme) {
         let frame_area = frame.size();
-        let mut width = frame_area.width.min(80);
-        let min_width = 40u16;
-        width = width.max(min_width).min(frame_area.width);
-        let computed_height = frame_area.height as u32;
-        let computed_height = computed_height.saturating_mul(70) / 100;
-        let mut height = u16::try_from(computed_height).unwrap_or(u16::MAX);
-        let min_height = 10u16;
-        if height < min_height {
-            height = min_height;
-        }
-        height = height.min(frame_area.height);
-        if width == 0 || height == 0 {
-            return;
-        }
-        let x = frame_area.x + frame_area.width.saturating_sub(width) / 2;
-        let y = frame_area.y + frame_area.height.saturating_sub(height) / 2;
-        let area = Rect::new(x, y, width, height);
         let lines = vec![
             Line::from("██████╗  █████╗ ██████╗ ██╗   ██╗ █████╗"),
             Line::from("██╔══██╗██╔══██╗██╔══██╗╚██╗ ██╔╝██╔══██╗"),
@@ -158,6 +141,20 @@ impl Ui {
             Line::from("  t: toggle the treemap panel"),
             Line::from("  ?: toggle this help, q: quit"),
         ];
+
+        let content_width = lines
+            .iter()
+            .map(|line| line.width())
+            .max()
+            .unwrap_or(0) as u16;
+        let width = content_width.saturating_add(4).min(frame_area.width);
+        let height = (lines.len() as u16 + 2).min(frame_area.height);
+        if width == 0 || height == 0 {
+            return;
+        }
+        let x = frame_area.x + frame_area.width.saturating_sub(width) / 2;
+        let y = frame_area.y + frame_area.height.saturating_sub(height) / 2;
+        let area = Rect::new(x, y, width, height);
 
         let popup = Paragraph::new(lines)
             .block(Block::default().title("").borders(Borders::ALL))
