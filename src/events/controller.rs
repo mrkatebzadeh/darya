@@ -26,30 +26,91 @@ pub fn handle_input_action(
     scan_trigger: &ScanTriggerSender,
 ) {
     match action {
-        InputAction::MoveUp => navigation::select_previous(state),
-        InputAction::MoveDown => navigation::select_next(state),
-        InputAction::JumpTop => navigation::select_first(state),
-        InputAction::JumpBottom => navigation::select_last(state),
-        InputAction::Expand => navigation::expand_selection(state),
-        InputAction::Select => navigation::toggle_selection(state),
-        InputAction::Delete => files::delete_selection(state),
-        InputAction::Open => files::open_selection(state),
-        InputAction::ToggleSizeMode => state.toggle_size_mode(),
-        InputAction::ToggleTreemap => state.toggle_treemap_visibility(),
-        InputAction::ExportScan => files::export_scan(state),
-        InputAction::ImportScan => files::import_scan(state),
-        InputAction::Rescan => scan::rescan_selection(state),
+        InputAction::MoveUp => {
+            navigation::select_previous(state);
+            state.mark_selection_dirty();
+        }
+        InputAction::MoveDown => {
+            navigation::select_next(state);
+            state.mark_selection_dirty();
+        }
+        InputAction::JumpTop => {
+            navigation::select_first(state);
+            state.mark_selection_dirty();
+        }
+        InputAction::JumpBottom => {
+            navigation::select_last(state);
+            state.mark_selection_dirty();
+        }
+        InputAction::Expand => {
+            navigation::expand_selection(state);
+            state.mark_tree_dirty();
+            state.mark_selection_dirty();
+        }
+        InputAction::Select => {
+            navigation::toggle_selection(state);
+            state.mark_tree_dirty();
+            state.mark_selection_dirty();
+        }
+        InputAction::Delete => {
+            files::delete_selection(state);
+            state.mark_tree_dirty();
+            state.mark_treemap_dirty();
+        }
+        InputAction::Open => {
+            files::open_selection(state);
+            state.mark_ui_dirty();
+        }
+        InputAction::ToggleSizeMode => {
+            state.toggle_size_mode();
+            state.mark_ui_dirty();
+            state.mark_treemap_dirty();
+        }
+        InputAction::ToggleTreemap => {
+            state.toggle_treemap_visibility();
+            state.mark_ui_dirty();
+        }
+        InputAction::ExportScan => {
+            files::export_scan(state);
+            state.mark_ui_dirty();
+        }
+        InputAction::ImportScan => {
+            files::import_scan(state);
+            state.mark_tree_dirty();
+            state.mark_treemap_dirty();
+            state.mark_selection_dirty();
+        }
+        InputAction::Rescan => {
+            scan::rescan_selection(state);
+            state.mark_tree_dirty();
+            state.mark_treemap_dirty();
+        }
         InputAction::StartFilter => {
             filter::start_filter(state);
+            state.mark_filter_dirty();
         }
-        InputAction::FilterChar(ch) => filter::filter_char(state, ch),
-        InputAction::FilterBackspace => filter::filter_backspace(state),
-        InputAction::ApplyFilter => filter::apply_filter(state),
-        InputAction::ClearFilter => filter::clear_filter(state),
+        InputAction::FilterChar(ch) => {
+            filter::filter_char(state, ch);
+            state.mark_filter_dirty();
+        }
+        InputAction::FilterBackspace => {
+            filter::filter_backspace(state);
+            state.mark_filter_dirty();
+        }
+        InputAction::ApplyFilter => {
+            filter::apply_filter(state);
+            state.mark_filter_dirty();
+        }
+        InputAction::ClearFilter => {
+            filter::clear_filter(state);
+            state.mark_filter_dirty();
+        }
         InputAction::CycleSort => {
             let next = next_sort_mode(state.sort_mode);
             state.set_sort_mode(next);
             state.update_status(StatusMessage::SortMode(next));
+            state.mark_tree_dirty();
+            state.mark_treemap_dirty();
         }
         InputAction::ToggleHidden => {
             state.display_options.show_hidden = !state.display_options.show_hidden;
@@ -58,6 +119,9 @@ pub fn handle_input_action(
             state.update_status(StatusMessage::HiddenFilesVisible(
                 state.display_options.show_hidden,
             ));
+            state.mark_tree_dirty();
+            state.mark_treemap_dirty();
+            state.mark_selection_dirty();
         }
         InputAction::ToggleHelp => {
             state.ui.show_help = !state.ui.show_help;
@@ -66,8 +130,13 @@ pub fn handle_input_action(
             } else {
                 state.update_status(StatusMessage::HelpClosed);
             }
+            state.mark_ui_dirty();
         }
-        InputAction::Collapse => navigation::collapse_selection(state),
+        InputAction::Collapse => {
+            navigation::collapse_selection(state);
+            state.mark_tree_dirty();
+            state.mark_selection_dirty();
+        }
         InputAction::StartScan => {
             if !matches!(state.scan.state, ScanState::Running(_)) {
                 let _ = scan_trigger.send(ScanTrigger::Start);
@@ -75,12 +144,11 @@ pub fn handle_input_action(
                     scanned: 0,
                     errors: 0,
                 });
+                state.mark_ui_dirty();
             }
         }
         _ => {}
     }
-
-    state.refresh_ui();
 }
 
 fn next_sort_mode(current: SortMode) -> SortMode {
