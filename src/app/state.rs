@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use super::scan_accumulator::ScanAccumulator;
 use crate::{
     config::SortMode,
     display::DisplayOptions,
@@ -21,8 +22,6 @@ use crate::{
     tree::{FileTree, NodeId, NodeType},
     treemap::TreemapNode,
 };
-
-use crate::fs_scan::ScanNode;
 use std::fmt;
 use std::path::PathBuf;
 
@@ -178,7 +177,7 @@ pub struct AppState {
     pub extended_mode: bool,
     pub display_options: DisplayOptions,
     pub export_options: ExportOptions,
-    pub pending_scan_nodes: Vec<ScanNode>,
+    pub scan_accumulator: ScanAccumulator,
 }
 
 impl AppState {
@@ -204,7 +203,7 @@ impl AppState {
             extended_mode: false,
             display_options: DisplayOptions::default(),
             export_options: ExportOptions::default(),
-            pending_scan_nodes: Vec::new(),
+            scan_accumulator: ScanAccumulator::default(),
         }
     }
 

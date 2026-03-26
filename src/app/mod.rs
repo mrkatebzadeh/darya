@@ -31,6 +31,7 @@ pub mod cli;
 pub mod config;
 pub mod fs_scan;
 pub mod input;
+pub mod scan_accumulator;
 pub mod scan_control;
 pub mod size;
 pub mod snapshot;
