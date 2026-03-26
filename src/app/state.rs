@@ -170,14 +170,30 @@ impl NavigationState {
     }
 }
 
+#[derive(Debug)]
+pub struct ScanStateData {
+    pub state: ScanState,
+    pub activity: ScanActivity,
+    pub accumulator: ScanAccumulator,
+}
+
+impl Default for ScanStateData {
+    fn default() -> Self {
+        Self {
+            state: ScanState::Idle,
+            activity: ScanActivity::default(),
+            accumulator: ScanAccumulator::default(),
+        }
+    }
+}
+
 /// Central application state shared across the UI and scanner.
 #[derive(Debug)]
 pub struct AppState {
     pub tree: FileTree,
     pub sort_mode: SortMode,
     pub navigation: NavigationState,
-    pub scan_state: ScanState,
-    pub scan_activity: ScanActivity,
+    pub scan: ScanStateData,
     pub status_message: Option<StatusMessage>,
     pub spinner_phase: usize,
     pub pending_delete: Option<NodeId>,
@@ -192,7 +208,6 @@ pub struct AppState {
     pub extended_mode: bool,
     pub display_options: DisplayOptions,
     pub export_options: ExportOptions,
-    pub scan_accumulator: ScanAccumulator,
 }
 
 impl AppState {
@@ -201,8 +216,7 @@ impl AppState {
             tree: FileTree::new(root),
             sort_mode,
             navigation: NavigationState::default(),
-            scan_state: ScanState::Idle,
-            scan_activity: ScanActivity::default(),
+            scan: ScanStateData::default(),
             status_message: None,
             spinner_phase: 0,
             pending_delete: None,
@@ -217,7 +231,6 @@ impl AppState {
             extended_mode: false,
             display_options: DisplayOptions::default(),
             export_options: ExportOptions::default(),
-            scan_accumulator: ScanAccumulator::default(),
         }
     }
 
@@ -266,7 +279,7 @@ impl AppState {
     }
 
     pub fn mark_scan_progress(&mut self, progress: ScanProgress) {
-        self.scan_state = ScanState::Running(progress);
+        self.scan.state = ScanState::Running(progress);
     }
 
     pub fn advance_spinner(&mut self, modulo: usize) {
@@ -276,11 +289,11 @@ impl AppState {
     }
 
     pub fn mark_scan_complete(&mut self) {
-        self.scan_state = ScanState::Completed;
+        self.scan.state = ScanState::Completed;
     }
 
     pub fn mark_scan_error(&mut self, message: impl Into<String>) {
-        self.scan_state = ScanState::Error(message.into());
+        self.scan.state = ScanState::Error(message.into());
     }
 
     pub fn toggle_size_mode(&mut self) {
@@ -309,7 +322,7 @@ impl AppState {
     }
 
     pub fn scan_activity_snapshot(&self) -> ScanActivity {
-        self.scan_activity.clone()
+        self.scan.activity.clone()
     }
 
     pub fn refresh_treemap_nodes(&mut self) {
@@ -394,7 +407,7 @@ mod tests {
     #[test]
     fn new_state_is_idle() {
         let state = state();
-        assert_eq!(state.scan_state, ScanState::Idle);
+        assert_eq!(state.scan.state, ScanState::Idle);
         assert!(state.navigation.selection.is_none());
         assert_eq!(state.sort_mode, SortMode::SizeDesc);
         assert!(state.treemap_nodes.is_empty());
@@ -422,11 +435,11 @@ mod tests {
             scanned: 1,
             errors: 0,
         });
-        assert!(matches!(state.scan_state, ScanState::Running(_)));
+        assert!(matches!(state.scan.state, ScanState::Running(_)));
         state.mark_scan_complete();
-        assert_eq!(state.scan_state, ScanState::Completed);
+        assert_eq!(state.scan.state, ScanState::Completed);
         state.mark_scan_error("oops");
-        assert!(matches!(state.scan_state, ScanState::Error(_)));
+        assert!(matches!(state.scan.state, ScanState::Error(_)));
     }
 
     #[test]

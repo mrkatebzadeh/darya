@@ -84,7 +84,7 @@ pub(crate) async fn run_export_mode(
     });
     run_scan_loop(&mut scanner_rx, |event| {
         process_scan_event(&mut state, event);
-        matches!(state.scan_state, ScanState::Completed)
+        matches!(state.scan.state, ScanState::Completed)
     })
     .await;
     let json_options = ExportOptions {

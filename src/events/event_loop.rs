@@ -94,7 +94,7 @@ pub fn run_event_loop(
         }
 
         if last_tick.elapsed() >= TICK_RATE {
-            let running = matches!(state.scan_state, ScanState::Running(_));
+            let running = matches!(state.scan.state, ScanState::Running(_));
             if running {
                 state.advance_spinner(BRAILLE_EIGHT.symbols.len());
             }

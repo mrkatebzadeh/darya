@@ -23,7 +23,7 @@ pub(crate) fn process_scan_event(state: &mut AppState, event: ScanEvent) {
     match event {
         ScanEvent::Batch(batch) => {
             let last_path = batch.nodes.last().map(|n| n.path.clone());
-            state.scan_accumulator.push_batch(batch.nodes);
+            state.scan.accumulator.push_batch(batch.nodes);
             if let Some(path) = last_path {
                 state.update_status(StatusMessage::ScanPath(path));
             }
@@ -37,14 +37,14 @@ pub(crate) fn process_scan_event(state: &mut AppState, event: ScanEvent) {
                 state.mark_scan_complete();
             }
             if let Some(activity) = batch.activity {
-                state.scan_activity = activity;
+                state.scan.activity = activity;
             }
         }
         ScanEvent::Node(node) => {
-            state.scan_accumulator.push_node(node);
+            state.scan.accumulator.push_node(node);
         }
         ScanEvent::Activity(activity) => {
-            state.scan_activity = activity;
+            state.scan.activity = activity;
         }
         ScanEvent::Progress(progress) => {
             state.mark_scan_progress(progress.clone());
@@ -174,7 +174,7 @@ fn rebuild_tree_from_pending(state: &mut AppState) {
     });
     state.tree = FileTree::new(root_path);
     let mut parents = Vec::new();
-    let drained_nodes: Vec<ScanNode> = state.scan_accumulator.drain();
+    let drained_nodes: Vec<ScanNode> = state.scan.accumulator.drain();
     for node in drained_nodes {
         if let Some((_path, Some(parent_id))) = insert_scan_node(state, &node) {
             parents.push(parent_id);

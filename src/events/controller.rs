@@ -69,7 +69,7 @@ pub fn handle_input_action(
         }
         InputAction::Collapse => navigation::collapse_selection(state),
         InputAction::StartScan => {
-            if !matches!(state.scan_state, ScanState::Running(_)) {
+            if !matches!(state.scan.state, ScanState::Running(_)) {
                 let _ = scan_trigger.send(ScanTrigger::Start);
                 state.mark_scan_progress(ScanProgress {
                     scanned: 0,
@@ -250,7 +250,7 @@ mod tests {
             activity: Some(ScanActivity::default()),
         };
         process_scan_event(&mut state, ScanEvent::Batch(batch));
-        if matches!(state.scan_state, ScanState::Completed) {
+        if matches!(state.scan.state, ScanState::Completed) {
             process_scan_event(&mut state, ScanEvent::Completed);
         }
         let root = state.tree.node(0).unwrap();
