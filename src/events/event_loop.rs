@@ -64,8 +64,28 @@ pub fn run_event_loop(
                     }
                     handle_input_action(action, state, scan_trigger);
                     pending_draw = state.ui.ui_revision != last_ui_revision;
+                    if pending_draw {
+                        terminal.draw(|frame| {
+                            let regions =
+                                layout::split_layout(frame.size(), state.ui.treemap_visible);
+                            ui.draw(frame, regions, state, theme);
+                        })?;
+                        pending_draw = false;
+                        last_ui_revision = state.ui.ui_revision;
+                        last_tick = Instant::now();
+                        continue;
+                    }
                 }
-                Event::Resize(_, _) => pending_draw = true,
+                Event::Resize(_, _) => {
+                    terminal.draw(|frame| {
+                        let regions = layout::split_layout(frame.size(), state.ui.treemap_visible);
+                        ui.draw(frame, regions, state, theme);
+                    })?;
+                    pending_draw = false;
+                    last_ui_revision = state.ui.ui_revision;
+                    last_tick = Instant::now();
+                    continue;
+                }
                 _ => {}
             }
         }
