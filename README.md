@@ -24,13 +24,19 @@ The interface is straightforward and easy to navigate, letting you move through 
 <img src="https://github.com/user-attachments/assets/9977c103-7b4b-4734-8ff4-4781b65be9c9" />
 
 ## Installation
-### 1) Cargo install
+### 1) Install script (fastest)
+1. Run the install script below to fetch the latest release for your platform.
+   ```bash
+   curl -fsSL https://mr.katebzadeh.xyz/tools/darya/install | bash
+   ```
+
+### 2) Cargo install
 1. Make sure Rust and Cargo are available on your system, then install the latest published build with the command below.
    ```bash
    cargo install darya
    ```
 
-### 2) Download from the releases page
+### 3) Download from the releases page
 1. Download the archive that matches your platform from the [darya releases page](https://github.com/mrkatebzadeh/darya/releases) using the command below.
    ```bash
    curl -LO https://github.com/mrkatebzadeh/darya/releases/latest/download/darya-<platform>.tar.gz
@@ -41,7 +47,7 @@ The interface is straightforward and easy to navigate, letting you move through 
    sudo mv darya /usr/local/bin/
    ```
 
-### 3) Building from source
+### 4) Building from source
 1. Clone the repository and reset to the desired release tag (skip if you already have the source) by running the command below.
    ```bash
    git clone https://github.com/mrkatebzadeh/darya && cd darya
@@ -91,7 +97,7 @@ The interface is straightforward and easy to navigate, letting you move through 
 - Settings come from a `config.toml` in your system config directory. On Linux this is `~/.config/darya/config.toml`, while on macOS it lives at `~/Library/Application Support/darya/config.toml`. Pass `--ignore-config` to skip loading it.
 - Overrides on the command line always win, so you can keep a mild default configuration and still tweak behavior at runtime.
 
-## Config file options
+
 | Section | Key | Type | Description |
 | --- | --- | --- | --- |
 | `sorting` | `mode` | string | Default sort mode (`size_desc`, `size_asc`, `name`, `modified_time`). |
