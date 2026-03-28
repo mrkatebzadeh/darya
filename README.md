@@ -21,8 +21,6 @@
 
 The interface is straightforward and easy to navigate, letting you move through directories, run scans when you want, and focus on the information that actually matters. It’s designed to stay fast and responsive, keeping things simple while working reliably across POSIX-like systems.
 
-Darya now also runs on Windows (MSVC), so the same keyboard-driven UI is available inside Windows terminals just like on Linux and macOS.
-
 <img src="https://github.com/user-attachments/assets/9977c103-7b4b-4734-8ff4-4781b65be9c9" />
 
 ## Installation
@@ -63,18 +61,6 @@ Darya now also runs on Windows (MSVC), so the same keyboard-driven UI is availab
    ```bash
    cargo install --path .
    ```
-
-### Windows support
-- Install the Visual Studio Build Tools (or the full Visual Studio Desktop C++ workload) to pull in the MSVC linker and headers required by the Windows toolchain.
-- Add the MSVC Rust target with:
-  ```bash
-  rustup target add x86_64-pc-windows-msvc
-  ```
-- From a Developer Command Prompt or an administrative PowerShell session, run:
-  ```bash
-  cargo install darya
-  ```
-- Run `cargo test` followed by `cargo build --release` on Windows to validate the build before tagging a release; the info panel in the UI surfaces Windows-specific attributes when the app is running on that platform.
 
 ## Quick start
 - Launch `darya` in any directory to open the UI, then press `R` to start a scan.
