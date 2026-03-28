@@ -13,23 +13,4 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod app;
-pub mod events;
-pub mod platform;
-pub mod ui;
-
-pub use app::cli;
-pub use app::config;
-pub use app::input;
-pub use app::scan;
-pub use app::scan::accumulator as scan_accumulator;
-pub use app::scan::control as scan_control;
-pub use app::scan::manager as scan_manager;
-pub use app::scan::scanner as fs_scan;
-pub use app::size;
-pub use app::snapshot;
-pub use app::state;
-pub use app::tree;
-pub use ui::display;
-pub use ui::theme;
-pub use ui::treemap;
+pub mod metadata;

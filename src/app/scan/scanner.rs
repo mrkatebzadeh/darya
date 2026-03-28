@@ -13,12 +13,13 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::platform::metadata::{
+    DeviceId, HardLinkKey, device_id, disk_usage_bytes, hard_link_key,
+};
 use crate::tree::NodeType;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use std::collections::HashSet;
 use std::ffi::OsStr;
-#[cfg(unix)]
-use std::os::unix::fs::MetadataExt;
 use std::{
     path::PathBuf,
     sync::{
@@ -151,17 +152,17 @@ fn run_scan(
 ) {
     let mut scanned = 0;
     let mut errors = 0;
-    let mut seen_links: HashSet<(u64, u64)> = HashSet::new();
+    let mut seen_links: HashSet<HardLinkKey> = HashSet::new();
 
     let custom_same_fs = options.same_file_system && cfg!(unix);
     #[cfg(unix)]
-    let root_dev = if custom_same_fs {
-        root.metadata().ok().map(|meta| meta.dev())
+    let root_dev: Option<DeviceId> = if custom_same_fs {
+        root.metadata().ok().and_then(|meta| device_id(&meta))
     } else {
         None
     };
     #[cfg(not(unix))]
-    let root_dev = None;
+    let root_dev: Option<DeviceId> = None;
 
     let walker = WalkDir::new(&root).follow_links(options.follow_symlinks);
     let walker = if options.same_file_system && !custom_same_fs {
@@ -214,9 +215,9 @@ fn run_scan(
                 match entry.metadata() {
                     Ok(metadata) => {
                         if custom_same_fs
-                            && let Some(root_dev) = root_dev
+                            && let Some(root_dev) = root_dev.as_ref()
                             && let Some(entry_dev) = device_id(&metadata)
-                            && entry_dev != root_dev
+                            && entry_dev != *root_dev
                         {
                             activity.skipped_mounts += 1;
                             if entry.file_type().is_dir() {
@@ -333,28 +334,6 @@ fn build_excludes(patterns: &[String]) -> Option<GlobSet> {
     builder.build().ok()
 }
 
-#[cfg(unix)]
-fn hard_link_key(metadata: &std::fs::Metadata) -> Option<(u64, u64)> {
-    use std::os::unix::fs::MetadataExt;
-    Some((metadata.dev(), metadata.ino()))
-}
-
-#[cfg(not(unix))]
-fn hard_link_key(_metadata: &std::fs::Metadata) -> Option<(u64, u64)> {
-    None
-}
-
-#[cfg(unix)]
-fn disk_usage_bytes(metadata: &std::fs::Metadata) -> u64 {
-    use std::os::unix::fs::MetadataExt;
-    metadata.blocks().saturating_mul(512)
-}
-
-#[cfg(not(unix))]
-fn disk_usage_bytes(metadata: &std::fs::Metadata) -> u64 {
-    metadata.len()
-}
-
 fn is_cache_entry(entry: &DirEntry) -> bool {
     entry
         .path()
@@ -405,16 +384,6 @@ fn classify(entry: &walkdir::DirEntry) -> NodeType {
     } else {
         NodeType::File
     }
-}
-
-#[cfg(unix)]
-fn device_id(metadata: &std::fs::Metadata) -> Option<u64> {
-    Some(metadata.dev())
-}
-
-#[cfg(not(unix))]
-fn device_id(_metadata: &std::fs::Metadata) -> Option<u64> {
-    None
 }
 
 #[cfg(test)]
