@@ -234,7 +234,19 @@ pub(crate) fn selected_info_line(state: &AppState) -> String {
         )
     }
 
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        let attrs = metadata.file_attributes();
+        let index = metadata.file_index();
+        let serial = metadata.volume_serial_number();
+        let readonly = metadata.permissions().readonly();
+        format!(
+            "info: attrs={attrs:#x} index={index} serial={serial} readonly={readonly} mtime={modified}"
+        )
+    }
+
+    #[cfg(all(not(unix), not(windows)))]
     {
         format!(
             "info: readonly={} mtime={modified}",
@@ -520,6 +532,8 @@ mod tests {
         assert!(info.contains("mtime="));
         #[cfg(unix)]
         assert!(info.contains("uid="));
+        #[cfg(windows)]
+        assert!(info.contains("index="));
 
         let _ = fs::remove_file(temp);
     }
