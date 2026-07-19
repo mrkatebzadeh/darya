@@ -22,7 +22,7 @@ use crate::theme::Theme;
 use crate::ui::{Ui, layout};
 use anyhow::Result;
 use crossterm::event::{self, Event};
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::{Terminal, backend::CrosstermBackend};
 use std::io::Stdout;
 use std::time::{Duration, Instant};
 use throbber_widgets_tui::BRAILLE_EIGHT;

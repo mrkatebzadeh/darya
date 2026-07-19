@@ -15,9 +15,9 @@
 
 use crate::theme::Theme;
 use crate::ui::view_model::FilesystemViewModel;
+use ratatui::Frame;
 use ratatui::layout::{Constraint, Rect};
 use ratatui::style::{Color, Style};
-use ratatui::Frame;
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Table};
 

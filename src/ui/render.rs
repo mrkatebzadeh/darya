@@ -21,9 +21,9 @@ use crate::ui::{
     layout::LayoutRegions,
     view_model::{ActivityViewModel, DetailViewModel, FilesystemViewModel},
 };
+use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
-use ratatui::Frame;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 

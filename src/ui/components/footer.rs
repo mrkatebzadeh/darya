@@ -17,9 +17,9 @@ use crate::state::{AppState, ScanState, StatusMessage};
 use crate::theme::Theme;
 use crate::ui::format::trim_to_width;
 use crate::ui::helpers::spinner_symbol;
+use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
-use ratatui::Frame;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 

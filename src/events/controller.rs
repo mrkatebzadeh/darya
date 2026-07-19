@@ -136,15 +136,13 @@ pub fn handle_input_action(
             state.mark_tree_dirty();
             state.mark_selection_dirty();
         }
-        InputAction::StartScan => {
-            if !matches!(state.scan.state, ScanState::Running(_)) {
-                let _ = scan_trigger.send(ScanTrigger::Start);
-                state.mark_scan_progress(ScanProgress {
-                    scanned: 0,
-                    errors: 0,
-                });
-                state.mark_ui_dirty();
-            }
+        InputAction::StartScan if !matches!(state.scan.state, ScanState::Running(_)) => {
+            let _ = scan_trigger.send(ScanTrigger::Start);
+            state.mark_scan_progress(ScanProgress {
+                scanned: 0,
+                errors: 0,
+            });
+            state.mark_ui_dirty();
         }
         _ => {}
     }

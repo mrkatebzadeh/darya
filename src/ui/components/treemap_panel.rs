@@ -17,9 +17,9 @@ use crate::state::AppState;
 use crate::theme::Theme;
 use crate::treemap::{TreemapLayout, TreemapNode, contextual_treemap_layout};
 use crate::ui::helpers::{draw_treemap_tile, fill_rect, gather_child_nodes, selection_path};
+use ratatui::Frame;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::{Color, Style};
-use ratatui::Frame;
 use ratatui::widgets::{Block, Borders, Paragraph};
 
 pub fn draw_treemap_panel(
