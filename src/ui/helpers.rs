@@ -23,7 +23,7 @@ use ratatui::layout::Rect;
 #[cfg(test)]
 use ratatui::layout::{Constraint, Layout};
 use ratatui::style::{Color, Style};
-use ratatui::terminal::Frame;
+use ratatui::Frame;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Cell, Row};
 #[cfg(test)]

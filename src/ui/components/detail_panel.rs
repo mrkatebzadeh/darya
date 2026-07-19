@@ -18,7 +18,7 @@ use crate::ui::format::trim_to_width;
 use crate::ui::view_model::DetailViewModel;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
-use ratatui::terminal::Frame;
+use ratatui::Frame;
 use ratatui::widgets::{Block, Borders, Clear};
 
 pub fn draw_detail_panel(

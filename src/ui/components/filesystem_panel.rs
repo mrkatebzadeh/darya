@@ -17,7 +17,7 @@ use crate::theme::Theme;
 use crate::ui::view_model::FilesystemViewModel;
 use ratatui::layout::{Constraint, Rect};
 use ratatui::style::{Color, Style};
-use ratatui::terminal::Frame;
+use ratatui::Frame;
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Table};
 
@@ -44,13 +44,12 @@ pub fn draw_filesystem_panel(
         );
     }
 
-    let table = Table::new(view_model.table_rows)
-        .widths(&[
-            Constraint::Percentage(53),
-            Constraint::Percentage(30),
-            Constraint::Percentage(15),
-        ])
-        .column_spacing(1);
+    let widths = [
+        Constraint::Percentage(53),
+        Constraint::Percentage(30),
+        Constraint::Percentage(15),
+    ];
+    let table = Table::new(view_model.table_rows, widths).column_spacing(1);
 
     frame.render_widget(table, table_area);
 
