@@ -120,7 +120,7 @@ impl Ui {
     }
 
     fn draw_help_modal(&self, frame: &mut Frame<'_>, _state: &AppState, theme: Theme) {
-        let frame_area = frame.size();
+        let frame_area = frame.area();
         let lines = vec![
             Line::from("██████╗  █████╗ ██████╗ ██╗   ██╗ █████╗"),
             Line::from("██╔══██╗██╔══██╗██╔══██╗╚██╗ ██╔╝██╔══██╗"),
