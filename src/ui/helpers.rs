@@ -327,10 +327,11 @@ pub(crate) fn fill_rect(frame: &mut Frame<'_>, rect: Rect, fg: Color, bg: Color)
 
     for y in rect.y..y_end {
         for x in rect.x..x_end {
-            let cell = &mut buf[(x, y)];
-            cell.set_symbol("█");
-            cell.set_fg(fg);
-            cell.set_bg(bg);
+            if let Some(cell) = buf.cell_mut((x, y)) {
+                cell.set_symbol("█");
+                cell.set_fg(fg);
+                cell.set_bg(bg);
+            }
         }
     }
 }
