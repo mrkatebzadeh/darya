@@ -19,11 +19,11 @@ use crate::theme::Theme;
 use crate::tree::{FileTree, NodeType, TreeNode};
 use crate::treemap::{TreemapNode, TreemapTile};
 use crate::ui::format::{format_size_custom, percent_bar, trim_to_width};
+use ratatui::Frame;
 use ratatui::layout::Rect;
 #[cfg(test)]
 use ratatui::layout::{Constraint, Layout};
 use ratatui::style::{Color, Style};
-use ratatui::Frame;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Cell, Row};
 #[cfg(test)]
@@ -458,6 +458,8 @@ impl TreeRow {
 mod tests {
     use super::*;
     use crate::tree::{NodeType, TreeNode};
+    use ratatui::style::Color;
+    use ratatui::{Terminal, backend::TestBackend};
     use std::{fs, path::PathBuf};
 
     #[test]
@@ -533,5 +535,21 @@ mod tests {
         assert!(inner.height < outer.height);
         assert!(inner.x > outer.x);
         assert!(inner.y > outer.y);
+    }
+
+    #[test]
+    fn fill_rect_clips_to_buffer() {
+        let mut terminal = Terminal::new(TestBackend::new(4, 3)).unwrap();
+        terminal
+            .draw(|frame| fill_rect(frame, Rect::new(2, 1, 4, 3), Color::Red, Color::Blue))
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        for &(x, y) in &[(2, 1), (3, 1), (2, 2), (3, 2)] {
+            let cell = &buffer[(x, y)];
+            assert_eq!(cell.symbol(), "█");
+            assert_eq!(cell.fg, Color::Red);
+            assert_eq!(cell.bg, Color::Blue);
+        }
     }
 }
