@@ -15,6 +15,7 @@
 
 pub mod app;
 pub mod events;
+pub mod platform;
 pub mod ui;
 
 pub use app::cli;

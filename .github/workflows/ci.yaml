@@ -64,15 +64,28 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             use_cross: false
+            bin_name: darya
+            archive_ext: tar.gz
           - os: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             use_cross: true
+            bin_name: darya
+            archive_ext: tar.gz
           - os: macos-latest
             target: x86_64-apple-darwin
             use_cross: false
+            bin_name: darya
+            archive_ext: tar.gz
           - os: macos-latest
             target: aarch64-apple-darwin
             use_cross: false
+            bin_name: darya
+            archive_ext: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            use_cross: false
+            bin_name: darya.exe
+            archive_ext: zip
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -86,26 +99,59 @@ jobs:
         if: matrix.use_cross == true
         run: cargo install cross --locked
 
-      - name: Build binaries
+      - name: Build binaries (Unix)
+        if: matrix.os != 'windows-latest'
+        shell: bash
         run: |
           if [ "${{ matrix.use_cross }}" = "true" ]; then
-            cross build --release --target "${{ matrix.target }}" --bin darya
+            cross build --release --target "${{ matrix.target }}" --bin ${{ matrix.bin_name }}
           else
-            cargo build --release --target "${{ matrix.target }}" --bin darya
+            cargo build --release --target "${{ matrix.target }}" --bin ${{ matrix.bin_name }}
           fi
 
-      - name: Archive artifacts
+      - name: Build binaries (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          if ("${{ matrix.use_cross }}" -eq "true") {
+            cross build --release --target "${{ matrix.target }}" --bin ${{ matrix.bin_name }}
+          } else {
+            cargo build --release --target "${{ matrix.target }}" --bin ${{ matrix.bin_name }}
+          }
+          
+
+      - name: Archive artifacts (Unix)
+        if: matrix.os != 'windows-latest'
         run: |
           ARTIFACT_NAME="darya-${{ matrix.target }}"
           DIST_DIR="dist"
           mkdir -p "${DIST_DIR}"
-          tar -czf "${DIST_DIR}/${ARTIFACT_NAME}.tar.gz" -C "target/${{ matrix.target }}/release" darya
+          tar -czf "${DIST_DIR}/${ARTIFACT_NAME}.${{ matrix.archive_ext }}" -C "target/${{ matrix.target }}/release" ${{ matrix.bin_name }}
 
-      - name: Upload artifacts
+      - name: Upload artifacts (Unix)
+        if: matrix.os != 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
           name: darya-${{ matrix.target }}
-          path: dist/darya-${{ matrix.target }}.tar.gz
+          path: dist/darya-${{ matrix.target }}.${{ matrix.archive_ext }}
+
+      - name: Archive artifacts (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $artifactName = "darya-${{ matrix.target }}"
+          $distDir = "dist"
+          New-Item -ItemType Directory -Force -Path $distDir | Out-Null
+          $binPath = "target/${{ matrix.target }}/release/${{ matrix.bin_name }}"
+          $zipPath = "$distDir/$artifactName.${{ matrix.archive_ext }}"
+          Compress-Archive -Path $binPath -DestinationPath $zipPath
+
+      - name: Upload artifacts (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: darya-${{ matrix.target }}
+          path: dist/darya-${{ matrix.target }}.${{ matrix.archive_ext }}
 
   release:
     runs-on: ubuntu-latest
@@ -127,6 +173,8 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          files: dist/**/*.tar.gz
+          files: |
+            dist/**/*.tar.gz
+            dist/**/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
