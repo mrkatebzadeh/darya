@@ -22,7 +22,7 @@ serde_json = "1.0"
 bincode = { version = "2.0", features = ["serde"] }
 thiserror = "2.0"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
-toml = "1.0"
+toml = "1.1"
 throbber-widgets-tui = "0.11"
 walkdir = "2.3"
 flate2 = "1.0"
