@@ -98,15 +98,15 @@ pub struct DaryaCli {
     pub export_block_size: Option<usize>,
 
     /// Force UI mode (default)
-    #[arg(long = "0")]
+    #[arg(short = '0', long = "0")]
     pub force_tui: bool,
 
     /// Print a textual progress report instead of the UI
-    #[arg(long = "1")]
+    #[arg(short = '1', long = "1")]
     pub force_progress: bool,
 
     /// Print a simple summary after scanning
-    #[arg(long = "2")]
+    #[arg(short = '2', long = "2")]
     pub force_summary: bool,
 
     /// Do not load configuration files
@@ -165,7 +165,7 @@ pub struct DaryaCli {
 
 impl DaryaCli {
     /// Preprocess argv so that `-0`, `-1`, `-2` become `--0`, `--1`, `--2` for interface mode.
-    /// Call this before parsing when using parse_from_iter for tests.
+    /// Retained for compatibility; parsing no longer requires preprocessing.
     pub fn preprocess_interface_args(
         args: impl IntoIterator<Item = std::ffi::OsString>,
     ) -> Vec<std::ffi::OsString> {
@@ -182,27 +182,19 @@ impl DaryaCli {
             .collect()
     }
 
-    /// Parse from the environment, with -0/-1/-2 preprocessing.
+    /// Parse from the environment.
     pub fn try_parse() -> Result<Self, clap::Error> {
-        let args: Vec<std::ffi::OsString> = env::args_os().collect();
-        let program = args
-            .first()
-            .cloned()
-            .unwrap_or_else(|| std::ffi::OsString::from("darya"));
-        let rest = Self::preprocess_interface_args(args.into_iter().skip(1));
-        Self::try_parse_from(std::iter::once(program).chain(rest))
+        <Self as Parser>::try_parse()
     }
 
-    /// Parse from the given iterator (for tests). Call preprocess_interface_args on the args first.
+    /// Parse arguments without the program name from the given iterator.
     pub fn parse_from_iter<I>(iter: I) -> Result<CliArgs, CliParseError>
     where
         I: IntoIterator<Item = std::ffi::OsString>,
     {
-        let preprocessed = Self::preprocess_interface_args(iter);
-        let raw = Self::try_parse_from(
-            std::iter::once(std::ffi::OsString::from("darya")).chain(preprocessed),
-        )
-        .map_err(CliParseError::Clap)?;
+        let raw =
+            Self::try_parse_from(std::iter::once(std::ffi::OsString::from("darya")).chain(iter))
+                .map_err(CliParseError::Clap)?;
         raw.into_cli_args()
     }
 
@@ -576,5 +568,30 @@ mod tests {
         let args = vec![OsString::from("-2")];
         let cli = parse(args).unwrap();
         assert_eq!(cli.interface_mode, InterfaceMode::Summary);
+    }
+
+    #[test]
+    fn clap_parses_numeric_interface_options_directly() {
+        for (flag, expected) in [
+            ("-0", InterfaceMode::Tui),
+            ("--0", InterfaceMode::Tui),
+            ("-1", InterfaceMode::Progress),
+            ("--1", InterfaceMode::Progress),
+            ("-2", InterfaceMode::Summary),
+            ("--2", InterfaceMode::Summary),
+        ] {
+            let cli = DaryaCli::try_parse_from(["darya", flag])
+                .unwrap()
+                .into_cli_args()
+                .unwrap();
+            assert_eq!(cli.interface_mode, expected, "{flag}");
+        }
+    }
+
+    #[test]
+    fn numeric_path_after_separator_is_not_rewritten() {
+        let cli = parse(vec![OsString::from("--"), OsString::from("-1")]).unwrap();
+        assert_eq!(cli.root, PathBuf::from("-1"));
+        assert_eq!(cli.interface_mode, InterfaceMode::Tui);
     }
 }

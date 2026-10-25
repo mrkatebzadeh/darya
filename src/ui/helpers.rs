@@ -19,16 +19,12 @@ use crate::theme::Theme;
 use crate::tree::{FileTree, NodeType, TreeNode};
 use crate::treemap::{TreemapNode, TreemapTile};
 use crate::ui::format::{format_size_custom, percent_bar, trim_to_width};
+use crate::ui::{SPINNER_SYMBOLS, view_model::DetailEntry};
 use ratatui::Frame;
 use ratatui::layout::Rect;
-#[cfg(test)]
-use ratatui::layout::{Constraint, Layout};
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Cell, Row};
-#[cfg(test)]
-use std::time::UNIX_EPOCH;
-use throbber_widgets_tui::BRAILLE_EIGHT;
 
 pub(crate) fn collect_tree_rows(
     tree: &FileTree,
@@ -188,96 +184,17 @@ pub(crate) fn chosen_size(row: &TreeRow, mode: SizeDisplayMode, options: Display
 }
 
 pub(crate) fn spinner_symbol(phase: usize) -> &'static str {
-    let symbols = BRAILLE_EIGHT.symbols;
-    symbols[phase % symbols.len()]
+    SPINNER_SYMBOLS[phase % SPINNER_SYMBOLS.len()]
 }
 
-#[cfg(test)]
-pub(crate) fn selected_info_line(state: &AppState) -> String {
-    let Some(selected) = state.navigation.selection else {
-        return "info: no selection".to_string();
-    };
-
-    let Some(node) = state.tree.node(selected) else {
-        return "info: no node".to_string();
-    };
-
-    if state.extended_mode
-        && let Some(line) = format_node_metadata(node)
-    {
-        return line;
-    }
-
-    let Ok(metadata) = std::fs::metadata(&node.path) else {
-        return format!("info: metadata unavailable for {}", node.path.display());
-    };
-
-    let modified = metadata
-        .modified()
-        .ok()
-        .and_then(|m| m.duration_since(UNIX_EPOCH).ok())
-        .map(|d| d.as_secs().to_string())
-        .unwrap_or_else(|| "-".to_string());
-
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::{MetadataExt, PermissionsExt};
-        let perm = metadata.permissions().mode() & 0o777;
-        format!(
-            "info: mode={perm:o} uid={} gid={} inode={} nlink={} mtime={} ctime={}",
-            metadata.uid(),
-            metadata.gid(),
-            metadata.ino(),
-            metadata.nlink(),
-            modified,
-            metadata.ctime()
-        )
-    }
-
-    #[cfg(not(unix))]
-    {
-        format!(
-            "info: readonly={} mtime={modified}",
-            metadata.permissions().readonly()
-        )
-    }
-}
-
-#[cfg(test)]
-fn format_node_metadata(node: &TreeNode) -> Option<String> {
-    let modified = node
-        .modified
-        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
-        .map(|d| d.as_secs().to_string())
-        .unwrap_or_else(|| "-".to_string());
-
-    #[cfg(unix)]
-    {
-        if let (Some(mode), Some(uid), Some(gid)) = (node.permissions, node.uid, node.gid) {
-            return Some(format!(
-                "info: mode={mode:o} uid={uid} gid={gid} mtime={modified}",
-            ));
-        }
-    }
-
-    #[cfg(not(unix))]
-    {
-        if let Some(mode) = node.permissions {
-            return Some(format!("info: mode={mode:o} mtime={modified}"));
-        }
-    }
-
-    None
-}
-
-pub(crate) fn detail_panel_lines(state: &AppState) -> Vec<String> {
+pub(crate) fn detail_panel_entries(state: &AppState) -> Vec<DetailEntry> {
     let empty = || {
         vec![
-            detail_line("•", "Path", ""),
-            detail_line("•", "Type", ""),
-            detail_line("•", "Apparent", ""),
-            detail_line("•", "Disk", ""),
-            detail_line("•", "Items", ""),
+            detail_entry("•", "Path", ""),
+            detail_entry("•", "Type", ""),
+            detail_entry("•", "Apparent", ""),
+            detail_entry("•", "Disk", ""),
+            detail_entry("•", "Items", ""),
         ]
     };
 
@@ -304,20 +221,24 @@ pub(crate) fn detail_panel_lines(state: &AppState) -> Vec<String> {
     };
 
     vec![
-        detail_line("📂", "Path", &node.path.display().to_string()),
-        detail_line("⬤", "Type", kind_label),
-        detail_line("⚖", "Apparent", &apparent),
-        detail_line("💾", "Disk", &format!("{disk} ({ratio:.1}%)")),
+        detail_entry("📂", "Path", &node.path.display().to_string()),
+        detail_entry("⬤", "Type", kind_label),
+        detail_entry("⚖", "Apparent", &apparent),
+        detail_entry("💾", "Disk", &format!("{disk} ({ratio:.1}%)")),
         if node.file_type == NodeType::Directory {
-            detail_line("📦", "Items", &node.children.len().to_string())
+            detail_entry("📦", "Items", &node.children.len().to_string())
         } else {
-            detail_line("📦", "Items", "")
+            detail_entry("📦", "Items", "")
         },
     ]
 }
 
-fn detail_line(glyph: &str, key: &str, value: &str) -> String {
-    format!("{glyph}\t{key}:\t{value}")
+fn detail_entry(glyph: &str, key: &str, value: &str) -> DetailEntry {
+    DetailEntry {
+        glyph: glyph.into(),
+        key: key.into(),
+        value: value.into(),
+    }
 }
 
 pub(crate) fn fill_rect(frame: &mut Frame<'_>, rect: Rect, fg: Color, bg: Color) {
@@ -418,27 +339,6 @@ fn node_size(node: &TreeNode, mode: SizeDisplayMode) -> u64 {
     }
 }
 
-#[cfg(test)]
-pub(crate) fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
-    let popup_layout = Layout::default()
-        .direction(ratatui::layout::Direction::Vertical)
-        .constraints([
-            Constraint::Percentage((100 - percent_y) / 2),
-            Constraint::Percentage(percent_y),
-            Constraint::Percentage((100 - percent_y) / 2),
-        ])
-        .split(r);
-
-    Layout::default()
-        .direction(ratatui::layout::Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage((100 - percent_x) / 2),
-            Constraint::Percentage(percent_x),
-            Constraint::Percentage((100 - percent_x) / 2),
-        ])
-        .split(popup_layout[1])[1]
-}
-
 pub(crate) struct TreeRow {
     id: usize,
     depth: usize,
@@ -460,7 +360,7 @@ mod tests {
     use crate::tree::{NodeType, TreeNode};
     use ratatui::style::Color;
     use ratatui::{Terminal, backend::TestBackend};
-    use std::{fs, path::PathBuf};
+    use std::path::PathBuf;
 
     #[test]
     fn flatten_tree_respects_depth() {
@@ -508,33 +408,52 @@ mod tests {
     }
 
     #[test]
-    fn selected_info_contains_metadata_fields() {
-        let temp = std::env::temp_dir().join("darya-info-panel-test");
-        fs::write(&temp, b"x").unwrap();
-
-        let mut state =
-            crate::state::AppState::new(PathBuf::from("/"), crate::config::SortMode::SizeDesc);
-        let file_id = state
-            .tree
-            .add_child(0, TreeNode::new(temp.clone(), NodeType::File));
-        state.navigation.selection = Some(file_id);
-
-        let info = selected_info_line(&state);
-        assert!(info.contains("mtime="));
-        #[cfg(unix)]
-        assert!(info.contains("uid="));
-
-        let _ = fs::remove_file(temp);
+    fn detail_view_model_preserves_fields() {
+        let mut state = AppState::new(
+            PathBuf::from("/root/with\ttab"),
+            crate::config::SortMode::SizeDesc,
+        );
+        let root = state.tree.root();
+        let node = state.tree.node_mut(root).unwrap();
+        node.size = 1024;
+        node.disk_size = 2048;
+        state.navigation.selection = Some(root);
+        let details = crate::ui::view_model::DetailViewModel::build(&state);
+        let entries: Vec<_> = details
+            .entries
+            .iter()
+            .map(|entry| {
+                (
+                    entry.glyph.as_str(),
+                    entry.key.as_str(),
+                    entry.value.as_str(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            entries,
+            [
+                ("📂", "Path", "/root/with\ttab"),
+                ("⬤", "Type", "directory"),
+                ("⚖", "Apparent", "1.0 KiB"),
+                ("💾", "Disk", "2.0 KiB (200.0%)"),
+                ("📦", "Items", "0"),
+            ]
+        );
+        state.navigation.selection = None;
+        let details = crate::ui::view_model::DetailViewModel::build(&state);
+        assert_eq!(details.entries.len(), 5);
+        assert!(details.entries.iter().all(|entry| entry.value.is_empty()));
     }
 
     #[test]
-    fn centered_rect_is_inside_parent() {
-        let outer = Rect::new(0, 0, 100, 40);
-        let inner = centered_rect(80, 70, outer);
-        assert!(inner.width < outer.width);
-        assert!(inner.height < outer.height);
-        assert!(inner.x > outer.x);
-        assert!(inner.y > outer.y);
+    fn spinner_keeps_frame_order_and_wraps() {
+        assert_eq!(
+            (0..8).map(spinner_symbol).collect::<Vec<_>>(),
+            ["⣷", "⣯", "⣟", "⡿", "⢿", "⣻", "⣽", "⣾"]
+        );
+        assert_eq!(spinner_symbol(8), spinner_symbol(0));
+        assert_eq!(spinner_symbol(usize::MAX), spinner_symbol(usize::MAX % 8));
     }
 
     #[test]

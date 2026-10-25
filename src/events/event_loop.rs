@@ -19,13 +19,12 @@ use crate::scan::control::ScanTriggerSender;
 use crate::scan::scanner::ScanEvent;
 use crate::state::{AppState, ScanState};
 use crate::theme::Theme;
-use crate::ui::{Ui, layout};
+use crate::ui::{SPINNER_SYMBOLS, Ui, layout};
 use anyhow::Result;
 use crossterm::event::{self, Event};
 use ratatui::{Terminal, backend::CrosstermBackend};
 use std::io::Stdout;
 use std::time::{Duration, Instant};
-use throbber_widgets_tui::BRAILLE_EIGHT;
 use tokio::sync::mpsc::UnboundedReceiver;
 
 const TICK_RATE: Duration = Duration::from_millis(250);
@@ -118,7 +117,7 @@ pub fn run_event_loop(
         if last_tick.elapsed() >= TICK_RATE {
             let running = matches!(state.scan.state, ScanState::Running(_));
             if running {
-                state.advance_spinner(BRAILLE_EIGHT.symbols.len());
+                state.advance_spinner(SPINNER_SYMBOLS.len());
             }
             let should_draw = pending_draw || running;
             if should_draw {

@@ -15,7 +15,7 @@
 
 use crate::state::AppState;
 use crate::theme::Theme;
-use crate::ui::helpers::{ColumnWidths, TreeRow, build_row, chosen_size, detail_panel_lines};
+use crate::ui::helpers::{ColumnWidths, TreeRow, build_row, chosen_size, detail_panel_entries};
 use ratatui::layout::Rect;
 use ratatui::widgets::Row;
 
@@ -33,23 +33,9 @@ pub struct DetailViewModel {
 
 impl DetailViewModel {
     pub fn build(state: &AppState) -> Self {
-        let lines = detail_panel_lines(state);
-        let entries = lines
-            .into_iter()
-            .map(|line| {
-                let mut parts = line.splitn(3, '\t');
-                let glyph = parts.next().unwrap_or_default().to_string();
-                let key = parts
-                    .next()
-                    .unwrap_or_default()
-                    .trim_end_matches(':')
-                    .to_string();
-                let value = parts.next().unwrap_or_default().to_string();
-                DetailEntry { glyph, key, value }
-            })
-            .collect();
-
-        Self { entries }
+        Self {
+            entries: detail_panel_entries(state),
+        }
     }
 }
 

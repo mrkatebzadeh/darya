@@ -25,3 +25,6 @@ mod helpers;
 mod render;
 
 pub use render::Ui;
+
+// ponytail: spinner frames need no widget dependency.
+pub(crate) const SPINNER_SYMBOLS: [&str; 8] = ["⣷", "⣯", "⣟", "⡿", "⢿", "⣻", "⣽", "⣾"];

@@ -16,14 +16,12 @@ crossterm = "0.29"
 directories = "6.0"
 globset = "0.4"
 ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
-rayon = "1.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 bincode = { version = "2.0", features = ["serde"] }
 thiserror = "2.0"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
 toml = "1.0"
-throbber-widgets-tui = "0.11"
 walkdir = "2.3"
 flate2 = "1.0"
 
