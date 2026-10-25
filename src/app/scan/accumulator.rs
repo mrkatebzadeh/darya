@@ -30,6 +30,6 @@ impl ScanAccumulator {
     }
 
     pub fn drain(&mut self) -> Vec<ScanNode> {
-        self.nodes.drain(..).collect()
+        std::mem::take(&mut self.nodes)
     }
 }
